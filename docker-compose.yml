@@ -1,14 +1,9 @@
-version: "3.9"
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: wis-backend
     restart: unless-stopped
-    ports:
-      - "4000:4000"
     environment:
       - PORT=4000
       - SMTP_HOST=${SMTP_HOST}
@@ -29,10 +24,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: wis-frontend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=https://wis-agency.com/api
