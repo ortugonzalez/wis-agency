@@ -105,7 +105,7 @@ body {
     print("\nReescribiendo page.tsx...")
     page_tsx = """'use client';
 import { motion } from 'framer-motion';
-import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight } from 'lucide-react';
+import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 const FadeIn = ({ children, delay = 0, className = '' }: { children: React.ReactNode, delay?: number, className?: string }) => (
@@ -165,7 +165,7 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
-            className="font-syne font-extrabold text-5xl md:text-7xl lg:text-8xl tracking-tight text-balance leading-tight"
+            className="font-syne font-extrabold text-4xl md:text-5xl lg:text-6xl tracking-tight text-balance leading-tight"
           >
             Tu negocio en <span className="text-brand-accent">automático.</span>
           </motion.h1>
@@ -264,21 +264,41 @@ export default function Home() {
             <a href="#" className="hidden sm:flex items-center gap-2 text-brand-accent font-mono text-sm hover:underline">Ver todos <ChevronRight size={16} /></a>
           </FadeIn>
           <div className="grid md:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <FadeIn key={i} delay={i * 0.1}>
+            {[
+              { id: 1, title: 'Cómo la IA puede reducir 40hs semanales en atención al cliente.', date: 'MAR 2026', img: 'https://picsum.photos/seed/ai1/600/400' },
+              { id: 2, title: 'Automatización de flujos B2B: 3 casos de éxito reales.', date: 'FEB 2026', img: 'https://picsum.photos/seed/ai2/600/400' },
+              { id: 3, title: 'Por qué tu agencia necesita un Agente de Ventas en 2026.', date: 'ENE 2026', img: 'https://picsum.photos/seed/ai3/600/400' },
+            ].map((article, i) => (
+              <FadeIn key={article.id} delay={i * 0.1}>
                 <div className="group cursor-pointer">
                   <div className="h-48 bg-brand-surface rounded-xl mb-6 overflow-hidden relative">
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+                    <img src={article.img} alt={article.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
                   </div>
                   <div className="font-mono text-xs text-brand-accent mb-3 flex gap-4">
                     <span>CASO DE ESTUDIO</span>
-                    <span className="text-brand-text/40">MAR 2026</span>
+                    <span className="text-brand-text/40">{article.date}</span>
                   </div>
-                  <h3 className="font-bold text-lg mb-2 group-hover:text-brand-accent transition-colors">Cómo reducimos 40hs semanales en atención al cliente.</h3>
+                  <h3 className="font-bold text-lg mb-2 group-hover:text-brand-accent transition-colors">{article.title}</h3>
                 </div>
               </FadeIn>
             ))}
           </div>
+
+          {/* NEWSLETTER */}
+          <FadeIn delay={0.4}>
+            <div className="mt-20 bg-brand-surface p-8 md:p-12 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-8 border border-brand-surface/50 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-accent/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+              <div className="relative z-10">
+                <h3 className="font-syne font-bold text-2xl md:text-3xl mb-2">Newsletter</h3>
+                <p className="text-brand-text/60 max-w-md">Recibí tácticas de automatización e IA directamente en tu bandeja de entrada.</p>
+              </div>
+              <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3 relative z-10">
+                <input type="email" placeholder="tu@email.com" className="bg-background border border-brand-surface/50 rounded-xl px-5 py-3 focus:outline-none focus:border-brand-accent min-w-[250px]" />
+                <button className="bg-brand-accent text-background font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity">Suscribirme</button>
+              </div>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
@@ -313,11 +333,23 @@ export default function Home() {
                 <button type="submit" className="flex-1 bg-brand-accent text-background font-bold py-4 rounded-xl hover:opacity-90 transition-opacity">
                   Enviar Mensaje
                 </button>
-                <button type="button" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
-                  <MessageSquare size={18} /> Escribir WhatsApp
-                </button>
+                <a href="https://wa.me/5492235428861" target="_blank" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                  <MessageSquare size={18} /> WhatsApp
+                </a>
+                <a href="mailto:ortu@wis-agency.com" className="flex-1 bg-brand-surface border border-brand-text/10 text-brand-text font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-opacity">
+                  <Mail size={18} /> Email
+                </a>
               </div>
             </form>
+
+            <div className="mt-12 pt-8 border-t border-brand-surface border-dashed">
+              <h3 className="font-syne font-bold text-xl mb-4">Contactanos directamente:</h3>
+              <div className="flex flex-col gap-3 font-mono text-sm text-brand-text/80">
+                <a href="mailto:ortu@wis-agency.com" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><Mail size={16}/> ortu@wis-agency.com</a>
+                <a href="https://instagram.com/wis.agency" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> @wis.agency</a>
+                <a href="https://wa.me/5492235428861" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><MessageSquare size={16}/> WhatsApp directo</a>
+              </div>
+            </div>
           </FadeIn>
         </div>
       </section>
@@ -329,9 +361,9 @@ export default function Home() {
             W I S
           </div>
           <div className="flex gap-6 font-mono text-xs text-brand-text/40">
-            <a href="#" className="hover:text-brand-text">X / TWITTER</a>
-            <a href="#" className="hover:text-brand-text">LINKEDIN</a>
-            <a href="#" className="hover:text-brand-text">GITHUB</a>
+            <a href="https://instagram.com/wis.agency" target="_blank" className="hover:text-brand-text">INSTAGRAM</a>
+            <a href="https://wa.me/5492235428861" target="_blank" className="hover:text-brand-text">WHATSAPP</a>
+            <a href="mailto:ortu@wis-agency.com" className="hover:text-brand-text">EMAIL</a>
           </div>
           <div className="font-mono text-xs text-brand-text/40">
             wis-agency.com · Work In Silence · 2025
