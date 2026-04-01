@@ -25,6 +25,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    labels:
+      - "easypanel.port=3000"
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=https://wis-agency.com/api
