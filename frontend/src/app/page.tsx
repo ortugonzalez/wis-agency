@@ -133,6 +133,8 @@ export default function Home() {
           </div>
           <div className="hidden md:flex gap-8 text-sm font-medium">
             <a href="#servicios" className="hover:text-brand-accent transition-colors">Servicios</a>
+            <a href="#sobre-wis" className="hover:text-brand-accent transition-colors">Nosotros</a>
+            <a href="#faq" className="hover:text-brand-accent transition-colors">FAQ</a>
             <a href="#blog" className="hover:text-brand-accent transition-colors">Blog</a>
             <a href="#contacto" className="hover:text-brand-accent transition-colors">Contacto</a>
           </div>
@@ -156,6 +158,8 @@ export default function Home() {
             >
               <div className="flex flex-col gap-4 px-6 py-6 text-sm font-medium">
                 <a href="#servicios" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Servicios</a>
+                <a href="#sobre-wis" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Nosotros</a>
+                <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">FAQ</a>
                 <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Blog</a>
                 <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Contacto</a>
               </div>
@@ -171,10 +175,9 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
-            className="text-4xl md:text-5xl lg:text-6xl text-balance leading-[1.05]" style={{ letterSpacing: '-0.03em' }}
+            className="font-syne font-black text-4xl md:text-5xl lg:text-6xl text-brand-text tracking-tight text-balance leading-tight"
           >
-            <span className="font-serif font-black italic">Tu negocio</span>{' '}
-            <span className="font-syne font-black">en <span className="text-brand-accent">automático.</span></span>
+            Tu negocio en automático.
           </motion.h1>
           <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
@@ -236,7 +239,7 @@ export default function Home() {
       </section>
 
       {/* 2.6 SOBRE WIS */}
-      <section className="py-24 px-6">
+      <section id="sobre-wis" className="py-24 px-6">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <FadeIn>
             <div>
@@ -383,7 +386,7 @@ export default function Home() {
       </section>
 
       {/* 6.5 FAQ */}
-      <section className="py-24 px-6">
+      <section id="faq" className="py-24 px-6">
         <div className="max-w-3xl mx-auto">
           <FadeIn>
             <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
