@@ -1,7 +1,15 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail, X } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail, X, Menu, Loader2 } from 'lucide-react';
+import { FormEvent, useState, useEffect } from 'react';
+
+const FAQ_ITEMS = [
+  { q: '¿Cuánto tiempo tarda en implementarse una automatización?', a: 'Depende de la complejidad, pero la mayoría de los proyectos están en producción en 2 a 4 semanas.' },
+  { q: '¿Necesito tener conocimientos técnicos?', a: 'No. Nosotros nos encargamos de todo el desarrollo. Solo necesitás contarnos cómo funciona tu negocio.' },
+  { q: '¿Qué pasa si la automatización no funciona como esperamos?', a: 'Tenemos garantía de 90 días. Si no ves resultados, te devolvemos el dinero.' },
+  { q: '¿Con qué herramientas trabajan?', a: 'n8n, Supabase, Claude AI, WhatsApp Business API, entre otras. Siempre elegimos la herramienta correcta para cada problema.' },
+  { q: '¿Trabajan con empresas de cualquier rubro?', a: 'Sí, aunque tenemos experiencia especial en retail, salud, inmobiliarias y concesionarias.' },
+];
 
 const BLOG_ARTICLES = [
   {
@@ -41,25 +49,51 @@ const FadeIn = ({ children, delay = 0, className = '' }: { children: React.React
 
 export default function Home() {
   const [formData, setFormData] = useState({ name: '', company: '', email: '', message: '' });
-  const [formStatus, setFormStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [formTouched, setFormTouched] = useState<Record<string, boolean>>({});
   const [selectedArticle, setSelectedArticle] = useState<typeof BLOG_ARTICLES[0] | null>(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'success'>('idle');
+  const [emailCopied, setEmailCopied] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [waTooltip, setWaTooltip] = useState(false);
 
-  const handleNewsletter = () => {
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const copyEmail = () => {
+    navigator.clipboard.writeText('ortu@wis-agency.com');
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  };
+
+  const handleNewsletter = async () => {
     if (!newsletterEmail || !newsletterEmail.includes('@')) return;
     try {
-      const existing = JSON.parse(localStorage.getItem('wis_newsletter_emails') || '[]');
-      existing.push({ email: newsletterEmail, date: new Date().toISOString() });
-      localStorage.setItem('wis_newsletter_emails', JSON.stringify(existing));
-    } catch {}
+      await fetch('https://wis-backend.xbgh9n.easypanel.host/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail })
+      });
+    } catch {
+      try {
+        const existing = JSON.parse(localStorage.getItem('wis_newsletter_emails') || '[]');
+        existing.push({ email: newsletterEmail, date: new Date().toISOString() });
+        localStorage.setItem('wis_newsletter_emails', JSON.stringify(existing));
+      } catch {}
+    }
     setNewsletterStatus('success');
     setNewsletterEmail('');
   };
 
   const handleContactSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setFormStatus('idle');
+    setFormStatus('loading');
     try {
       const res = await fetch('https://wis-backend.xbgh9n.easypanel.host/api/contact', {
         method: 'POST',
@@ -69,16 +103,30 @@ export default function Home() {
       if (!res.ok) throw new Error('Response not ok');
       setFormStatus('success');
       setFormData({ name: '', company: '', email: '', message: '' });
+      setFormTouched({});
     } catch (err) {
       console.error(err);
       setFormStatus('error');
     }
   };
 
+  const fieldError = (field: string) => {
+    if (!formTouched[field]) return null;
+    const v = formData[field as keyof typeof formData];
+    if (!v.trim()) return 'Este campo es obligatorio';
+    if (field === 'email' && !v.includes('@')) return 'Ingresá un email válido';
+    return null;
+  };
+
+  const inputClass = (field: string) =>
+    `w-full bg-background border rounded-lg p-4 focus:outline-none transition-colors ${
+      fieldError(field) ? 'border-red-500/60 focus:border-red-500' : 'border-brand-surface/50 focus:border-brand-accent'
+    }`;
+
   return (
     <main className="min-h-screen">
       {/* 1. NAV */}
-      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-md z-50 border-b border-brand-surface/50">
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 shadow-lg shadow-black/20' : 'bg-background/80 backdrop-blur-md border-b border-transparent'}`}>
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2 font-syne font-bold text-xl tracking-tight">
             <span className="text-brand-accent">W</span>I<span className="text-brand-surface">S</span>
@@ -88,36 +136,59 @@ export default function Home() {
             <a href="#blog" className="hover:text-brand-accent transition-colors">Blog</a>
             <a href="#contacto" className="hover:text-brand-accent transition-colors">Contacto</a>
           </div>
-          <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-accent text-background px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2">
-            <MessageSquare size={14} /> Hablemos
-          </a>
+          <div className="flex items-center gap-3">
+            <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-accent text-background px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2">
+              <MessageSquare size={14} /> Hablemos
+            </a>
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden text-brand-text p-2">
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
+        {/* Mobile menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 overflow-hidden"
+            >
+              <div className="flex flex-col gap-4 px-6 py-6 text-sm font-medium">
+                <a href="#servicios" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Servicios</a>
+                <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Blog</a>
+                <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Contacto</a>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* 2. HERO */}
       <section className="pt-48 pb-24 px-6">
         <div className="max-w-4xl mx-auto text-center space-y-8">
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
-            className="font-syne font-black text-4xl md:text-5xl lg:text-6xl text-balance leading-[1.05]" style={{ letterSpacing: '-0.05em' }}
+            className="text-4xl md:text-5xl lg:text-6xl text-balance leading-[1.05]" style={{ letterSpacing: '-0.03em' }}
           >
-            Tu negocio en <span className="text-brand-accent">automático.</span>
+            <span className="font-serif font-black italic">Tu negocio</span>{' '}
+            <span className="font-syne font-black">en <span className="text-brand-accent">automático.</span></span>
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
             className="text-base md:text-lg text-brand-accent/90 max-w-2xl mx-auto text-balance font-medium"
           >
             Ahorramos +20hs semanales a nuestros clientes y los ayudamos a generar más ingresos con automatizaciones de IA.
           </motion.p>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
             className="text-base md:text-lg text-brand-text/60 max-w-2xl mx-auto text-balance"
           >
-            Conectamos IA con tus procesos reales. Sin demos vacías.
+            Conectamos IA con tus procesos reales.
           </motion.p>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
           >
@@ -133,7 +204,7 @@ export default function Home() {
 
       {/* 2.5 GARANTÍA */}
       <section className="py-20 px-6" style={{ backgroundColor: '#0F0F0C' }}>
-        <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <FadeIn>
             <div className="text-center p-8 rounded-2xl">
               <div className="mb-4 flex justify-center">
@@ -149,7 +220,7 @@ export default function Home() {
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
               <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>3x</h3>
-              <p className="text-brand-text/60 font-sans">más leads calificados con agentes de IA</p>
+              <p className="text-brand-text/60 font-sans">Mayor conversión de los leads que ya tenés</p>
             </div>
           </FadeIn>
           <FadeIn delay={0.2}>
@@ -159,6 +230,25 @@ export default function Home() {
               </div>
               <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-accent mb-2" style={{ fontWeight: 800 }}>90 días</h3>
               <p className="text-brand-text/60 font-sans">Si no ves resultados, te devolvemos el dinero</p>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* 2.6 SOBRE WIS */}
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
+          <FadeIn>
+            <div>
+              <h2 className="font-syne font-bold text-4xl md:text-5xl mb-6">Work In Silence<span className="text-brand-accent">.</span></h2>
+              <p className="text-brand-text/70 text-lg leading-relaxed">
+                WIS nació de un proceso personal de aprendizaje silencioso. Mientras el mercado gritaba sobre IA, nosotros construíamos. Somos una agencia de automatización que primero entiende tu negocio, después construye. Sin demos infinitas, sin tecnología por la tecnología.
+              </p>
+            </div>
+          </FadeIn>
+          <FadeIn delay={0.2}>
+            <div className="rounded-2xl overflow-hidden">
+              <img src="https://picsum.photos/600/400?random=10" alt="Sobre WIS" className="w-full h-[300px] md:h-[400px] object-cover rounded-2xl" />
             </div>
           </FadeIn>
         </div>
@@ -292,6 +382,43 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 6.5 FAQ */}
+      <section className="py-24 px-6">
+        <div className="max-w-3xl mx-auto">
+          <FadeIn>
+            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
+          </FadeIn>
+          <div className="space-y-3">
+            {FAQ_ITEMS.map((faq, i) => (
+              <FadeIn key={i} delay={i * 0.05}>
+                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden">
+                  <button
+                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    className="flex items-center justify-between w-full p-6 text-left font-medium hover:text-brand-accent transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronRight size={18} className={`transition-transform duration-300 flex-shrink-0 ml-4 ${openFaq === i ? 'rotate-90' : ''}`} />
+                  </button>
+                  <AnimatePresence>
+                    {openFaq === i && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="px-6 pb-6 text-brand-text/60 leading-relaxed">{faq.a}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* 7. CONTACTO */}
       <section id="contacto" className="py-32 px-6">
         <div className="max-w-3xl mx-auto bg-brand-surface p-8 md:p-12 rounded-3xl border border-brand-surface/50">
@@ -302,33 +429,69 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block font-mono text-xs mb-2 text-brand-text/50">NOMBRE</label>
-                  <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-background border border-brand-surface/50 rounded-lg p-4 focus:outline-none focus:border-brand-accent transition-colors" />
+                  <input
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    onBlur={() => setFormTouched({...formTouched, name: true})}
+                    className={inputClass('name')}
+                  />
+                  {fieldError('name') && <p className="text-red-400 text-xs mt-1">{fieldError('name')}</p>}
                 </div>
                 <div>
                   <label className="block font-mono text-xs mb-2 text-brand-text/50">EMPRESA</label>
-                  <input required value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} className="w-full bg-background border border-brand-surface/50 rounded-lg p-4 focus:outline-none focus:border-brand-accent transition-colors" />
-                </div>
-              </div>
-              <div className="grid md:grid-cols-1 gap-6">
-                <div>
-                  <label className="block font-mono text-xs mb-2 text-brand-text/50">EMAIL</label>
-                  <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-background border border-brand-surface/50 rounded-lg p-4 focus:outline-none focus:border-brand-accent transition-colors" />
+                  <input
+                    required
+                    value={formData.company}
+                    onChange={e => setFormData({...formData, company: e.target.value})}
+                    onBlur={() => setFormTouched({...formTouched, company: true})}
+                    className={inputClass('company')}
+                  />
+                  {fieldError('company') && <p className="text-red-400 text-xs mt-1">{fieldError('company')}</p>}
                 </div>
               </div>
               <div>
+                <label className="block font-mono text-xs mb-2 text-brand-text/50">EMAIL</label>
+                <input
+                  required
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                  onBlur={() => setFormTouched({...formTouched, email: true})}
+                  className={inputClass('email')}
+                />
+                {fieldError('email') && <p className="text-red-400 text-xs mt-1">{fieldError('email')}</p>}
+              </div>
+              <div>
                 <label className="block font-mono text-xs mb-2 text-brand-text/50">¿EN QUÉ PODEMOS AYUDARTE?</label>
-                <textarea required rows={4} value={formData.message} onChange={e => setFormData({...formData, message: e.target.value})} className="w-full bg-background border border-brand-surface/50 rounded-lg p-4 focus:outline-none focus:border-brand-accent transition-colors"></textarea>
+                <textarea
+                  required
+                  rows={4}
+                  value={formData.message}
+                  onChange={e => setFormData({...formData, message: e.target.value})}
+                  onBlur={() => setFormTouched({...formTouched, message: true})}
+                  className={inputClass('message')}
+                ></textarea>
+                {fieldError('message') && <p className="text-red-400 text-xs mt-1">{fieldError('message')}</p>}
               </div>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button type="submit" className="flex-1 bg-brand-accent text-background font-bold py-4 rounded-xl hover:opacity-90 transition-opacity">
-                  Enviar Mensaje
+                <button
+                  type="submit"
+                  disabled={formStatus === 'loading'}
+                  className="flex-1 bg-brand-accent text-background font-bold py-4 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {formStatus === 'loading' ? (
+                    <><Loader2 size={18} className="animate-spin" /> Enviando...</>
+                  ) : (
+                    'Enviar Mensaje'
+                  )}
                 </button>
                 <a href="https://wa.me/5492235428861" target="_blank" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
                   <MessageSquare size={18} /> WhatsApp
                 </a>
-                <a href="mailto:ortu@wis-agency.com" className="flex-1 bg-brand-surface border border-brand-text/10 text-brand-text font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-opacity">
-                  <Mail size={18} /> Email
-                </a>
+                <button type="button" onClick={copyEmail} className="flex-1 bg-brand-surface border border-brand-text/10 text-brand-text font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-opacity relative">
+                  <Mail size={18} /> {emailCopied ? '¡Email copiado!' : 'Copiar Email'}
+                </button>
               </div>
               {formStatus === 'success' && (
                 <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl p-4 text-sm font-medium flex items-center gap-3">
@@ -347,7 +510,10 @@ export default function Home() {
             <div className="mt-12 pt-8 border-t border-brand-surface border-dashed">
               <h3 className="font-syne font-bold text-xl mb-4">Contactanos directamente:</h3>
               <div className="flex flex-col gap-3 font-mono text-sm text-brand-text/80">
-                <a href="mailto:ortu@wis-agency.com" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><Mail size={16}/> ortu@wis-agency.com</a>
+                <button onClick={copyEmail} className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit cursor-pointer relative">
+                  <Mail size={16}/> ortu@wis-agency.com
+                  {emailCopied && <span className="absolute -top-6 left-0 bg-emerald-500 text-white text-xs px-2 py-1 rounded">¡Copiado!</span>}
+                </button>
                 <a href="https://instagram.com/wis.agency" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> @wis.agency</a>
                 <a href="https://wa.me/5492235428861" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><MessageSquare size={16}/> WhatsApp directo</a>
               </div>
@@ -365,13 +531,38 @@ export default function Home() {
           <div className="flex gap-6 font-mono text-xs text-brand-text/40">
             <a href="https://instagram.com/wis.agency" target="_blank" className="hover:text-brand-text">INSTAGRAM</a>
             <a href="https://wa.me/5492235428861" target="_blank" className="hover:text-brand-text">WHATSAPP</a>
-            <a href="mailto:ortu@wis-agency.com" className="hover:text-brand-text">EMAIL</a>
+            <button onClick={copyEmail} className="hover:text-brand-text cursor-pointer">EMAIL</button>
           </div>
           <div className="font-mono text-xs text-brand-text/40">
             wis-agency.com · Work In Silence · 2025
           </div>
         </div>
       </footer>
+
+      {/* FLOATING WHATSAPP */}
+      <a
+        href="https://wa.me/5492235428861"
+        target="_blank"
+        className="fixed bottom-6 right-6 z-50 group"
+        onMouseEnter={() => setWaTooltip(true)}
+        onMouseLeave={() => setWaTooltip(false)}
+      >
+        <div className="w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg shadow-[#25D366]/30 hover:scale-110 transition-transform">
+          <MessageSquare size={24} className="text-white" />
+        </div>
+        <AnimatePresence>
+          {waTooltip && (
+            <motion.span
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              className="absolute right-16 top-1/2 -translate-y-1/2 bg-brand-surface text-brand-text text-xs font-medium px-3 py-2 rounded-lg whitespace-nowrap border border-brand-surface/50"
+            >
+              Chateanos
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </a>
 
       {/* ARTICLE MODAL */}
       <AnimatePresence>
