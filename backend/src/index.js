@@ -2,6 +2,7 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "../../.env"
 const express = require("express");
 const cors = require("cors");
 const contactRouter = require("./routes/contact");
+const newsletterRouter = require("./routes/newsletter");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,6 +20,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 app.use("/api/contact", contactRouter);
+app.use("/api/newsletter", newsletterRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
