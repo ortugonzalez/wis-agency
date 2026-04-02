@@ -1,7 +1,7 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail, X, Menu, Loader2 } from 'lucide-react';
-import { FormEvent, useState, useEffect } from 'react';
+import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail, X, Menu, MessageCircle, Bot, Users, LineChart } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 const FAQ_ITEMS = [
   { q: '¿Cuánto tiempo tarda en implementarse una automatización?', a: 'Depende de la complejidad, pero la mayoría de los proyectos están en producción en 2 a 4 semanas.' },
@@ -48,9 +48,6 @@ const FadeIn = ({ children, delay = 0, className = '' }: { children: React.React
 );
 
 export default function Home() {
-  const [formData, setFormData] = useState({ name: '', company: '', email: '', message: '' });
-  const [formStatus, setFormStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [formTouched, setFormTouched] = useState<Record<string, boolean>>({});
   const [selectedArticle, setSelectedArticle] = useState<typeof BLOG_ARTICLES[0] | null>(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'success'>('idle');
@@ -90,38 +87,6 @@ export default function Home() {
     setNewsletterStatus('success');
     setNewsletterEmail('');
   };
-
-  const handleContactSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setFormStatus('loading');
-    try {
-      const res = await fetch('https://wis-backend.xbgh9n.easypanel.host/api/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (!res.ok) throw new Error('Response not ok');
-      setFormStatus('success');
-      setFormData({ name: '', company: '', email: '', message: '' });
-      setFormTouched({});
-    } catch (err) {
-      console.error(err);
-      setFormStatus('error');
-    }
-  };
-
-  const fieldError = (field: string) => {
-    if (!formTouched[field]) return null;
-    const v = formData[field as keyof typeof formData];
-    if (!v.trim()) return 'Este campo es obligatorio';
-    if (field === 'email' && !v.includes('@')) return 'Ingresá un email válido';
-    return null;
-  };
-
-  const inputClass = (field: string) =>
-    `w-full bg-background border rounded-lg p-4 focus:outline-none transition-colors ${
-      fieldError(field) ? 'border-red-500/60 focus:border-red-500' : 'border-brand-surface/50 focus:border-brand-accent'
-    }`;
 
   return (
     <main className="min-h-screen">
@@ -185,14 +150,8 @@ export default function Home() {
           >
             Ahorramos +20hs semanales a nuestros clientes y los ayudamos a generar más ingresos con automatizaciones de IA.
           </motion.p>
-          <motion.p
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
-            className="text-base md:text-lg text-brand-text/60 max-w-2xl mx-auto text-balance"
-          >
-            Conectamos IA con tus procesos reales.
-          </motion.p>
           <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
           >
             <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-8 py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-transform hover:scale-105">
@@ -222,8 +181,8 @@ export default function Home() {
               <div className="mb-4 flex justify-center">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
-              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>3x</h3>
-              <p className="text-brand-text/60 font-sans">Mayor conversión de los leads que ya tenés</p>
+              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>+30%</h3>
+              <p className="text-brand-text/60 font-sans">conversión de clientes en promedio</p>
             </div>
           </FadeIn>
           <FadeIn delay={0.2}>
@@ -238,7 +197,51 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2.6 SOBRE WIS */}
+      {/* 2.6 ¿CÓMO PODEMOS AYUDARTE? */}
+      <section className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
+        <div className="max-w-7xl mx-auto">
+          <FadeIn className="text-center mb-16">
+            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-4">¿Cómo podemos ayudarte?</h2>
+            <p className="text-brand-text/60 text-lg max-w-2xl mx-auto text-balance">
+              Estas son las tareas que más tiempo y dinero le cuestan a tu empresa — y que podemos resolver desde el día 1.
+            </p>
+          </FadeIn>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+            {[
+              { icon: MessageCircle, title: "Atención por WhatsApp 24/7", impact: "Respondé consultas y agendá turnos automáticamente.", ahorro: "💰 Ahorrás el sueldo de 1 o 2 personas de atención.", emo: "Tu equipo deja de apagar incendios y empieza a vender." },
+              { icon: Bot, title: "Agente de ventas con IA", impact: "Califica, persuade y cierra leads sin intervención humana.", ahorro: "💰 Más cierres, menos tiempo de tu equipo comercial.", emo: "Vendés mientras dormís. Literalmente." },
+              { icon: Link, title: "Integración de sistemas", impact: "Tus herramientas conectadas — sin copiar y pegar datos.", ahorro: "💰 Eliminás horas de trabajo manual por semana.", emo: "La información fluye sola. Vos te enfocás en crecer." },
+              { icon: Users, title: "Gestión automática de leads", impact: "Cada lead clasificado y asignado según tus reglas.", ahorro: "💰 Cero leads perdidos. Cero seguimientos olvidados.", emo: "Nunca más 'se me pasó llamarle' como excusa." },
+              { icon: Mail, title: "Seguimiento automático", impact: "Secuencias que se disparan solas según el comportamiento.", ahorro: "💰 El cliente siente que lo seguís de cerca, sin que vos hagas nada.", emo: "Construís relaciones en piloto automático." },
+              { icon: LineChart, title: "Reportes y métricas", impact: "Los números que importan, sin armar planillas a mano.", ahorro: "💰 Tomás decisiones con datos reales, no con intuición.", emo: "Sabés exactamente qué funciona y qué no, siempre." }
+            ].map((c, i) => (
+              <FadeIn key={i} delay={i * 0.1}>
+                <div className="bg-[#1E1E1A] border border-[#2C2C26] hover:border-[#F0B429] transition-colors duration-300 p-8 rounded-2xl h-full flex flex-col relative pt-12 mt-6">
+                  <div className="absolute -top-6 left-8 w-12 h-12 bg-background border border-[#F0B429] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(240,180,41,0.2)]">
+                    <c.icon size={20} className="text-[#F0B429]" />
+                  </div>
+                  <h3 className="font-syne font-bold text-2xl mb-3 text-brand-text">{c.title}</h3>
+                  <p className="text-brand-text/80 mb-6">{c.impact}</p>
+                  <div className="mt-auto space-y-2">
+                    <p className="text-[#F0B429] font-medium font-sans text-sm">{c.ahorro}</p>
+                    <p className="text-brand-text/40 italic font-mono text-xs">{c.emo}</p>
+                  </div>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+          <FadeIn delay={0.6}>
+            <div className="mt-16 text-center flex flex-col items-center">
+              <p className="text-brand-text/70 mb-4 font-medium">¿Tu proceso no está en la lista? Contanos.</p>
+              <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-surface border border-brand-surface/50 hover:border-brand-accent transition-colors px-8 py-3 rounded-full flex items-center gap-2 group">
+                <MessageSquare size={16} className="text-brand-text group-hover:text-brand-accent transition-colors" /> Hablar por WhatsApp
+              </a>
+            </div>
+          </FadeIn>
+        </div>
+      </section>
+
+      {/* 2.7 SOBRE WIS */}
       <section id="sobre-wis" className="py-24 px-6">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <FadeIn>
@@ -258,7 +261,7 @@ export default function Home() {
       </section>
 
       {/* 3. SERVICIOS */}
-      <section id="servicios" className="py-24 px-6 bg-brand-surface/30">
+      <section id="servicios" className="py-24 px-6 bg-brand-surface/30 border-y border-brand-surface/50">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="mb-16">
             <h2 className="font-syne font-bold text-4xl md:text-5xl">Servicios</h2>
@@ -283,7 +286,7 @@ export default function Home() {
       </section>
 
       {/* 4. PROCESO */}
-      <section className="py-24 px-6 border-y border-brand-surface/50">
+      <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="mb-16">
             <h2 className="font-syne font-bold text-4xl md:text-5xl text-center">Nuestro Proceso</h2>
@@ -309,7 +312,7 @@ export default function Home() {
       </section>
 
       {/* 5. DIFERENCIAL */}
-      <section className="py-24 px-6">
+      <section className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
         <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
           {[
             { title: "Nos metemos en el negocio", text: "No somos solo devs. Analizamos tus cuellos de botella reales." },
@@ -325,7 +328,7 @@ export default function Home() {
       </section>
 
       {/* 6. BLOG PREVIEW */}
-      <section id="blog" className="py-24 px-6 bg-brand-surface/20">
+      <section id="blog" className="py-24 px-6 border-t border-brand-surface/50">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="flex justify-between items-end mb-12">
             <h2 className="font-syne font-bold text-4xl">Últimos Casos</h2>
@@ -386,7 +389,7 @@ export default function Home() {
       </section>
 
       {/* 6.5 FAQ */}
-      <section id="faq" className="py-24 px-6">
+      <section id="faq" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
         <div className="max-w-3xl mx-auto">
           <FadeIn>
             <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
@@ -394,7 +397,7 @@ export default function Home() {
           <div className="space-y-3">
             {FAQ_ITEMS.map((faq, i) => (
               <FadeIn key={i} delay={i * 0.05}>
-                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden">
+                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden bg-background">
                   <button
                     onClick={() => setOpenFaq(openFaq === i ? null : i)}
                     className="flex items-center justify-between w-full p-6 text-left font-medium hover:text-brand-accent transition-colors"
@@ -422,103 +425,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7. CONTACTO */}
+      {/* 7. CONTACTO (NUEVO) */}
       <section id="contacto" className="py-32 px-6">
-        <div className="max-w-3xl mx-auto bg-brand-surface p-8 md:p-12 rounded-3xl border border-brand-surface/50">
+        <div className="max-w-3xl mx-auto bg-brand-surface p-8 md:p-16 rounded-3xl border border-brand-surface/50 text-center">
           <FadeIn>
-            <h2 className="font-syne font-bold text-3xl md:text-4xl mb-2">Iniciemos el sistema.</h2>
-            <p className="text-brand-text/60 mb-10">Dejanos tus datos o escribinos directo por WhatsApp.</p>
-            <form onSubmit={handleContactSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block font-mono text-xs mb-2 text-brand-text/50">NOMBRE</label>
-                  <input
-                    required
-                    value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
-                    onBlur={() => setFormTouched({...formTouched, name: true})}
-                    className={inputClass('name')}
-                  />
-                  {fieldError('name') && <p className="text-red-400 text-xs mt-1">{fieldError('name')}</p>}
-                </div>
-                <div>
-                  <label className="block font-mono text-xs mb-2 text-brand-text/50">EMPRESA</label>
-                  <input
-                    required
-                    value={formData.company}
-                    onChange={e => setFormData({...formData, company: e.target.value})}
-                    onBlur={() => setFormTouched({...formTouched, company: true})}
-                    className={inputClass('company')}
-                  />
-                  {fieldError('company') && <p className="text-red-400 text-xs mt-1">{fieldError('company')}</p>}
-                </div>
-              </div>
-              <div>
-                <label className="block font-mono text-xs mb-2 text-brand-text/50">EMAIL</label>
-                <input
-                  required
-                  type="email"
-                  value={formData.email}
-                  onChange={e => setFormData({...formData, email: e.target.value})}
-                  onBlur={() => setFormTouched({...formTouched, email: true})}
-                  className={inputClass('email')}
-                />
-                {fieldError('email') && <p className="text-red-400 text-xs mt-1">{fieldError('email')}</p>}
-              </div>
-              <div>
-                <label className="block font-mono text-xs mb-2 text-brand-text/50">¿EN QUÉ PODEMOS AYUDARTE?</label>
-                <textarea
-                  required
-                  rows={4}
-                  value={formData.message}
-                  onChange={e => setFormData({...formData, message: e.target.value})}
-                  onBlur={() => setFormTouched({...formTouched, message: true})}
-                  className={inputClass('message')}
-                ></textarea>
-                {fieldError('message') && <p className="text-red-400 text-xs mt-1">{fieldError('message')}</p>}
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button
-                  type="submit"
-                  disabled={formStatus === 'loading'}
-                  className="flex-1 bg-brand-accent text-background font-bold py-4 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
-                >
-                  {formStatus === 'loading' ? (
-                    <><Loader2 size={18} className="animate-spin" /> Enviando...</>
-                  ) : (
-                    'Enviar Mensaje'
-                  )}
-                </button>
-                <a href="https://wa.me/5492235428861" target="_blank" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
-                  <MessageSquare size={18} /> WhatsApp
-                </a>
-                <button type="button" onClick={copyEmail} className="flex-1 bg-brand-surface border border-brand-text/10 text-brand-text font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-opacity relative">
-                  <Mail size={18} /> {emailCopied ? '¡Email copiado!' : 'Copiar Email'}
-                </button>
-              </div>
-              {formStatus === 'success' && (
-                <div className="mt-6 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl p-4 text-sm font-medium flex items-center gap-3">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                  ¡Mensaje enviado con éxito! Nos pondremos en contacto pronto.
-                </div>
-              )}
-              {formStatus === 'error' && (
-                <div className="mt-6 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-4 text-sm font-medium flex items-center gap-3">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                  Hubo un error al enviar el mensaje. Intentá nuevamente o escribinos por WhatsApp.
-                </div>
-              )}
-            </form>
-
-            <div className="mt-12 pt-8 border-t border-brand-surface border-dashed">
-              <h3 className="font-syne font-bold text-xl mb-4">Contactanos directamente:</h3>
-              <div className="flex flex-col gap-3 font-mono text-sm text-brand-text/80">
-                <button onClick={copyEmail} className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit cursor-pointer relative">
+            <h2 className="font-syne font-bold text-3xl md:text-5xl mb-4">¿Listo para automatizar?</h2>
+            <p className="text-brand-text/60 mb-12 text-lg">Sin formularios. Sin esperas. Escribinos directo.</p>
+            
+            <div className="flex flex-col items-center gap-8">
+              <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-10 py-5 rounded-full font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-transform hover:scale-105 text-lg shadow-[0_0_30px_rgba(240,180,41,0.2)]">
+                <MessageSquare size={24} /> Hablar por WhatsApp
+              </a>
+              
+              <div className="flex flex-col items-center gap-2">
+                <button onClick={copyEmail} className="flex items-center gap-3 text-brand-text/60 hover:text-brand-accent transition-colors w-fit cursor-pointer relative font-mono text-sm group">
                   <Mail size={16}/> ortu@wis-agency.com
-                  {emailCopied && <span className="absolute -top-6 left-0 bg-emerald-500 text-white text-xs px-2 py-1 rounded">¡Copiado!</span>}
+                  {emailCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg">¡Copiado!</span>}
                 </button>
-                <a href="https://instagram.com/wis.agency" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> @wis.agency</a>
-                <a href="https://wa.me/5492235428861" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><MessageSquare size={16}/> WhatsApp directo</a>
               </div>
             </div>
           </FadeIn>
