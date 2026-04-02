@@ -1,6 +1,6 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MessageSquare, Code, Cpu, Link, ChevronRight, Mail, X, Menu, MessageCircle, Bot, Users, LineChart } from 'lucide-react';
+import { ArrowRight, MessageSquare, Link, ChevronRight, Mail, X, Menu, MessageCircle, Bot, Users, LineChart } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const FAQ_ITEMS = [
@@ -97,7 +97,7 @@ export default function Home() {
             <span className="text-brand-accent">W</span>I<span className="text-brand-surface">S</span>
           </div>
           <div className="hidden md:flex gap-8 text-sm font-medium">
-            <a href="#servicios" className="hover:text-brand-accent transition-colors">Servicios</a>
+            <a href="#como-ayudarte" className="hover:text-brand-accent transition-colors">Soluciones</a>
             <a href="#sobre-wis" className="hover:text-brand-accent transition-colors">Nosotros</a>
             <a href="#faq" className="hover:text-brand-accent transition-colors">FAQ</a>
             <a href="#blog" className="hover:text-brand-accent transition-colors">Blog</a>
@@ -122,7 +122,7 @@ export default function Home() {
               className="md:hidden bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 overflow-hidden"
             >
               <div className="flex flex-col gap-4 px-6 py-6 text-sm font-medium">
-                <a href="#servicios" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Servicios</a>
+                <a href="#como-ayudarte" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Soluciones</a>
                 <a href="#sobre-wis" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Nosotros</a>
                 <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">FAQ</a>
                 <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Blog</a>
@@ -157,14 +157,14 @@ export default function Home() {
             <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-8 py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-transform hover:scale-105">
               <MessageSquare size={18} /> Quiero automatizar mi negocio
             </a>
-            <a href="#servicios" className="w-full sm:w-auto bg-brand-surface text-brand-text px-8 py-4 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-transform hover:scale-105 border border-brand-surface/50">
-              Ver servicios <ArrowRight size={18} />
+            <a href="#como-ayudarte" className="w-full sm:w-auto bg-brand-surface text-brand-text px-8 py-4 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-transform hover:scale-105 border border-brand-surface/50">
+              Ver soluciones <ArrowRight size={18} />
             </a>
           </motion.div>
         </div>
       </section>
 
-      {/* 2.5 GARANTÍA */}
+      {/* 3. GARANTÍA */}
       <section className="py-20 px-6" style={{ backgroundColor: '#0F0F0C' }}>
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <FadeIn>
@@ -197,13 +197,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2.6 ¿CÓMO PODEMOS AYUDARTE? */}
-      <section className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
+      {/* 4. ¿CÓMO PODEMOS AYUDARTE? */}
+      <section id="como-ayudarte" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="text-center mb-16">
             <h2 className="font-syne font-bold text-4xl md:text-5xl mb-4">¿Cómo podemos ayudarte?</h2>
             <p className="text-brand-text/60 text-lg max-w-2xl mx-auto text-balance">
-              Estas son las tareas que más tiempo y dinero le cuestan a tu empresa — y que podemos resolver desde el día 1.
+              Estas son las tareas más comunes que le ahorrarían tiempo y dinero a tu empresa.
             </p>
           </FadeIn>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
@@ -232,7 +232,7 @@ export default function Home() {
           </div>
           <FadeIn delay={0.6}>
             <div className="mt-16 text-center flex flex-col items-center">
-              <p className="text-brand-text/70 mb-4 font-medium">¿Tu proceso no está en la lista? Contanos.</p>
+              <p className="text-brand-text/70 mb-4 font-medium">¿Querés automatizar algo diferente? Escribinos.</p>
               <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-surface border border-brand-surface/50 hover:border-brand-accent transition-colors px-8 py-3 rounded-full flex items-center gap-2 group">
                 <MessageSquare size={16} className="text-brand-text group-hover:text-brand-accent transition-colors" /> Hablar por WhatsApp
               </a>
@@ -241,14 +241,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2.7 SOBRE WIS */}
+      {/* 5. SOBRE WIS */}
       <section id="sobre-wis" className="py-24 px-6">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <FadeIn>
             <div>
               <h2 className="font-syne font-bold text-4xl md:text-5xl mb-6">Work In Silence<span className="text-brand-accent">.</span></h2>
               <p className="text-brand-text/70 text-lg leading-relaxed">
-                WIS nació de un proceso personal de aprendizaje silencioso. Mientras el mercado gritaba sobre IA, nosotros construíamos. Somos una agencia de automatización que primero entiende tu negocio, después construye. Sin demos infinitas, sin tecnología por la tecnología.
+                WIS nació de un proceso personal de aprendizaje silencioso. Mientras el mercado gritaba sobre IA, nosotros construíamos. Somos una agencia de automatización que primero entiende tu negocio, después construye.
               </p>
             </div>
           </FadeIn>
@@ -260,64 +260,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3. SERVICIOS */}
-      <section id="servicios" className="py-24 px-6 bg-brand-surface/30 border-y border-brand-surface/50">
-        <div className="max-w-7xl mx-auto">
-          <FadeIn className="mb-16">
-            <h2 className="font-syne font-bold text-4xl md:text-5xl">Servicios</h2>
-          </FadeIn>
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              { icon: MessageSquare, title: "Agentes de ventas con IA", desc: "Clasificación inteligente y persuasión 24/7." },
-              { icon: Cpu, title: "Automatización de atención", desc: "Respuestas exactas, no más cuellos de botella." },
-              { icon: Link, title: "Integraciones entre sistemas", desc: "Tus herramientas actuales conversando entre sí." },
-              { icon: Code, title: "Desarrollo con IA", desc: "Soluciones a la medida de tu complejidad." }
-            ].map((s, i) => (
-              <FadeIn key={i} delay={i * 0.1}>
-                <div className="bg-brand-surface p-8 rounded-2xl hover:border-brand-accent border border-transparent transition-all group duration-300">
-                  <s.icon className="text-brand-accent mb-6 w-10 h-10 group-hover:scale-110 transition-transform" />
-                  <h3 className="font-bold text-xl mb-3">{s.title}</h3>
-                  <p className="text-brand-text/60">{s.desc}</p>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. PROCESO */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <FadeIn className="mb-16">
-            <h2 className="font-syne font-bold text-4xl md:text-5xl text-center">Nuestro Proceso</h2>
-          </FadeIn>
-          <div className="flex flex-col md:flex-row justify-between relative">
-            <div className="hidden md:block absolute top-[28px] left-[10%] right-[10%] h-[1px] bg-brand-surface border-dashed"></div>
-            {[
-              "Entendemos tu operación",
-              "Diseñamos el sistema",
-              "Lo construimos y entregamos"
-            ].map((step, i) => (
-              <FadeIn key={i} delay={i * 0.2} className="flex-1 relative mb-12 md:mb-0 px-6">
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-14 h-14 bg-background border-2 border-brand-accent rounded-full flex items-center justify-center font-mono text-brand-accent font-bold text-xl mb-6 relative z-10 shadow-[0_0_15px_rgba(240,180,41,0.2)]">
-                    0{i + 1}
-                  </div>
-                  <h3 className="font-bold text-lg max-w-[200px] text-balance">{step}</h3>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. DIFERENCIAL */}
+      {/* 6. DIFERENCIAL */}
       <section className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
         <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
           {[
-            { title: "Nos metemos en el negocio", text: "No somos solo devs. Analizamos tus cuellos de botella reales." },
+            { title: "Nos metemos en el negocio", text: "Analizamos tus cuellos de botella reales." },
             { title: "Construimos, no prometemos", text: "Prototipos rápidos, valor inmediato. Sin humo." },
-            { title: "Work In Silence", text: "Ejecución perfecta sin ruido. Los resultados hablan solos." }
+            { title: "Work In Silence", text: "Construimos en silencio. Los resultados son lo único que importa." }
           ].map((item, i) => (
             <FadeIn key={i} delay={i * 0.1}>
               <h3 className="font-syne font-bold text-2xl text-brand-accent mb-4">{item.title}</h3>
@@ -327,8 +276,45 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 6. BLOG PREVIEW */}
-      <section id="blog" className="py-24 px-6 border-t border-brand-surface/50">
+      {/* 7. FAQ */}
+      <section id="faq" className="py-24 px-6 border-t border-brand-surface/50">
+        <div className="max-w-3xl mx-auto">
+          <FadeIn>
+            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
+          </FadeIn>
+          <div className="space-y-3">
+            {FAQ_ITEMS.map((faq, i) => (
+              <FadeIn key={i} delay={i * 0.05}>
+                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden bg-background">
+                  <button
+                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                    className="flex items-center justify-between w-full p-6 text-left font-medium hover:text-brand-accent transition-colors"
+                  >
+                    <span>{faq.q}</span>
+                    <ChevronRight size={18} className={`transition-transform duration-300 flex-shrink-0 ml-4 ${openFaq === i ? 'rotate-90' : ''}`} />
+                  </button>
+                  <AnimatePresence>
+                    {openFaq === i && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <p className="px-6 pb-6 text-brand-text/60 leading-relaxed">{faq.a}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 8. BLOG PREVIEW */}
+      <section id="blog" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
         <div className="max-w-7xl mx-auto">
           <FadeIn className="flex justify-between items-end mb-12">
             <h2 className="font-syne font-bold text-4xl">Últimos Casos</h2>
@@ -388,44 +374,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 6.5 FAQ */}
-      <section id="faq" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
-        <div className="max-w-3xl mx-auto">
-          <FadeIn>
-            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
-          </FadeIn>
-          <div className="space-y-3">
-            {FAQ_ITEMS.map((faq, i) => (
-              <FadeIn key={i} delay={i * 0.05}>
-                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden bg-background">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="flex items-center justify-between w-full p-6 text-left font-medium hover:text-brand-accent transition-colors"
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronRight size={18} className={`transition-transform duration-300 flex-shrink-0 ml-4 ${openFaq === i ? 'rotate-90' : ''}`} />
-                  </button>
-                  <AnimatePresence>
-                    {openFaq === i && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <p className="px-6 pb-6 text-brand-text/60 leading-relaxed">{faq.a}</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 7. CONTACTO (NUEVO) */}
+      {/* 9. CONTACTO */}
       <section id="contacto" className="py-32 px-6">
         <div className="max-w-3xl mx-auto bg-brand-surface p-8 md:p-16 rounded-3xl border border-brand-surface/50 text-center">
           <FadeIn>
@@ -448,7 +397,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. FOOTER */}
+      {/* 10. FOOTER */}
       <footer className="border-t border-brand-surface/50 py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="font-syne font-bold text-xl tracking-tight grayscale opacity-50">
