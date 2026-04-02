@@ -43,6 +43,19 @@ export default function Home() {
   const [formData, setFormData] = useState({ name: '', company: '', email: '', message: '' });
   const [formStatus, setFormStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [selectedArticle, setSelectedArticle] = useState<typeof BLOG_ARTICLES[0] | null>(null);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'success'>('idle');
+
+  const handleNewsletter = () => {
+    if (!newsletterEmail || !newsletterEmail.includes('@')) return;
+    try {
+      const existing = JSON.parse(localStorage.getItem('wis_newsletter_emails') || '[]');
+      existing.push({ email: newsletterEmail, date: new Date().toISOString() });
+      localStorage.setItem('wis_newsletter_emails', JSON.stringify(existing));
+    } catch {}
+    setNewsletterStatus('success');
+    setNewsletterEmail('');
+  };
 
   const handleContactSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,19 +95,25 @@ export default function Home() {
       </nav>
 
       {/* 2. HERO */}
-      <section className="pt-48 pb-32 px-6">
+      <section className="pt-48 pb-24 px-6">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <motion.h1 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8 }}
-            className="font-syne font-extrabold text-4xl md:text-5xl lg:text-6xl tracking-tight text-balance leading-tight"
+            className="font-syne font-black text-4xl md:text-5xl lg:text-6xl text-balance leading-[1.05]" style={{ letterSpacing: '-0.05em' }}
           >
             Tu negocio en <span className="text-brand-accent">automático.</span>
           </motion.h1>
           <motion.p 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-            className="text-lg md:text-xl text-brand-text/70 max-w-2xl mx-auto text-balance"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+            className="text-base md:text-lg text-brand-accent/90 max-w-2xl mx-auto text-balance font-medium"
+          >
+            Ahorramos +20hs semanales a nuestros clientes y los ayudamos a generar más ingresos con automatizaciones de IA.
+          </motion.p>
+          <motion.p 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+            className="text-base md:text-lg text-brand-text/60 max-w-2xl mx-auto text-balance"
           >
             Conectamos IA con tus procesos reales. Sin demos vacías.
           </motion.p>
@@ -103,12 +122,45 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
           >
             <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-8 py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-transform hover:scale-105">
-              <MessageSquare size={18} /> WhatsApp
+              <MessageSquare size={18} /> Quiero automatizar mi negocio
             </a>
             <a href="#servicios" className="w-full sm:w-auto bg-brand-surface text-brand-text px-8 py-4 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-transform hover:scale-105 border border-brand-surface/50">
-              Conocé WIS <ArrowRight size={18} />
+              Ver servicios <ArrowRight size={18} />
             </a>
           </motion.div>
+        </div>
+      </section>
+
+      {/* 2.5 GARANTÍA */}
+      <section className="py-20 px-6" style={{ backgroundColor: '#0F0F0C' }}>
+        <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
+          <FadeIn>
+            <div className="text-center p-8 rounded-2xl">
+              <div className="mb-4 flex justify-center">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>+20hs</h3>
+              <p className="text-brand-text/60 font-sans">ahorradas por semana en promedio</p>
+            </div>
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <div className="text-center p-8 rounded-2xl">
+              <div className="mb-4 flex justify-center">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>3x</h3>
+              <p className="text-brand-text/60 font-sans">más leads calificados con agentes de IA</p>
+            </div>
+          </FadeIn>
+          <FadeIn delay={0.2}>
+            <div className="text-center p-8 rounded-2xl border-2 border-brand-accent/60 shadow-[0_0_30px_rgba(240,180,41,0.1)]">
+              <div className="mb-4 flex justify-center">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-accent mb-2" style={{ fontWeight: 800 }}>90 días</h3>
+              <p className="text-brand-text/60 font-sans">Si no ves resultados, te devolvemos el dinero</p>
+            </div>
+          </FadeIn>
         </div>
       </section>
 
@@ -212,9 +264,28 @@ export default function Home() {
                 <h3 className="font-syne font-bold text-2xl md:text-3xl mb-2">Recibí contenido sobre IA y automatización</h3>
                 <p className="text-brand-text/60 max-w-md">Tácticas, casos de uso y novedades directo a tu bandeja de entrada.</p>
               </div>
-              <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3 relative z-10">
-                <input type="email" placeholder="tu@email.com" className="bg-background border border-brand-surface/50 rounded-xl px-5 py-3 focus:outline-none focus:border-brand-accent min-w-[250px]" />
-                <button className="bg-brand-accent text-background font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity">Suscribirme</button>
+              <div className="flex flex-col w-full md:w-auto gap-3 relative z-10">
+                {newsletterStatus === 'success' ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl px-5 py-3 text-sm font-medium">
+                    ¡Gracias! Te avisamos cuando haya novedades.
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={newsletterEmail}
+                      onChange={e => setNewsletterEmail(e.target.value)}
+                      className="bg-background border border-brand-surface/50 rounded-xl px-5 py-3 focus:outline-none focus:border-brand-accent min-w-[250px]"
+                    />
+                    <button
+                      onClick={handleNewsletter}
+                      className="bg-brand-accent text-background font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
+                    >
+                      Suscribirme
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </FadeIn>
