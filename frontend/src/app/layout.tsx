@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const syne = Syne({ subsets: ["latin"], weight: ["700", "800"], variable: "--font-syne" });
@@ -38,6 +39,17 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <head>
+        <Script
+          id="gtm-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-MB8NZMQC');`
+          }}
+        />
         <link rel="icon" href="/favicon.png" sizes="32x32"/>
         <link rel="apple-touch-icon" href="/icon-512.png"/>
         <link rel="manifest" href="/manifest.json"/>
@@ -47,6 +59,13 @@ export default function RootLayout({
         <meta name="twitter:image" content="https://wis-agency.com/og-image.png"/>
       </head>
       <body className={`${syne.variable} ${dmSans.variable} ${jetBrainsMono.variable} bg-background text-brand-text font-sans antialiased selection:bg-brand-accent selection:text-background`}>
+        <noscript>
+          <iframe
+            src="https://www.googletagmanager.com/ns.html?id=GTM-MB8NZMQC"
+            height="0" width="0"
+            style={{display:'none', visibility:'hidden'}}
+          />
+        </noscript>
         {children}
       </body>
     </html>
