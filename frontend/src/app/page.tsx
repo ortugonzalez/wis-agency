@@ -93,8 +93,8 @@ export default function Home() {
       {/* 1. NAV */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 shadow-lg shadow-black/20' : 'bg-background/80 backdrop-blur-md border-b border-transparent'}`}>
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-syne font-bold text-xl tracking-tight">
-            <span className="text-brand-accent">W</span>I<span className="text-brand-surface">S</span>
+          <div className="bg-white rounded-lg px-3 py-1">
+            <img src="/logo.png" alt="WIS Agency" style={{height:'40px', width:'auto'}}/>
           </div>
           <div className="hidden md:flex gap-8 text-sm font-medium">
             <a href="#como-ayudarte" className="hover:text-brand-accent transition-colors">Soluciones</a>

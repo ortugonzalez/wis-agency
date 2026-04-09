@@ -37,6 +37,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
+      <head>
+        <link rel="icon" href="/favicon.png" sizes="32x32"/>
+        <link rel="apple-touch-icon" href="/icon-512.png"/>
+        <link rel="manifest" href="/manifest.json"/>
+        <meta property="og:image" content="https://wis-agency.com/og-image.png"/>
+        <meta property="og:image:width" content="1200"/>
+        <meta property="og:image:height" content="630"/>
+        <meta name="twitter:image" content="https://wis-agency.com/og-image.png"/>
+      </head>
       <body className={`${syne.variable} ${dmSans.variable} ${jetBrainsMono.variable} bg-background text-brand-text font-sans antialiased selection:bg-brand-accent selection:text-background`}>
         {children}
       </body>
