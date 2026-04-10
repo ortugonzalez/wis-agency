@@ -50,6 +50,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-MB8NZMQC');`
           }}
         />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-BRH24BX6BY"
+          strategy="afterInteractive"
+        />
+        <Script id="ga4-script" strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-BRH24BX6BY');
+            `
+          }}
+        />
         <link rel="icon" href="/favicon.png" sizes="32x32"/>
         <link rel="apple-touch-icon" href="/icon-512.png"/>
         <link rel="manifest" href="/manifest.json"/>
