@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowRight, ArrowUpRight, Mail, Menu, MessageCircle, Send, Workflow, X } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const WHATSAPP_URL = 'https://wa.me/5492235428861';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wis-backend.xbgh9n.easypanel.host/api';
@@ -22,6 +22,24 @@ function BrandMark() {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+
+  useEffect(() => {
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
+    if (!('IntersectionObserver' in window)) {
+      nodes.forEach((node) => node.classList.add('is-visible'));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' });
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, []);
 
   async function submitContact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,19 +83,19 @@ export default function Home() {
       <a className="hero-film-scroll" href="#que-hacemos" aria-label="Bajar a qué hacemos"><span>Scroll</span><ArrowDown size={15} /></a>
     </section>
 
-    <section id="que-hacemos" className="section-shell intro-section">
+    <section id="que-hacemos" className="section-shell intro-section reveal">
       <div className="intro-copy"><span className="section-kicker">01 / QUÉ HACEMOS</span><h2>Tu equipo no necesita hacer más.<br /><span>Necesita hacer mejor.</span></h2></div>
       <div className="intro-side"><p>WIS diseña automatizaciones con IA para que las consultas se atiendan, los datos circulen y los procesos sigan avanzando sin depender de una sola persona.</p><a className="text-link" href="#contacto">Hablemos de tu operación <ArrowUpRight size={16} /></a></div>
     </section>
 
-    <section className="section-shell services-section"><div className="services-list">{services.map(([number, title, text]) => <article className="service-row" key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><Workflow size={20} /></article>)}</div><div className="service-foot"><span>SE CONECTA CON LO QUE YA USÁS</span><div><b>WhatsApp</b><b>CRM</b><b>Google Sheets</b><b>n8n</b><b>APIs</b></div></div></section>
+    <section className="section-shell services-section reveal"><div className="services-list">{services.map(([number, title, text], index) => <article className={`service-row reveal reveal-delay-${index + 1}`} key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><Workflow size={20} /></article>)}</div><div className="service-foot"><span>SE CONECTA CON LO QUE YA USÁS</span><div><b>WhatsApp</b><b>CRM</b><b>Google Sheets</b><b>n8n</b><b>APIs</b></div></div></section>
 
-    <section id="casos" className="cases-section"><div className="section-shell cases-intro"><span className="section-kicker">02 / CASOS DE TRABAJO</span><h2>Empresas que eligieron<br /><span>moverse distinto.</span></h2><p>Una línea de marcas con las que trabajamos.</p></div><div className="brand-marquee" aria-label="Casos de trabajo de WIS"><div className="brand-marquee-track">{[0, 1].flatMap((copy) => caseBrands.map((brand) => <span className="brand-marquee-item" key={`${copy}-${brand}`}>{brand}<i>✦</i></span>))}</div></div></section>
+    <section id="casos" className="cases-section reveal"><div className="section-shell cases-intro"><span className="section-kicker">02 / CASOS DE TRABAJO</span><h2>Empresas que eligieron<br /><span>moverse distinto.</span></h2><p>Una línea de marcas con las que trabajamos.</p></div><div className="brand-marquee reveal reveal-delay-1" aria-label="Casos de trabajo de WIS"><div className="brand-marquee-track">{[0, 1].flatMap((copy) => caseBrands.map((brand) => <span className="brand-marquee-item" key={`${copy}-${brand}`}>{brand}<i>✦</i></span>))}</div></div></section>
 
-    <section className="section-shell method-section"><div className="method-head"><span className="section-kicker">03 / EL MÉTODO</span><h2>Primero entendemos.<br /><span>Después automatizamos.</span></h2></div><div className="method-steps">{[['01', 'Miramos', 'Dónde se va el tiempo.'], ['02', 'Diseñamos', 'Qué puede empezar a resolverse solo.'], ['03', 'Activamos', 'Una mejora real, con tu equipo.']].map(([number, title, text]) => <article key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
+    <section className="section-shell method-section reveal"><div className="method-head"><span className="section-kicker">03 / EL MÉTODO</span><h2>Primero entendemos.<br /><span>Después automatizamos.</span></h2></div><div className="method-steps reveal reveal-delay-1">{[['01', 'Miramos', 'Dónde se va el tiempo.'], ['02', 'Diseñamos', 'Qué puede empezar a resolverse solo.'], ['03', 'Activamos', 'Una mejora real, con tu equipo.']].map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
 
-    <section id="contacto" className="contact-section"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / HABLEMOS</span><h2>¿Qué parte de tu negocio te está frenando?</h2><p>Contanos cómo trabajan hoy. Te respondemos con un próximo paso posible.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos consultas porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar mensaje'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
+    <section id="contacto" className="contact-section reveal"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / HABLEMOS</span><h2>¿Qué parte de tu negocio te está frenando?</h2><p>Contanos cómo trabajan hoy. Te respondemos con un próximo paso posible.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos consultas porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar mensaje'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
 
-    <footer className="footer section-shell"><div className="footer-brand"><BrandMark /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Casos</a><a href="#contacto">Contacto</a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Automatización con IA · Argentina + LATAM</div></footer>
+    <footer className="footer section-shell reveal"><div className="footer-brand"><BrandMark /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Casos</a><a href="#contacto">Contacto</a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Automatización con IA · Argentina + LATAM</div></footer>
   </main>;
 }
