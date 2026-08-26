@@ -1,484 +1,89 @@
 'use client';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, MessageSquare, Link, ChevronRight, Mail, X, Menu, MessageCircle, Bot, Users, LineChart } from 'lucide-react';
-import { useState, useEffect } from 'react';
 
-const FAQ_ITEMS = [
-  { q: '¿Cuánto tiempo tarda en implementarse una automatización?', a: 'Depende de la complejidad, pero la mayoría de los proyectos están en producción en 2 a 4 semanas.' },
-  { q: '¿Necesito tener conocimientos técnicos?', a: 'No. Nosotros nos encargamos de todo el desarrollo. Solo necesitás contarnos cómo funciona tu negocio.' },
-  { q: '¿Qué pasa si la automatización no funciona como esperamos?', a: 'Tenemos garantía de 90 días. Si no ves resultados, te devolvemos el dinero.' },
-  { q: '¿Con qué herramientas trabajan?', a: 'n8n, Supabase, Claude AI, WhatsApp Business API, entre otras. Siempre elegimos la herramienta correcta para cada problema.' },
-  { q: '¿Trabajan con empresas de cualquier rubro?', a: 'Sí, aunque tenemos experiencia especial en retail, salud, inmobiliarias y concesionarias.' },
+import {
+  ArrowRight, ArrowUpRight, Check, ChevronDown, CircleDollarSign, Clock3, Code2,
+  Database, Gauge, Layers3, Mail, Menu, MessageCircle, Play, Send,
+  ShieldCheck, Sparkles, Target, Workflow, X,
+} from 'lucide-react';
+import Image from 'next/image';
+import { useState } from 'react';
+
+const WHATSAPP_URL = 'https://wa.me/5492235428861';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wis-backend.xbgh9n.easypanel.host/api';
+
+const solutions = [
+  { number: '01', icon: MessageCircle, title: 'Agentes de atención y ventas', text: 'Responden consultas, califican oportunidades y agendan reuniones por WhatsApp, web o email.', tags: ['WhatsApp', 'CRM', 'Calificación'] },
+  { number: '02', icon: Workflow, title: 'Workflows que ejecutan', text: 'Conectamos las herramientas que ya usás para que los datos fluyan sin copiar, pegar ni perseguir pendientes.', tags: ['n8n', 'APIs', 'Automatización'] },
+  { number: '03', icon: Database, title: 'Operaciones con contexto', text: 'Centralizamos información, documentos y reglas para que tu equipo pueda decidir más rápido y con menos errores.', tags: ['OCR', 'Dashboards', 'Datos'] },
+  { number: '04', icon: Code2, title: 'Sistemas a medida', text: 'Cuando una herramienta genérica no alcanza, construimos la capa digital que tu negocio necesita para crecer.', tags: ['MVP', 'Integraciones', 'Escalabilidad'] },
 ];
 
-const BLOG_ARTICLES = [
-  {
-    id: 1,
-    title: 'Cómo la IA puede reducir 40hs semanales en atención al cliente.',
-    date: 'MAR 2026',
-    img: 'https://picsum.photos/800/400?random=1',
-    content: 'Las empresas que implementan agentes de IA en su atención al cliente reportan una reducción promedio de 40 horas semanales en tareas repetitivas. Esto no significa reemplazar personas, sino liberarlas para que se enfoquen en lo que realmente importa: resolver problemas complejos y construir relaciones con los clientes.\n\nEn WIS, hemos implementado sistemas de clasificación inteligente que priorizan tickets, responden consultas frecuentes y escalan solo lo necesario a un humano. El resultado: tiempos de respuesta 5x más rápidos y equipos más contentos.\n\nLa clave está en entrenar al agente con datos reales de tu negocio, no con respuestas genéricas. Cada empresa tiene su lenguaje, sus productos y sus clientes. Un agente bien entrenado se siente como hablar con alguien que realmente conoce la empresa.'
-  },
-  {
-    id: 2,
-    title: 'Automatización de flujos B2B: 3 casos de éxito reales.',
-    date: 'FEB 2026',
-    img: 'https://picsum.photos/800/400?random=2',
-    content: 'La automatización B2B no es solo conectar APIs. Es entender el flujo completo de información entre empresas y eliminar los puntos de fricción.\n\nCaso 1: Una distribuidora procesaba pedidos por email manualmente. Implementamos un sistema que lee emails, extrae datos del pedido, verifica stock en tiempo real y genera la orden automáticamente. Resultado: de 45 minutos por pedido a 2 minutos.\n\nCaso 2: Una agencia de marketing sincronizaba reportes entre 5 plataformas copiando datos a mano. Creamos un pipeline que consolida métricas de Google Ads, Meta, Analytics y CRM en un dashboard unificado. Resultado: reportes que tomaban 4 horas ahora se generan solos.\n\nCaso 3: Un estudio contable recibía documentación de clientes por 7 canales distintos. Centralizamos todo en un sistema inteligente que clasifica, extrae datos y pre-carga en el sistema contable. Resultado: 60% menos de errores de carga.'
-  },
-  {
-    id: 3,
-    title: 'Por qué tu agencia necesita un Agente de Ventas en 2026.',
-    date: 'ENE 2026',
-    img: 'https://picsum.photos/800/400?random=3',
-    content: 'En 2026, no tener un agente de ventas con IA es como no tener sitio web en 2010. La tecnología ya no es experimental: es infraestructura básica.\n\nUn agente de ventas con IA puede calificar leads las 24 horas, responder consultas técnicas sobre tus servicios, agendar reuniones y nutrir prospectos fríos. Todo esto sin que tu equipo pierda tiempo en leads que no van a cerrar.\n\nLa diferencia entre un chatbot genérico y un agente de ventas real está en la personalización. Nuestros agentes entienden tu propuesta de valor, conocen tus casos de éxito y saben hacer las preguntas correctas para calificar. No son un formulario con esteroides: son un vendedor que nunca duerme.\n\nEl ROI típico que vemos: por cada $1 invertido en un agente de ventas, las empresas recuperan $8 en pipeline generado en los primeros 90 días.'
-  }
+const cases = [
+  { label: 'VENTAS + ATENCIÓN', title: 'Más conversaciones útiles. Menos leads perdidos.', text: 'Diseñamos agentes que responden preguntas frecuentes, detectan intención y derivan al equipo comercial solo cuando hace falta criterio humano.', result: '+30%', resultLabel: 'conversión promedio', details: ['Agente conversacional', 'Seguimiento automático', 'CRM conectado'], tone: 'gold' },
+  { label: 'OPERACIÓN INTERNA', title: 'Tu equipo vuelve a trabajar en lo importante.', text: 'Automatizamos reportes, clasificación de pedidos y tareas repetitivas para liberar horas de operación cada semana.', result: '+20h', resultLabel: 'ahorradas por semana', details: ['Reglas de negocio', 'Alertas inteligentes', 'Métricas en tiempo real'], tone: 'mint' },
+  { label: 'INTEGRACIONES B2B', title: 'De siete herramientas desconectadas a un solo flujo.', text: 'Conectamos formularios, planillas, correo, CRM y sistemas internos para que la información llegue al lugar correcto automáticamente.', result: '4h → 30m', resultLabel: 'gestión diaria', details: ['APIs y webhooks', 'Validación automática', 'Tablero operativo'], tone: 'violet' },
 ];
 
-const FadeIn = ({ children, delay = 0, className = '' }: { children: React.ReactNode, delay?: number, className?: string }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 30 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: "-100px" }}
-    transition={{ duration: 0.6, delay }}
-    className={className}
-  >
-    {children}
-  </motion.div>
-);
+const faqs = [
+  ['¿Qué tipo de empresas trabajan con WIS?', 'Trabajamos con PyMEs y equipos en crecimiento que ya tienen clientes, herramientas y procesos, pero sienten que la operación depende demasiado de tareas manuales. Tenemos experiencia en retail, salud, inmobiliarias, concesionarias y servicios B2B.'],
+  ['¿Tengo que cambiar todas mis herramientas?', 'No. Partimos de lo que ya usás y conectamos las piezas que tienen sentido. La tecnología queda al servicio del proceso, no al revés.'],
+  ['¿Cuánto tarda una implementación?', 'Un primer piloto suele estar listo entre 2 y 4 semanas, según el alcance y la cantidad de integraciones. Priorizamos una mejora concreta antes de construir algo más grande.'],
+  ['¿La IA reemplaza a mi equipo?', 'La usamos para sacar trabajo repetitivo del camino. Las conversaciones sensibles, las decisiones y el criterio siguen en manos de tu equipo.'],
+  ['¿Cómo sé si vale la pena automatizar?', 'En el diagnóstico medimos frecuencia, tiempo, errores y costo de cada tarea. Si no hay un impacto claro, te lo decimos antes de proponer una implementación.'],
+];
+
+function Reveal({ children, className = '' }: { children: React.ReactNode; className?: string }) { return <div className={`reveal ${className}`}>{children}</div>; }
 
 export default function Home() {
-  const [selectedArticle, setSelectedArticle] = useState<typeof BLOG_ARTICLES[0] | null>(null);
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'success'>('idle');
-  const [emailCopied, setEmailCopied] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [waTooltip, setWaTooltip] = useState(false);
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'success'>('idle');
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  async function submitContact(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setFormStatus('sending');
+    const form = new FormData(event.currentTarget); const body = Object.fromEntries(form.entries());
+    try { const response = await fetch(`${API_URL}/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error('contact-failed'); setFormStatus('success'); event.currentTarget.reset(); } catch { setFormStatus('error'); }
+  }
 
-  const copyEmail = () => {
-    navigator.clipboard.writeText('ortu@wis-agency.com');
-    setEmailCopied(true);
-    setTimeout(() => setEmailCopied(false), 2000);
-  };
-
-  const handleNewsletter = async () => {
-    if (!newsletterEmail || !newsletterEmail.includes('@')) return;
-    try {
-      await fetch('https://wis-backend.xbgh9n.easypanel.host/api/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newsletterEmail })
-      });
-    } catch {
-      try {
-        const existing = JSON.parse(localStorage.getItem('wis_newsletter_emails') || '[]');
-        existing.push({ email: newsletterEmail, date: new Date().toISOString() });
-        localStorage.setItem('wis_newsletter_emails', JSON.stringify(existing));
-      } catch {}
-    }
-    setNewsletterStatus('success');
-    setNewsletterEmail('');
-  };
+  async function submitNewsletter(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget); const email = String(form.get('email') || ''); if (!email) return;
+    try { await fetch(`${API_URL}/newsletter`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }); } finally { setNewsletterStatus('success'); event.currentTarget.reset(); }
+  }
 
   return (
-    <main className="min-h-screen">
-      {/* 1. NAV */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 shadow-lg shadow-black/20' : 'bg-background/80 backdrop-blur-md border-b border-transparent'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <img src="/logo.png" alt="WIS Agency" style={{height:'40px', width:'auto'}}/>
-          <div className="hidden md:flex gap-8 text-sm font-medium">
-            <a href="#como-ayudarte" className="hover:text-brand-accent transition-colors">Soluciones</a>
-            <a href="#sobre-wis" className="hover:text-brand-accent transition-colors">Nosotros</a>
-            <a href="#faq" className="hover:text-brand-accent transition-colors">FAQ</a>
-            <a href="#blog" className="hover:text-brand-accent transition-colors">Blog</a>
-            <a href="#contacto" className="hover:text-brand-accent transition-colors">Contacto</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-accent text-background px-6 py-2.5 rounded-full font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-2">
-              <MessageSquare size={14} /> Hablemos
-            </a>
-            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden text-brand-text p-2">
-              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-        {/* Mobile menu */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden bg-background/95 backdrop-blur-lg border-b border-brand-surface/50 overflow-hidden"
-            >
-              <div className="flex flex-col gap-4 px-6 py-6 text-sm font-medium">
-                <a href="#como-ayudarte" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Soluciones</a>
-                <a href="#sobre-wis" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Nosotros</a>
-                <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">FAQ</a>
-                <a href="#blog" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Blog</a>
-                <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="hover:text-brand-accent transition-colors">Contacto</a>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+    <main>
+      <div className="topline"><span className="pulse" /> Sistemas que trabajan mientras vos hacés crecer el negocio <span className="topline-dot">·</span> Argentina + LATAM</div>
+      <nav className="nav-shell">
+        <a href="#inicio" className="brand" aria-label="WIS Agency, inicio"><Image src="/logo.png" alt="WIS Agency" width={56} height={56} priority /></a>
+        <div className={`nav-links ${menuOpen ? 'is-open' : ''}`}><a href="#problema" onClick={() => setMenuOpen(false)}>El problema</a><a href="#soluciones" onClick={() => setMenuOpen(false)}>Soluciones</a><a href="#casos" onClick={() => setMenuOpen(false)}>Casos</a><a href="#metodo" onClick={() => setMenuOpen(false)}>Método</a><a href="#contacto" onClick={() => setMenuOpen(false)}>Contacto</a></div>
+        <a className="nav-cta" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Agendar diagnóstico <ArrowUpRight size={15} /></a>
+        <button className="menu-toggle" aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>
       </nav>
 
-      {/* 2. HERO */}
-      <section className="pt-48 pb-24 px-6">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <motion.h1
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8 }}
-            className="font-syne font-black text-4xl md:text-5xl lg:text-6xl text-brand-text tracking-tight text-balance leading-tight"
-          >
-            Tu negocio en automático.
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-            className="text-base md:text-lg text-brand-accent/90 max-w-2xl mx-auto text-balance font-medium"
-          >
-            Ahorramos +20hs semanales a nuestros clientes y los ayudamos a generar más ingresos con automatizaciones de IA.
-          </motion.p>
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
-          >
-            <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-8 py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-transform hover:scale-105">
-              <MessageSquare size={18} /> Quiero automatizar mi negocio
-            </a>
-            <a href="#como-ayudarte" className="w-full sm:w-auto bg-brand-surface text-brand-text px-8 py-4 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-transform hover:scale-105 border border-brand-surface/50">
-              Ver soluciones <ArrowRight size={18} />
-            </a>
-          </motion.div>
-        </div>
+      <section id="inicio" className="hero section-shell">
+        <div className="hero-copy"><div className="eyebrow"><span>WIS / 2026</span><span className="eyebrow-line" /><span>AUTOMATIZACIÓN CON IA</span></div><h1>Tu operación tiene un <em>límite.</em><br />Tu crecimiento no.</h1><p className="hero-lead">Diseñamos agentes, integraciones y sistemas que eliminan trabajo manual, aceleran tus ventas y hacen que tu negocio funcione mejor incluso cuando vos no estás mirando.</p><div className="hero-actions"><a className="button button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Quiero ordenar mi operación <ArrowRight size={18} /></a><a className="button button-ghost" href="#casos"><Play size={15} /> Ver cómo lo hacemos</a></div><div className="hero-note"><ShieldCheck size={16} /> Diagnóstico claro antes de construir nada</div></div>
+        <div className="hero-visual" aria-label="Resumen de una operación automatizada"><div className="visual-grid" /><div className="visual-window"><div className="window-top"><span className="window-lights"><i /><i /><i /></span><span>WIS / OPERACIÓN VIVA</span><span className="window-status"><b /> ONLINE</span></div><div className="window-body"><div className="window-kicker">IMPACTO ESTA SEMANA</div><div className="window-metric">+20<span>hs</span></div><div className="window-caption">liberadas de tareas repetitivas</div><div className="mini-chart"><span /><span /><span /><span /><span /><span /><span /></div><div className="flow-list"><div><span className="flow-icon flow-gold"><MessageCircle size={14} /></span><span>Nuevo lead detectado</span><b>ahora</b></div><div><span className="flow-icon flow-mint"><Target size={14} /></span><span>Lead calificado por IA</span><b>+12s</b></div><div><span className="flow-icon flow-violet"><Send size={14} /></span><span>Reunión agendada</span><b>+28s</b></div></div></div></div><div className="floating-badge badge-one"><Gauge size={16} /><span><b>+30%</b> conversión</span></div><div className="floating-badge badge-two"><Clock3 size={16} /><span><b>24/7</b> funcionando</span></div></div>
       </section>
 
-      {/* 3. GARANTÍA */}
-      <section className="py-20 px-6" style={{ backgroundColor: '#0F0F0C' }}>
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          <FadeIn>
-            <div className="text-center p-8 rounded-2xl">
-              <div className="mb-4 flex justify-center">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>+20hs</h3>
-              <p className="text-brand-text/60 font-sans">ahorradas por semana en promedio</p>
-            </div>
-          </FadeIn>
-          <FadeIn delay={0.1}>
-            <div className="text-center p-8 rounded-2xl">
-              <div className="mb-4 flex justify-center">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              </div>
-              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-text mb-2" style={{ fontWeight: 800 }}>+30%</h3>
-              <p className="text-brand-text/60 font-sans">conversión de clientes en promedio</p>
-            </div>
-          </FadeIn>
-          <FadeIn delay={0.2}>
-            <div className="text-center p-8 rounded-2xl border-2 border-brand-accent/60 shadow-[0_0_30px_rgba(240,180,41,0.1)]">
-              <div className="mb-4 flex justify-center">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#F0B429" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              </div>
-              <h3 className="font-syne font-extrabold text-4xl md:text-5xl text-brand-accent mb-2" style={{ fontWeight: 800 }}>90 días</h3>
-              <p className="text-brand-text/60 font-sans">Si no ves resultados, te devolvemos el dinero</p>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      <section className="proof-strip section-shell" aria-label="Resultados de WIS"><div><strong>+20hs</strong><span>ahorradas por semana<br />en promedio</span></div><div><strong>+30%</strong><span>conversión de clientes<br />en promedio</span></div><div><strong>90 días</strong><span>garantía para validar<br />resultados</span></div><div className="proof-side"><span className="proof-label">HECHO PARA EQUIPOS QUE</span><span>quieren crecer sin sumar caos</span></div></section>
 
-      {/* 4. ¿CÓMO PODEMOS AYUDARTE? */}
-      <section id="como-ayudarte" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
-        <div className="max-w-7xl mx-auto">
-          <FadeIn className="text-center mb-16">
-            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-4">¿Cómo podemos ayudarte?</h2>
-            <p className="text-brand-text/60 text-lg max-w-2xl mx-auto text-balance">
-              Estas son las tareas más comunes que le ahorrarían tiempo y dinero a tu empresa.
-            </p>
-          </FadeIn>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-            {[
-              { icon: MessageCircle, title: "Atención por WhatsApp 24/7", impact: "Respondé consultas y agendá turnos automáticamente.", ahorro: "💰 Ahorrás el sueldo de 1 o 2 personas de atención.", emo: "Tu equipo deja de apagar incendios y empieza a vender." },
-              { icon: Bot, title: "Agente de ventas con IA", impact: "Califica, persuade y cierra leads sin intervención humana.", ahorro: "💰 Más cierres, menos tiempo de tu equipo comercial.", emo: "Vendés mientras dormís. Literalmente." },
-              { icon: Link, title: "Integración de sistemas", impact: "Tus herramientas conectadas — sin copiar y pegar datos.", ahorro: "💰 Eliminás horas de trabajo manual por semana.", emo: "La información fluye sola. Vos te enfocás en crecer." },
-              { icon: Users, title: "Gestión automática de leads", impact: "Cada lead clasificado y asignado según tus reglas.", ahorro: "💰 Cero leads perdidos. Cero seguimientos olvidados.", emo: "Nunca más 'se me pasó llamarle' como excusa." },
-              { icon: Mail, title: "Seguimiento automático", impact: "Secuencias que se disparan solas según el comportamiento.", ahorro: "💰 El cliente siente que lo seguís de cerca, sin que vos hagas nada.", emo: "Construís relaciones en piloto automático." },
-              { icon: LineChart, title: "Reportes y métricas", impact: "Los números que importan, sin armar planillas a mano.", ahorro: "💰 Tomás decisiones con datos reales, no con intuición.", emo: "Sabés exactamente qué funciona y qué no, siempre." }
-            ].map((c, i) => (
-              <FadeIn key={i} delay={i * 0.1}>
-                <div className="bg-[#1E1E1A] border border-[#2C2C26] hover:border-[#F0B429] transition-colors duration-300 p-8 rounded-2xl h-full flex flex-col relative pt-12 mt-6">
-                  <div className="absolute -top-6 left-8 w-12 h-12 bg-background border border-[#F0B429] rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(240,180,41,0.2)]">
-                    <c.icon size={20} className="text-[#F0B429]" />
-                  </div>
-                  <h3 className="font-syne font-bold text-2xl mb-3 text-brand-text">{c.title}</h3>
-                  <p className="text-brand-text/80 mb-6">{c.impact}</p>
-                  <div className="mt-auto space-y-2">
-                    <p className="text-[#F0B429] font-medium font-sans text-sm">{c.ahorro}</p>
-                    <p className="text-brand-text/40 italic font-mono text-xs">{c.emo}</p>
-                  </div>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-          <FadeIn delay={0.6}>
-            <div className="mt-16 text-center flex flex-col items-center">
-              <p className="text-brand-text/70 mb-4 font-medium">¿Querés automatizar algo diferente? Escribinos.</p>
-              <a href="https://wa.me/5492235428861" target="_blank" className="bg-brand-surface border border-brand-surface/50 hover:border-brand-accent transition-colors px-8 py-3 rounded-full flex items-center gap-2 group">
-                <MessageSquare size={16} className="text-brand-text group-hover:text-brand-accent transition-colors" /> Hablar por WhatsApp
-              </a>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      <section id="problema" className="section-shell section-padded problem-section"><Reveal className="section-heading split-heading"><div><span className="section-kicker">01 / EL PROBLEMA</span><h2>Lo que frena a tu negocio no siempre es vender más.</h2></div><p>Muchas empresas ya tienen clientes, equipo y herramientas. Lo que no tienen es un sistema que conecte todo. Ahí aparecen las horas perdidas, los leads que nadie sigue y las decisiones tomadas a ciegas.</p></Reveal><div className="problem-grid">{[[Clock3, 'Horas que desaparecen', 'Tu equipo copia datos entre WhatsApp, planillas, mails y sistemas que no se hablan.'], [CircleDollarSign, 'Oportunidades que se enfrían', 'Una consulta sin respuesta rápida o un seguimiento olvidado puede costar una venta.'], [Layers3, 'Información que no llega', 'Cada persona tiene una parte del contexto y nadie ve la operación completa.']].map(([Icon, title, text]) => { const CardIcon = Icon as typeof Clock3; return <Reveal key={String(title)}><article className="problem-card"><CardIcon size={22} /><h3>{String(title)}</h3><p>{String(text)}</p><span className="card-arrow">↘</span></article></Reveal>; })}</div></section>
 
-      {/* 5. SOBRE WIS */}
-      <section id="sobre-wis" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-12 items-center">
-          <FadeIn>
-            <div>
-              <h2 className="font-syne font-bold text-4xl md:text-5xl mb-6">Work In Silence<span className="text-brand-accent">.</span></h2>
-              <p className="text-brand-text/70 text-lg leading-relaxed">
-                WIS nació de un proceso personal de aprendizaje silencioso. Mientras el mercado gritaba sobre IA, nosotros construíamos. Somos una agencia de automatización que primero entiende tu negocio, después construye.
-              </p>
-            </div>
-          </FadeIn>
-          <FadeIn delay={0.2}>
-            <div className="rounded-2xl overflow-hidden">
-              <img src="https://picsum.photos/600/400?random=10" alt="Sobre WIS" className="w-full h-[300px] md:h-[400px] object-cover rounded-2xl" />
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      <section id="soluciones" className="section-shell section-padded solutions-section"><Reveal className="section-heading split-heading"><div><span className="section-kicker">02 / LO QUE CONSTRUIMOS</span><h2>Menos tareas sueltas.<br /><span>Más sistema.</span></h2></div><p>No vendemos una herramienta más. Entendemos cómo funciona tu negocio, encontramos el cuello de botella y construimos la automatización que tiene sentido para vos.</p></Reveal><div className="solutions-grid">{solutions.map((solution) => { const Icon = solution.icon; return <Reveal key={solution.number}><article className="solution-card"><div className="solution-card-top"><span className="solution-number">{solution.number}</span><Icon size={22} /></div><h3>{solution.title}</h3><p>{solution.text}</p><div className="tag-row">{solution.tags.map(tag => <span key={tag}>{tag}</span>)}</div><a href="#contacto" aria-label={`Consultar por ${solution.title}`}><ArrowUpRight size={18} /></a></article></Reveal>; })}</div><div className="integration-line"><span>SE INTEGRA CON LO QUE YA USÁS</span><div><b>WhatsApp</b><b>Google Sheets</b><b>CRM</b><b>n8n</b><b>APIs</b><b>+ lo que haga falta</b></div></div></section>
 
-      {/* 6. DIFERENCIAL */}
-      <section className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-3 gap-12">
-          {[
-            { title: "Nos metemos en el negocio", text: "Analizamos tus cuellos de botella reales." },
-            { title: "Construimos, no prometemos", text: "Prototipos rápidos, valor inmediato. Sin humo." },
-            { title: "Work In Silence", text: "Construimos en silencio. Los resultados son lo único que importa." }
-          ].map((item, i) => (
-            <FadeIn key={i} delay={i * 0.1}>
-              <h3 className="font-syne font-bold text-2xl text-brand-accent mb-4">{item.title}</h3>
-              <p className="text-brand-text/70">{item.text}</p>
-            </FadeIn>
-          ))}
-        </div>
-      </section>
+      <section id="casos" className="section-shell section-padded cases-section"><Reveal className="section-heading split-heading"><div><span className="section-kicker">03 / CASOS Y RESULTADOS</span><h2>No prometemos magia.<br /><span>Mostramos impacto.</span></h2></div><p>Un caso de éxito no es una captura linda. Es un antes, un después y una métrica que importa para el negocio. Estos son los problemas que resolvemos con más frecuencia.</p></Reveal><div className="cases-list">{cases.map((item, index) => <Reveal key={item.title}><article className={`case-card case-${item.tone}`}><div className="case-index">0{index + 1}</div><div className="case-main"><span className="case-label">{item.label}</span><h3>{item.title}</h3><p>{item.text}</p><div className="case-details">{item.details.map(detail => <span key={detail}><Check size={14} />{detail}</span>)}</div></div><div className="case-result"><strong>{item.result}</strong><span>{item.resultLabel}</span><ArrowUpRight size={19} /></div></article></Reveal>)}</div><div className="case-disclaimer"><Sparkles size={15} /> Cada proyecto se mide con indicadores acordados en el diagnóstico. Las métricas se validan antes y después de implementar.</div></section>
 
-      {/* 7. FAQ */}
-      <section id="faq" className="py-24 px-6 border-t border-brand-surface/50">
-        <div className="max-w-3xl mx-auto">
-          <FadeIn>
-            <h2 className="font-syne font-bold text-4xl md:text-5xl mb-12 text-center">Preguntas frecuentes</h2>
-          </FadeIn>
-          <div className="space-y-3">
-            {FAQ_ITEMS.map((faq, i) => (
-              <FadeIn key={i} delay={i * 0.05}>
-                <div className="border border-brand-surface/50 rounded-2xl overflow-hidden bg-background">
-                  <button
-                    onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="flex items-center justify-between w-full p-6 text-left font-medium hover:text-brand-accent transition-colors"
-                  >
-                    <span>{faq.q}</span>
-                    <ChevronRight size={18} className={`transition-transform duration-300 flex-shrink-0 ml-4 ${openFaq === i ? 'rotate-90' : ''}`} />
-                  </button>
-                  <AnimatePresence>
-                    {openFaq === i && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <p className="px-6 pb-6 text-brand-text/60 leading-relaxed">{faq.a}</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
+      <section id="metodo" className="section-padded method-section"><div className="section-shell"><Reveal className="section-heading split-heading"><div><span className="section-kicker">04 / EL MÉTODO WIS</span><h2>Primero entendemos.<br /><span>Después automatizamos.</span></h2></div><p>La tecnología cambia rápido. El problema de tu negocio merece una solución pensada, medible y mantenible.</p></Reveal><div className="method-grid">{[['01', 'Entendemos', 'Mapeamos tu operación, detectamos fricciones y elegimos el proceso con mayor impacto.'], ['02', 'Diseñamos', 'Definimos reglas, integraciones y una primera versión que tu equipo pueda probar rápido.'], ['03', 'Construimos', 'Implementamos, medimos y mejoramos. Sin entregarte un proyecto para que después lo mantengas solo.']].map(([number, title, text], index) => <Reveal key={number}><div className="method-step"><span>{number}</span><div className="method-line"><i /></div><h3>{title}</h3><p>{text}</p>{index === 2 && <a href="#contacto">Empezar diagnóstico <ArrowRight size={15} /></a>}</div></Reveal>)}</div><div className="quote-card"><div className="quote-mark">“</div><blockquote>No vendemos IA. Devolvemos tiempo, contexto y capacidad de decisión.</blockquote><span>— WIS / Work In Silence</span></div></div></section>
 
-      {/* 8. BLOG PREVIEW */}
-      <section id="blog" className="py-24 px-6 bg-brand-surface/20 border-t border-brand-surface/50">
-        <div className="max-w-7xl mx-auto">
-          <FadeIn className="flex justify-between items-end mb-12">
-            <h2 className="font-syne font-bold text-4xl">Últimos Casos</h2>
-            <a href="#" className="hidden sm:flex items-center gap-2 text-brand-accent font-mono text-sm hover:underline">Ver todos <ChevronRight size={16} /></a>
-          </FadeIn>
-          <div className="grid md:grid-cols-3 gap-6">
-            {BLOG_ARTICLES.map((article, i) => (
-              <FadeIn key={article.id} delay={i * 0.1}>
-                <div className="group cursor-pointer" onClick={() => setSelectedArticle(article)}>
-                  <div className="h-48 bg-brand-surface rounded-xl mb-6 overflow-hidden relative">
-                    <img src={article.img} alt={article.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
-                  </div>
-                  <div className="font-mono text-xs text-brand-accent mb-3 flex gap-4">
-                    <span>CASO DE ESTUDIO</span>
-                    <span className="text-brand-text/40">{article.date}</span>
-                  </div>
-                  <h3 className="font-bold text-lg mb-2 group-hover:text-brand-accent transition-colors">{article.title}</h3>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
+      <section className="section-shell section-padded fit-section"><Reveal className="section-heading"><span className="section-kicker">05 / PARA QUIÉN</span><h2>Si tu negocio crece,<br /><span>tu operación también tiene que hacerlo.</span></h2></Reveal><div className="fit-layout"><div className="fit-copy"><p>WIS es para equipos que quieren dejar de depender de héroes operativos, chats eternos y planillas que solo entiende una persona.</p><a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="text-link">Contanos qué te está trabando <ArrowUpRight size={17} /></a></div><div className="fit-chips"><span>Retail</span><span>Salud</span><span>Inmobiliarias</span><span>Concesionarias</span><span>Servicios B2B</span><span>Educación</span><span>Estudios profesionales</span><span>Equipos comerciales</span></div></div></section>
 
-          {/* NEWSLETTER */}
-          <FadeIn delay={0.4}>
-            <div className="mt-20 bg-brand-surface p-8 md:p-12 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-8 border border-brand-surface/50 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-accent/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-              <div className="relative z-10">
-                <h3 className="font-syne font-bold text-2xl md:text-3xl mb-2">Recibí contenido sobre IA y automatización</h3>
-                <p className="text-brand-text/60 max-w-md">Tácticas, casos de uso y novedades directo a tu bandeja de entrada.</p>
-              </div>
-              <div className="flex flex-col w-full md:w-auto gap-3 relative z-10">
-                {newsletterStatus === 'success' ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl px-5 py-3 text-sm font-medium">
-                    ¡Gracias! Te avisamos cuando haya novedades.
-                  </div>
-                ) : (
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={newsletterEmail}
-                      onChange={e => setNewsletterEmail(e.target.value)}
-                      className="bg-background border border-brand-surface/50 rounded-xl px-5 py-3 focus:outline-none focus:border-brand-accent min-w-[250px]"
-                    />
-                    <button
-                      onClick={handleNewsletter}
-                      className="bg-brand-accent text-background font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
-                    >
-                      Suscribirme
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      <section className="section-shell section-padded faq-section" id="faq"><Reveal className="section-heading split-heading"><div><span className="section-kicker">06 / PREGUNTAS FRECUENTES</span><h2>Antes de empezar,<br /><span>hablemos claro.</span></h2></div><p>Si la automatización no resuelve un problema real, es solo otra cosa que mantener. Por eso hacemos estas preguntas antes de construir.</p></Reveal><div className="faq-list">{faqs.map(([question, answer], index) => <Reveal key={question}><div className={`faq-item ${openFaq === index ? 'is-open' : ''}`}><button onClick={() => setOpenFaq(openFaq === index ? null : index)} aria-expanded={openFaq === index}><span>{question}</span><ChevronDown size={18} /></button>{openFaq === index && <p>{answer}</p>}</div></Reveal>)}</div></section>
 
-      {/* 9. CONTACTO */}
-      <section id="contacto" className="py-32 px-6">
-        <div className="max-w-3xl mx-auto bg-brand-surface p-8 md:p-16 rounded-3xl border border-brand-surface/50 text-center">
-          <FadeIn>
-            <h2 className="font-syne font-bold text-3xl md:text-5xl mb-4">¿Listo para automatizar?</h2>
-            <p className="text-brand-text/60 mb-12 text-lg">Sin formularios. Sin esperas. Escribinos directo.</p>
-            
-            <div className="flex flex-col items-center gap-8">
-              <a href="https://wa.me/5492235428861" target="_blank" className="w-full sm:w-auto bg-brand-accent text-background px-10 py-5 rounded-full font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-transform hover:scale-105 text-lg shadow-[0_0_30px_rgba(240,180,41,0.2)]">
-                <MessageSquare size={24} /> Hablar por WhatsApp
-              </a>
-              
-              <div className="flex flex-col items-center gap-2">
-                <button onClick={copyEmail} className="flex items-center gap-3 text-brand-text/60 hover:text-brand-accent transition-colors w-fit cursor-pointer relative font-mono text-sm group">
-                  <Mail size={16}/> ortu@wis-agency.com
-                  {emailCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg">¡Copiado!</span>}
-                </button>
-              </div>
-            </div>
-          </FadeIn>
-        </div>
-      </section>
+      <section id="contacto" className="contact-section"><div className="section-shell contact-grid"><Reveal><span className="section-kicker">07 / HABLEMOS</span><h2>El próximo cuello de botella puede ser la próxima mejora.</h2><p>Contanos qué parte de tu operación te está sacando tiempo. Te respondemos con una mirada concreta, aunque todavía no estés listo para implementar.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></Reveal><Reveal><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos leads porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar diagnóstico'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviar el mensaje. Escribinos directo por WhatsApp.</p>}</form></Reveal></div></section>
 
-      {/* 10. FOOTER */}
-      <footer className="border-t border-brand-surface/50 py-12 px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="font-syne font-bold text-xl tracking-tight grayscale opacity-50">
-            W I S
-          </div>
-          <div className="flex gap-6 font-mono text-xs text-brand-text/40">
-            <a href="https://instagram.com/wis.agency" target="_blank" className="hover:text-brand-text">INSTAGRAM</a>
-            <a href="https://wa.me/5492235428861" target="_blank" className="hover:text-brand-text">WHATSAPP</a>
-            <button onClick={copyEmail} className="hover:text-brand-text cursor-pointer">EMAIL</button>
-          </div>
-          <div className="font-mono text-xs text-brand-text/40">
-            wis-agency.com · Work In Silence · 2025
-          </div>
-        </div>
-      </footer>
-
-      {/* FLOATING WHATSAPP */}
-      <a
-        href="https://wa.me/5492235428861"
-        target="_blank"
-        className="fixed bottom-6 right-6 z-50 group"
-        onMouseEnter={() => setWaTooltip(true)}
-        onMouseLeave={() => setWaTooltip(false)}
-      >
-        <div className="w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg shadow-[#25D366]/30 hover:scale-110 transition-transform">
-          <MessageSquare size={24} className="text-white" />
-        </div>
-        <AnimatePresence>
-          {waTooltip && (
-            <motion.span
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              className="absolute right-16 top-1/2 -translate-y-1/2 bg-brand-surface text-brand-text text-xs font-medium px-3 py-2 rounded-lg whitespace-nowrap border border-brand-surface/50"
-            >
-              Chateanos
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </a>
-
-      {/* ARTICLE MODAL */}
-      <AnimatePresence>
-        {selectedArticle && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/90 backdrop-blur-md z-[60] flex items-center justify-center p-4 md:p-8"
-            onClick={() => setSelectedArticle(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 40, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-              className="bg-brand-surface rounded-3xl border border-brand-surface/50 max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="relative">
-                <img src={selectedArticle.img} alt={selectedArticle.title} className="w-full h-56 md:h-72 object-cover rounded-t-3xl" />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent rounded-t-3xl" />
-                <button
-                  onClick={() => setSelectedArticle(null)}
-                  className="absolute top-4 right-4 bg-background/60 backdrop-blur-sm rounded-full p-2 hover:bg-background/80 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 md:p-12">
-                <div className="font-mono text-xs text-brand-accent mb-4 flex gap-4">
-                  <span>CASO DE ESTUDIO</span>
-                  <span className="text-brand-text/40">{selectedArticle.date}</span>
-                </div>
-                <h2 className="font-syne font-bold text-2xl md:text-3xl mb-6">{selectedArticle.title}</h2>
-                {selectedArticle.content.split('\n\n').map((p, i) => (
-                  <p key={i} className="text-brand-text/70 mb-4 leading-relaxed">{p}</p>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <section className="section-shell newsletter-section"><div><span className="section-kicker">WIS / SIGNAL</span><h3>Ideas prácticas para automatizar mejor.</h3><p>Una vez por mes: casos, aprendizajes y herramientas para hacer crecer tu operación.</p></div>{newsletterStatus === 'success' ? <div className="newsletter-success"><Check size={17} /> Listo. Te avisamos cuando salga el próximo.</div> : <form onSubmit={submitNewsletter}><input name="email" type="email" required placeholder="tu@email.com" aria-label="Tu email" /><button aria-label="Suscribirme"><ArrowRight size={18} /></button></form>}</section>
+      <footer className="footer section-shell"><div className="footer-brand"><Image src="/logo.png" alt="WIS" width={38} height={38} /><span>Work In Silence.</span></div><div className="footer-links"><a href="#soluciones">Soluciones</a><a href="#casos">Casos</a><a href="#faq">FAQ</a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Automatización con IA · Argentina + LATAM</div></footer>
     </main>
   );
 }
