@@ -132,6 +132,29 @@ button { cursor: pointer; }
 .footer-links a { display: inline-flex; align-items: center; gap: 5px; }
 .footer-copy { color: var(--quiet); font-size: 10px; line-height: 1.5; text-align: right; }
 
+@media (min-width: 901px) {
+  .hero-film-content { padding-top: 165px; padding-bottom: 96px; }
+  .hero-film h1 { max-width: 790px; font-size: clamp(64px, 7.6vw, 112px); font-weight: 500; line-height: .91; letter-spacing: -.07em; }
+  .hero-film-content > p { max-width: 390px; font-size: 15px; }
+  .intro-section { grid-template-columns: 1.05fr .72fr; gap: 120px; padding-top: 130px; padding-bottom: 110px; }
+  .intro-copy h2, .cases-intro h2, .method-head h2, .contact-copy h2 { font-weight: 500; font-size: clamp(44px, 4.85vw, 68px); letter-spacing: -.065em; }
+  .services-section { padding-bottom: 120px; }
+  .service-row { min-height: 120px; }
+  .service-row h3 { font-size: 24px; font-weight: 500; }
+  .cases-section { padding-top: 125px; padding-bottom: 120px; }
+  .cases-intro { margin-bottom: 52px; }
+  .brand-marquee { padding-top: 35px; padding-bottom: 31px; }
+  .brand-marquee-item { min-width: 285px; gap: 45px; font-size: clamp(23px, 2vw, 29px); font-weight: 500; }
+  .method-section { gap: 80px; padding-top: 125px; padding-bottom: 135px; }
+  .method-head h2 { font-size: clamp(42px, 4.55vw, 64px); }
+  .method-steps article { min-height: 112px; }
+  .method-steps h3 { font-size: 23px; font-weight: 500; }
+  .contact-section { padding-top: 125px; padding-bottom: 125px; }
+  .contact-grid { gap: 80px; }
+  .contact-copy h2 { font-size: clamp(44px, 4.8vw, 68px); }
+  .contact-form { padding: 32px; }
+}
+
 @media (max-width: 900px) {
   .section-shell, .nav-shell { width: min(100% - 42px, 720px); }
   .nav-links { position: absolute; top: 76px; left: 0; right: 0; display: none; flex-direction: column; align-items: stretch; gap: 0; padding: 10px 20px 18px; background: rgba(8,9,8,.98); border-bottom: 1px solid var(--line); }
