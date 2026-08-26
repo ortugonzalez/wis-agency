@@ -26,7 +26,7 @@ const cases = [
 ];
 
 function BrandMark({ compact = false }: { compact?: boolean }) {
-  return <span className={`brand-mark ${compact ? 'brand-mark-compact' : ''}`} aria-hidden="true"><Image src="/og-image.png" alt="" width={1200} height={630} priority={!compact} /></span>;
+  return <span className={`brand-mark ${compact ? 'brand-mark-compact' : ''}`} aria-hidden="true"><Image src="/logo-transparent.png" alt="" fill sizes={compact ? '54px' : '78px'} priority={!compact} /></span>;
 }
 
 function CaseLogo({ item, large = false }: { item: typeof cases[number]; large?: boolean }) {
@@ -71,9 +71,9 @@ export default function Home() {
     <section id="inicio" className="hero section-shell">
       <div className="hero-copy">
         <div className="eyebrow"><span>WIS / 2026</span><span className="eyebrow-line" /><span>AUTOMATIZACIÓN + IA</span></div>
-        <h1>Hacemos que tu negocio <em>avance solo.</em></h1>
-        <p className="hero-lead">Diseñamos automatizaciones que conectan tus consultas, ventas y operación. Menos tareas manuales. Más tiempo para hacer crecer el negocio.</p>
-        <div className="hero-actions"><a className="button button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contanos qué querés mejorar <ArrowRight size={18} /></a><a className="button button-ghost" href="#casos">Ver casos reales <ArrowDownRight size={16} /></a></div>
+        <h1>Tu negocio, <em>en automático.</em></h1>
+        <p className="hero-lead">Automatizamos la atención, el seguimiento y los procesos que hoy le sacan tiempo a tu equipo.</p>
+        <div className="hero-actions"><a className="button button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Quiero automatizar mi negocio <ArrowRight size={18} /></a><a className="button button-ghost" href="#casos">Ver casos reales <ArrowDownRight size={16} /></a></div>
         <div className="hero-note"><span className="hero-note-dot" /> Agentes · integraciones · flujos de trabajo</div>
       </div>
 
@@ -87,7 +87,7 @@ export default function Home() {
         <div className="visual-ribbon visual-ribbon-one" />
         <div className="visual-ribbon visual-ribbon-two" />
         <div className="visual-ribbon visual-ribbon-three" />
-        <div className="visual-core"><span>WIS</span><small>WORK IN SILENCE</small></div>
+        <div className="visual-core"><Image src="/logo-transparent.png" alt="WIS" width={120} height={94} /><small>WORK IN SILENCE</small></div>
         <div className="visual-node visual-node-one"><Gauge size={15} /><span>Detectar</span></div>
         <div className="visual-node visual-node-two"><MessageCircle size={15} /><span>Responder</span></div>
         <div className="visual-node visual-node-three"><Check size={15} /><span>Avanzar</span></div>
@@ -98,22 +98,22 @@ export default function Home() {
     <div className="hero-bottom section-shell"><span>01</span><p>Una capa de automatización sobre la forma en que ya trabajás.</p><span className="hero-scroll">Scroll <ArrowDownRight size={14} /></span></div>
 
     <section id="que-hacemos" className="section-shell section-padded work-section">
-      <div className="section-heading"><div><span className="section-kicker">01 / QUÉ HACEMOS</span><h2>La tecnología tiene que <em>hacerte la vida más fácil.</em></h2></div><p>WIS ordena tareas repetitivas y conecta las partes de tu negocio que hoy trabajan separadas.</p></div>
+      <div className="section-heading"><div><span className="section-kicker">01 / QUÉ HACEMOS</span><h2>Automatizamos el trabajo que no debería ocupar a tu equipo.</h2></div><p>WIS conecta tus consultas, ventas y operación para que el día a día fluya con menos tareas manuales.</p></div>
       <div className="solutions-list">{solutions.map((solution) => { const Icon = solution.icon; return <article className="solution-row" key={solution.number}><span className="solution-number">{solution.number}</span><Icon size={22} /><div><h3>{solution.title}</h3><p>{solution.text}</p></div><ArrowUpRight className="solution-arrow" size={20} /></article>; })}</div>
       <div className="integration-line"><span>SE INTEGRA CON LO QUE YA USÁS</span><div><b>WhatsApp</b><b>Google Sheets</b><b>CRM</b><b>n8n</b><b>APIs</b></div></div>
     </section>
 
     <section id="casos" className="cases-section section-padded">
-      <div className="section-shell"><div className="section-heading cases-heading"><div><span className="section-kicker">02 / CASOS REALES</span><h2>Lo que hacemos, <em>se nota.</em></h2></div><p>Una selección de empresas con las que trabajamos para mejorar atención, seguimiento y operación.</p></div></div>
+      <div className="section-shell"><div className="section-heading cases-heading"><div><span className="section-kicker">02 / CASOS REALES</span><h2>Problemas reales.<br /><em>Mejoras concretas.</em></h2></div><p>Empresas con las que trabajamos para mejorar atención, seguimiento y operación.</p></div></div>
       <div className="case-marquee" aria-label="Casos de éxito de WIS">
         <div className="case-marquee-track">{[0, 1].flatMap((copy) => cases.map((item, index) => <button className={`case-marquee-item ${activeCase === index ? 'is-active' : ''}`} key={`${copy}-${item.name}`} onClick={() => setActiveCase(index)} aria-label={`Ver caso ${item.name}`}><CaseLogo item={item} /><span className="case-mark">✦</span></button>))}</div>
       </div>
       <div className="section-shell"><div className="case-story" key={selectedCase.name}><div className="case-story-index">0{activeCase + 1}<span> / 0{cases.length}</span></div><div className="case-story-main"><div className="case-story-top"><CaseLogo item={selectedCase} large /><span>{selectedCase.sector}</span></div><h3>{selectedCase.title}</h3><p>{selectedCase.text}</p><div className="case-details">{selectedCase.bullets.map((detail) => <span key={detail}><Check size={14} />{detail}</span>)}</div></div><a className="case-story-link" href={selectedCase.url} target="_blank" rel="noreferrer">Ver sitio <ArrowUpRight size={16} /></a></div></div>
     </section>
 
-    <section id="metodo" className="section-shell section-padded method-section"><div className="section-heading"><div><span className="section-kicker">03 / CÓMO TRABAJAMOS</span><h2>Primero entendemos.<br /><em>Después construimos.</em></h2></div><p>La herramienta es lo último. Primero encontramos qué está frenando a tu equipo y dónde una mejora puede mover la aguja.</p></div><div className="method-line">{[['01', 'Miramos', 'Entendemos tu operación y detectamos la fricción real.'], ['02', 'Diseñamos', 'Armamos una solución simple, medible y posible de mantener.'], ['03', 'Activamos', 'Implementamos con tu equipo y mejoramos sobre la marcha.']].map(([number, title, text]) => <article className="method-step" key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div><p className="method-signature">WIS / Work In Silence</p></section>
+    <section id="metodo" className="section-shell section-padded method-section"><div className="section-heading"><div><span className="section-kicker">03 / CÓMO TRABAJAMOS</span><h2>Entendemos tu negocio.<br /><em>Automatizamos lo que lo frena.</em></h2></div><p>No arrancamos por la herramienta. Primero encontramos qué está trabando a tu equipo y qué conviene mejorar.</p></div><div className="method-line">{[['01', 'Miramos', 'Entendemos tu operación y detectamos la fricción real.'], ['02', 'Diseñamos', 'Armamos una solución simple, medible y posible de mantener.'], ['03', 'Activamos', 'Implementamos con tu equipo y mejoramos sobre la marcha.']].map(([number, title, text]) => <article className="method-step" key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div><p className="method-signature">WIS / Work In Silence</p></section>
 
-    <section id="contacto" className="contact-section"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / HABLEMOS</span><h2>¿Qué parte de tu negocio te está haciendo perder tiempo?</h2><p>Contanos cómo trabajan hoy. Te respondemos con una mirada concreta y un próximo paso posible.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos consultas porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar mensaje'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
+    <section id="contacto" className="contact-section"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / HABLEMOS</span><h2>Hablemos de lo que hoy te está frenando.</h2><p>Contanos cómo trabajan hoy. Te respondemos con una mirada concreta y un próximo paso posible.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos consultas porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar mensaje'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
 
     <footer className="footer section-shell"><div className="footer-brand"><BrandMark compact /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Casos</a><a href="#contacto">Contacto</a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Automatización con IA · Argentina + LATAM</div></footer>
   </main>;
