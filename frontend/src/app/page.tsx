@@ -2,15 +2,15 @@
 
 import { ArrowDown, ArrowRight, ArrowUpRight, Mail, Menu, MessageCircle, Send, Workflow, X } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const WHATSAPP_URL = 'https://wa.me/5492235428861';
+const WHATSAPP_URL = 'https://wa.me/5491130035679';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://wis-backend.xbgh9n.easypanel.host/api';
 
 const services = [
-  ['01', 'Atención', 'Agentes que responden, califican y derivan cada consulta.'],
-  ['02', 'Seguimiento', 'Flujos que hacen que ninguna oportunidad quede olvidada.'],
-  ['03', 'Operación', 'Integraciones que sacan trabajo repetitivo del medio.'],
+  ['01', 'Atención', 'Respuestas con contexto para cada consulta que llega.'],
+  ['02', 'Seguimiento', 'Un próximo paso claro para cada oportunidad abierta.'],
+  ['03', 'Operación', 'Procesos conectados para que la información circule.'],
 ];
 
 const caseBrands = ['Quality Hard', 'IMEPHO', 'Movimientos Indumec', 'Metzeler Joyas', 'Dugas'];
@@ -22,6 +22,7 @@ function BrandMark() {
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const marqueeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const nodes = Array.from(document.querySelectorAll<HTMLElement>('.reveal'));
@@ -41,6 +42,40 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const marquee = marqueeRef.current;
+    if (!marquee) return;
+    let startX = 0;
+    let startScrollLeft = 0;
+    let isDragging = false;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      startX = event.clientX;
+      startScrollLeft = marquee.scrollLeft;
+      isDragging = true;
+      marquee.classList.add('is-dragging');
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isDragging) return;
+      marquee.scrollLeft = startScrollLeft - (event.clientX - startX);
+    };
+    const handlePointerUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      marquee.classList.remove('is-dragging');
+    };
+    marquee.addEventListener('pointerdown', handlePointerDown);
+    marquee.addEventListener('pointermove', handlePointerMove);
+    marquee.addEventListener('pointerup', handlePointerUp);
+    marquee.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      marquee.removeEventListener('pointerdown', handlePointerDown);
+      marquee.removeEventListener('pointermove', handlePointerMove);
+      marquee.removeEventListener('pointerup', handlePointerUp);
+      marquee.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, []);
+
   async function submitContact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormStatus('sending');
@@ -56,7 +91,7 @@ export default function Home() {
   }
 
   return <main>
-    <div className="topline"><span className="topline-dot" /> WIS / automatización con IA para empresas <span className="topline-separator">·</span> Argentina + LATAM</div>
+    <div className="topline"><span className="topline-dot" /> WIS / sistemas inteligentes para empresas <span className="topline-separator">·</span> Argentina + LATAM</div>
 
     <nav className="nav-shell">
       <a href="#inicio" className="brand" aria-label="WIS Agency, inicio"><BrandMark /></a>
@@ -75,27 +110,27 @@ export default function Home() {
       <div className="hero-video-grain" />
       <div className="hero-film-content section-shell">
         <div className="hero-kicker"><span>WIS / 2026</span><i /><span>WORK IN SILENCE</span></div>
-        <h1>Automatizamos<br /><span>lo que te frena.</span></h1>
-        <p>Atención, ventas y operación conectadas para que tu empresa funcione mejor todos los días.</p>
-        <div className="hero-actions"><a className="button button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Quiero automatizar mi negocio <ArrowRight size={18} /></a><a className="button button-ghost" href="#que-hacemos">Conocé WIS <ArrowDown size={16} /></a></div>
+        <h1>La tecnología que<br /><span>trabaja por vos.</span></h1>
+        <p>Diseñamos sistemas con IA para ordenar la atención, el seguimiento y los procesos de tu empresa.</p>
+        <div className="hero-actions"><a className="button button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Hablemos de tu operación <ArrowRight size={18} /></a><a className="button button-ghost" href="#que-hacemos">Conocé el enfoque <ArrowDown size={16} /></a></div>
       </div>
       <div className="hero-film-meta"><span>MOTION LOOP / 01</span><span>IA · INTEGRACIONES · PROCESOS</span></div>
       <a className="hero-film-scroll" href="#que-hacemos" aria-label="Bajar a qué hacemos"><span>Scroll</span><ArrowDown size={15} /></a>
     </section>
 
     <section id="que-hacemos" className="section-shell intro-section reveal">
-      <div className="intro-copy"><span className="section-kicker">01 / QUÉ HACEMOS</span><h2>Tu equipo no necesita hacer más.<br /><span>Necesita hacer mejor.</span></h2></div>
-      <div className="intro-side"><p>WIS diseña automatizaciones con IA para que las consultas se atiendan, los datos circulen y los procesos sigan avanzando sin depender de una sola persona.</p><a className="text-link" href="#contacto">Hablemos de tu operación <ArrowUpRight size={16} /></a></div>
+      <div className="intro-copy"><span className="section-kicker">01 / WIS</span><h2>La operación debería avanzar<br /><span>sin pedirte más tiempo.</span></h2></div>
+      <div className="intro-side"><p>Integramos inteligencia artificial, automatizaciones y las herramientas que ya usa tu equipo para que cada tarea tenga un próximo paso claro.</p><a className="text-link" href="#metodo">Ver cómo lo hacemos <ArrowUpRight size={16} /></a></div>
     </section>
 
-    <section className="section-shell services-section reveal"><div className="services-list">{services.map(([number, title, text], index) => <article className={`service-row reveal reveal-delay-${index + 1}`} key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><Workflow size={20} /></article>)}</div><div className="service-foot"><span>SE CONECTA CON LO QUE YA USÁS</span><div><b>WhatsApp</b><b>CRM</b><b>Google Sheets</b><b>n8n</b><b>APIs</b></div></div></section>
+    <section className="section-shell services-section reveal"><div className="services-list">{services.map(([number, title, text], index) => <article className={`service-row reveal reveal-delay-${index + 1}`} key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div><Workflow size={20} /></article>)}</div><div className="service-foot"><span>INTEGRAMOS CON TU ECOSISTEMA</span><div><b>WhatsApp</b><b>CRM</b><b>Google Sheets</b><b>n8n</b><b>APIs</b></div></div></section>
 
-    <section id="casos" className="cases-section reveal"><div className="section-shell cases-intro"><span className="section-kicker">02 / CASOS DE TRABAJO</span><h2>Empresas que eligieron<br /><span>moverse distinto.</span></h2><p>Una línea de marcas con las que trabajamos.</p></div><div className="brand-marquee reveal reveal-delay-1" aria-label="Casos de trabajo de WIS"><div className="brand-marquee-track">{[0, 1].flatMap((copy) => caseBrands.map((brand) => <span className="brand-marquee-item" key={`${copy}-${brand}`}>{brand}<i>✦</i></span>))}</div></div></section>
+    <section id="casos" className="cases-section reveal"><div className="section-shell cases-intro"><span className="section-kicker">02 / CLIENTES</span><h2>Marcas que ya están<br /><span>trabajando con WIS.</span></h2><p>Una selección de empresas con las que desarrollamos soluciones a medida.</p></div><div ref={marqueeRef} className="brand-marquee reveal reveal-delay-1" aria-label="Clientes de WIS. Deslizá para recorrerlos"><div className="brand-marquee-track">{[0, 1].flatMap((copy) => caseBrands.map((brand) => <span className="brand-marquee-item" key={`${copy}-${brand}`}>{brand}<i>✦</i></span>))}</div></div></section>
 
-    <section className="section-shell method-section reveal"><div className="method-head"><span className="section-kicker">03 / EL MÉTODO</span><h2>Primero entendemos.<br /><span>Después automatizamos.</span></h2></div><div className="method-steps reveal reveal-delay-1">{[['01', 'Miramos', 'Dónde se va el tiempo.'], ['02', 'Diseñamos', 'Qué puede empezar a resolverse solo.'], ['03', 'Activamos', 'Una mejora real, con tu equipo.']].map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
+    <section id="metodo" className="section-shell method-section reveal"><div className="method-head"><span className="section-kicker">03 / ENFOQUE</span><h2>Diagnóstico preciso.<br /><span>Implementación concreta.</span></h2></div><div className="method-steps reveal reveal-delay-1">{[['01', 'Entender', 'Mapeamos la operación y detectamos dónde se pierde tiempo.'], ['02', 'Diseñar', 'Definimos la solución más simple para resolverlo bien.'], ['03', 'Implementar', 'La ponemos en marcha junto a tu equipo.']].map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div></section>
 
-    <section id="contacto" className="contact-section reveal"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / HABLEMOS</span><h2>¿Qué parte de tu negocio te está frenando?</h2><p>Contanos cómo trabajan hoy. Te respondemos con un próximo paso posible.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>DIAGNÓSTICO INICIAL</span><b>Sin humo. Sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué te gustaría mejorar?<textarea name="message" required rows={4} placeholder="Ej: perdemos consultas porque nadie hace el seguimiento..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar mensaje'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
+    <section id="contacto" className="contact-section reveal"><div className="section-shell contact-grid"><div className="contact-copy"><span className="section-kicker">04 / CONTACTO</span><h2>Hablemos de tu<br />próximo sistema.</h2><p>Contanos cómo funciona hoy tu empresa y dónde querés ganar tiempo, orden o capacidad.</p><div className="contact-direct"><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><span className="whatsapp-mark"><MessageCircle size={14} /></span> WhatsApp directo <ArrowUpRight size={15} /></a><a href="mailto:ortu@wis-agency.com"><Mail size={17} /> ortu@wis-agency.com <ArrowUpRight size={15} /></a></div></div><form className="contact-form" onSubmit={submitContact}><div className="form-heading"><span>PRIMERA CONVERSACIÓN</span><b>Directa y sin compromiso.</b></div><label>Nombre<input name="name" required placeholder="Tu nombre" /></label><label>Empresa<input name="company" placeholder="Nombre de tu empresa" /></label><label>Email<input name="email" required type="email" placeholder="tu@email.com" /></label><label>¿Qué necesitás resolver?<textarea name="message" required rows={4} placeholder="Contanos brevemente qué querés mejorar..." /></label><button className="button button-primary" disabled={formStatus === 'sending'}>{formStatus === 'sending' ? 'Enviando...' : 'Enviar consulta'} <Send size={16} /></button>{formStatus === 'success' && <p className="form-success">Recibimos tu mensaje. Te vamos a responder pronto.</p>}{formStatus === 'error' && <p className="form-error">No pudimos enviarlo. Escribinos directo por WhatsApp.</p>}</form></div></section>
 
-    <footer className="footer section-shell reveal"><div className="footer-brand"><BrandMark /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Casos</a><a href="#contacto">Contacto</a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Automatización con IA · Argentina + LATAM</div></footer>
+    <footer className="footer section-shell reveal"><div className="footer-brand"><BrandMark /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Clientes</a><a href="#contacto">Contacto</a><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><span className="whatsapp-mark"><MessageCircle size={14} /></span> WhatsApp <ArrowUpRight size={14} /></a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Sistemas inteligentes · Argentina + LATAM</div></footer>
   </main>;
 }

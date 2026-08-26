@@ -83,12 +83,15 @@ button { cursor: pointer; }
 .cases-section { overflow: hidden; padding: 150px 0 145px; background: var(--black-soft); }
 .cases-intro { margin-bottom: 66px; }
 .cases-intro p { margin: 27px 0 0; color: var(--muted); font-size: 14px; }
-.brand-marquee { position: relative; width: 100%; overflow: hidden; padding: 42px 0 38px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent); }
+.brand-marquee { position: relative; width: 100%; overflow-x: auto; overflow-y: hidden; padding: 42px 0 38px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: grab; scrollbar-width: none; mask-image: linear-gradient(90deg, transparent, black 9%, black 91%, transparent); overscroll-behavior-x: contain; touch-action: pan-x; }
+.brand-marquee::-webkit-scrollbar { display: none; }
+.brand-marquee.is-dragging { cursor: grabbing; }
 .brand-marquee::before, .brand-marquee::after { content: ''; position: absolute; top: 0; bottom: 0; z-index: 1; width: 13%; pointer-events: none; }
 .brand-marquee::before { left: 0; background: linear-gradient(90deg, var(--black-soft), transparent); }
 .brand-marquee::after { right: 0; background: linear-gradient(270deg, var(--black-soft), transparent); }
 .brand-marquee-track { display: flex; width: max-content; animation: brand-flow 30s linear infinite; }
 .brand-marquee:hover .brand-marquee-track { animation-play-state: paused; }
+.brand-marquee.is-dragging .brand-marquee-track { animation-play-state: paused; }
 @keyframes brand-flow { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 .brand-marquee-item { display: inline-flex; align-items: center; gap: 58px; min-width: 320px; color: rgba(245,241,232,.75); font-size: clamp(23px, 2.2vw, 32px); font-weight: 500; letter-spacing: -.065em; white-space: nowrap; }
 .brand-marquee-item i { color: var(--gold); font-style: normal; font-size: 15px; }
@@ -111,6 +114,9 @@ button { cursor: pointer; }
 .contact-direct a { display: inline-flex; align-items: center; gap: 9px; width: fit-content; color: var(--muted); font-size: 13px; }
 .contact-direct a:hover { color: var(--gold); transform: translateX(3px); }
 .contact-direct a svg:last-child { margin-left: 3px; color: var(--gold); }
+.whatsapp-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto; color: #fff; background: #25d366; border-radius: 50%; }
+.whatsapp-mark svg { color: #fff !important; }
+.footer-links .whatsapp-mark { width: 19px; height: 19px; }
 .contact-form { padding: 38px; background: rgba(8,9,8,.62); border: 1px solid var(--line); border-radius: 28px; }
 .form-heading { display: flex; justify-content: space-between; gap: 20px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
 .form-heading span { color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .14em; }

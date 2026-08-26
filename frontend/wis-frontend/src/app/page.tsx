@@ -228,7 +228,7 @@ export default function Home() {
                 <button type="submit" className="flex-1 bg-brand-accent text-background font-bold py-4 rounded-xl hover:opacity-90 transition-opacity">
                   Enviar Mensaje
                 </button>
-                <a href="https://wa.me/5492235428861" target="_blank" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                <a href="https://wa.me/5491130035679" target="_blank" className="flex-1 bg-[#25D366] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
                   <MessageSquare size={18} /> WhatsApp
                 </a>
                 <a href="mailto:ortu@wis-agency.com" className="flex-1 bg-brand-surface border border-brand-text/10 text-brand-text font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-brand-surface/80 transition-opacity">
@@ -242,7 +242,7 @@ export default function Home() {
               <div className="flex flex-col gap-3 font-mono text-sm text-brand-text/80">
                 <a href="mailto:ortu@wis-agency.com" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><Mail size={16}/> ortu@wis-agency.com</a>
                 <a href="https://instagram.com/wis.agency" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> @wis.agency</a>
-                <a href="https://wa.me/5492235428861" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><MessageSquare size={16}/> WhatsApp directo</a>
+                <a href="https://wa.me/5491130035679" target="_blank" className="flex items-center gap-3 hover:text-brand-accent transition-colors w-fit"><MessageSquare size={16}/> WhatsApp directo</a>
               </div>
             </div>
           </FadeIn>
@@ -257,7 +257,7 @@ export default function Home() {
           </div>
           <div className="flex gap-6 font-mono text-xs text-brand-text/40">
             <a href="https://instagram.com/wis.agency" target="_blank" className="hover:text-brand-text">INSTAGRAM</a>
-            <a href="https://wa.me/5492235428861" target="_blank" className="hover:text-brand-text">WHATSAPP</a>
+            <a href="https://wa.me/5491130035679" target="_blank" className="hover:text-brand-text">WHATSAPP</a>
             <a href="mailto:ortu@wis-agency.com" className="hover:text-brand-text">EMAIL</a>
           </div>
           <div className="font-mono text-xs text-brand-text/40">

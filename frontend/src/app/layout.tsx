@@ -8,12 +8,12 @@ const wisFont = Nunito_Sans({ subsets: ['latin'], weight: ['400', '500', '600', 
 export const metadata: Metadata = {
   metadataBase: new URL('https://wis-agency.com'),
   title: { default: 'WIS Agency | Automatización con IA para empresas', template: '%s | WIS Agency' },
-  description: 'WIS automatiza la atención, el seguimiento y los procesos de tu empresa con inteligencia artificial.',
+  description: 'WIS diseña sistemas con inteligencia artificial para ordenar la atención, el seguimiento y los procesos de tu empresa.',
   keywords: ['automatización con IA', 'agencia de IA Argentina', 'agentes de IA para empresas', 'automatización WhatsApp', 'n8n', 'integración de sistemas', 'automatización de procesos', 'IA para PyMEs', 'automatización comercial', 'casos de éxito IA'],
   alternates: { canonical: 'https://wis-agency.com' },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
-  openGraph: { type: 'website', locale: 'es_AR', url: 'https://wis-agency.com', siteName: 'WIS Agency', title: 'Automatización con IA para empresas | WIS Agency', description: 'Atención, ventas y operación conectadas para que tu empresa funcione mejor.', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'WIS Agency — Work In Silence' }] },
-  twitter: { card: 'summary_large_image', title: 'Automatización con IA para empresas | WIS Agency', description: 'Atención, ventas y operación conectadas para que tu empresa funcione mejor.', images: ['/og-image.png'] },
+  openGraph: { type: 'website', locale: 'es_AR', url: 'https://wis-agency.com', siteName: 'WIS Agency', title: 'La tecnología que trabaja por vos | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y los procesos de tu empresa.', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'WIS Agency — Work In Silence' }] },
+  twitter: { card: 'summary_large_image', title: 'La tecnología que trabaja por vos | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y los procesos de tu empresa.', images: ['/og-image.png'] },
   icons: { icon: '/favicon.png', apple: '/icon-512.png' },
 };
 
