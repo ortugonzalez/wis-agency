@@ -1,0 +1,77 @@
+[
+  {
+    "name": "WIS X - Auth Health",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-auth-trigger-20260825", "name": "Weekday 07:20 ART", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0,0], "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "20 7 * * 1-5" }] } } },
+      { "id": "x-auth-health-20260825", "name": "X Auth Health", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240,0], "parameters": { "method": "GET", "url": "={{ $env.X_PUBLISHER_URL + '/auth/health' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "x-bot-secret", "value": "={{ $env.BOT_SECRET }}" }] }, "options": {} } }
+    ],
+    "connections": { "Weekday 07:20 ART": { "main": [[{ "node": "X Auth Health", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Scout",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-scout-trigger-20260825", "name": "Weekday 07:30 ART", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0,0], "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "30 7 * * 1-5" }] } } },
+      { "id": "x-scout-query-20260825", "name": "Get Unprocessed News", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240,0], "parameters": { "method": "GET", "url": "={{ $env.SUPABASE_URL + '/rest/v1/noticias_dia?select=*&procesada=eq.false&order=fecha.desc&limit=25' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }, { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY }}" }] }, "options": {} } },
+      { "id": "x-scout-score-20260825", "name": "Score X Candidate", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [480,0], "parameters": { "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r.id);\nconst terms = ['ia','inteligencia artificial','automatización','ventas','atención','agentes'];\nconst scored = rows.map(r => ({...r, x_score: terms.reduce((n,t) => n + (String(r.titulo || r.title || r.resumen || '').toLowerCase().includes(t) ? 2 : 0), 0)})).sort((a,b) => b.x_score - a.x_score);\nif (!scored[0]) return [{json:{ok:false,error:'no_news'}}];\nreturn [{json:{ok:true,noticia_id:scored[0].id,source:scored[0]}}];" } },
+      { "id": "x-scout-writer-20260825", "name": "Call X Writer", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [720,0], "parameters": { "method": "POST", "url": "={{ $env.N8N_PUBLIC_BASE_URL + '/webhook/wis-x/writer/run' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "x-bot-secret", "value": "={{ $env.BOT_SECRET }}" }] }, "sendBody": true, "jsonBody": "={{ { noticia_id: $json.noticia_id, run_id: $execution.id } }}", "options": {} } }
+    ],
+    "connections": { "Weekday 07:30 ART": { "main": [[{ "node": "Get Unprocessed News", "type": "main", "index": 0 }]] }, "Get Unprocessed News": { "main": [[{ "node": "Score X Candidate", "type": "main", "index": 0 }]] }, "Score X Candidate": { "main": [[{ "node": "Call X Writer", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Writer",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-writer-webhook-20260825", "name": "Writer Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0,0], "parameters": { "httpMethod": "POST", "path": "wis-x/writer/run", "responseMode": "lastNode", "options": {} }, "webhookId": "wis-x-writer-20260825" },
+      { "id": "x-writer-validate-20260825", "name": "Validate Writer Request", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [240,0], "parameters": { "jsCode": "const body = $json.body || {};\nconst secret = String($json.headers?.['x-bot-secret'] || '');\nif (!secret || secret !== String($env.BOT_SECRET || '')) throw new Error('unauthorized');\nconst noticia_id = Number(body.noticia_id);\nif (!Number.isInteger(noticia_id) || noticia_id <= 0) throw new Error('invalid_noticia_id');\nreturn [{json:{ok:true,noticia_id,run_id:String(body.run_id || $execution.id)}}];" } },
+      { "id": "x-writer-contract-20260825", "name": "Writer Contract", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [480,0], "parameters": { "jsCode": "// El modelo debe devolver {platform:'x',format:'single'|'thread',source_title,source_url,angle,posts:[{sequence,text}]}.\n// Este nodo deja explícito el contrato y bloquea cualquier payload de otra plataforma.\nreturn [{json:{ok:true,platform:'x',status:'writer_contract_ready',noticia_id:$json.noticia_id,run_id:$json.run_id}}];" } }
+    ],
+    "connections": { "Writer Webhook": { "main": [[{ "node": "Validate Writer Request", "type": "main", "index": 0 }]] }, "Validate Writer Request": { "main": [[{ "node": "Writer Contract", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Telegram Inbound",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-tg-webhook-20260825", "name": "Telegram Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0,0], "parameters": { "httpMethod": "POST", "path": "wis-x/telegraminbound/webhook", "responseMode": "onReceived", "options": {} }, "webhookId": "wis-x-telegram-inbound-20260825" },
+      { "id": "x-tg-parse-20260825", "name": "Validate Telegram Action", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [240,0], "parameters": { "jsCode": "const msg = $json.body?.message || $json.message || {};\nconst text = String(msg.text || '').trim();\nconst norm = text.toLowerCase();\nconst action = /^(ok|si|sí|dale)$/.test(norm) ? 'approve' : norm.startsWith('editar') ? 'edit' : /^(no|rechazar)$/.test(norm) ? 'reject' : norm === 'hilo' ? 'thread' : norm === 'corto' ? 'short' : 'unknown';\nconst chat_id = String(msg.chat?.id || ''); const user_id = String(msg.from?.id || '');\nconst reply_to_message_id = msg.reply_to_message?.message_id ? String(msg.reply_to_message.message_id) : null;\nreturn [{json:{action,chat_id,user_id,reply_to_message_id,text,authorized:chat_id === String($env.AUTHORIZED_TELEGRAM_CHAT_ID || '') && user_id === String($env.AUTHORIZED_TELEGRAM_USER_ID || '')}}];" } },
+      { "id": "x-tg-reject-20260825", "name": "Reject Unauthorized", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [480,0], "parameters": { "jsCode": "if (!$json.authorized) return [{json:{ok:false,error:'telegram_unauthorized'}}];\nreturn [{json:{ok:true,route:$json.action,correlation:$json.reply_to_message_id || 'single_pending_only'}}];" } }
+    ],
+    "connections": { "Telegram Webhook": { "main": [[{ "node": "Validate Telegram Action", "type": "main", "index": 0 }]] }, "Validate Telegram Action": { "main": [[{ "node": "Reject Unauthorized", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Publisher",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-pub-webhook-20260825", "name": "Publisher Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0,0], "parameters": { "httpMethod": "POST", "path": "wis-x/publish", "responseMode": "lastNode", "options": {} }, "webhookId": "wis-x-publisher-20260825" },
+      { "id": "x-pub-call-20260825", "name": "Call Isolated X Publisher", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [260,0], "parameters": { "method": "POST", "url": "={{ $env.X_PUBLISHER_URL + '/publish' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "x-bot-secret", "value": "={{ $env.BOT_SECRET }}" }] }, "sendBody": true, "jsonBody": "={{ $json.body }}", "options": {} } }
+    ],
+    "connections": { "Publisher Webhook": { "main": [[{ "node": "Call Isolated X Publisher", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Expiration and Reconciliation",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-exp-trigger-20260825", "name": "Every 15 Minutes", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0,0], "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] } } },
+      { "id": "x-expire-rpc-20260825", "name": "Expire X Drafts", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [260,0], "parameters": { "method": "POST", "url": "={{ $env.SUPABASE_URL + '/rest/v1/rpc/expire_x_posts' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}" }, { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY }}" }] }, "jsonBody": "={{ {p_now: new Date().toISOString()} }}", "sendBody": true, "options": {} } }
+    ],
+    "connections": { "Every 15 Minutes": { "main": [[{ "node": "Expire X Drafts", "type": "main", "index": 0 }]] } }
+  },
+  {
+    "name": "WIS X - Daily Conductor",
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "nodes": [
+      { "id": "x-conductor-trigger-20260825", "name": "Weekday 07:20 ART", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0,0], "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "20 7 * * 1-5" }] } } },
+      { "id": "x-conductor-auth-20260825", "name": "Run Auth Health", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240,0], "parameters": { "method": "GET", "url": "={{ $env.X_PUBLISHER_URL + '/auth/health' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "x-bot-secret", "value": "={{ $env.BOT_SECRET }}" }] }, "options": {} } },
+      { "id": "x-conductor-scout-20260825", "name": "Run Scout", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [480,0], "parameters": { "method": "POST", "url": "={{ $env.N8N_PUBLIC_BASE_URL + '/webhook/wis-x/scout/run' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "x-bot-secret", "value": "={{ $env.BOT_SECRET }}" }] }, "jsonBody": "={{ {run_id:$execution.id} }}", "sendBody": true, "options": {} } }
+    ],
+    "connections": { "Weekday 07:20 ART": { "main": [[{ "node": "Run Auth Health", "type": "main", "index": 0 }]] }, "Run Auth Health": { "main": [[{ "node": "Run Scout", "type": "main", "index": 0 }]] } }
+  }
+]

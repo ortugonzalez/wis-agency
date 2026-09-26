@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/agent-approval.json",
+  "title": "WIS Human Approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id", "task_id", "action", "impact", "requested_at", "decision"],
+  "properties": {
+    "approval_id": {"type": "string"},
+    "task_id": {"type": "string"},
+    "action": {"type": "string"},
+    "impact": {"type": "string", "minLength": 5},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "requested_at": {"type": "string", "format": "date-time"},
+    "decision": {"enum": ["PENDING", "APPROVED", "REJECTED", "EXPIRED"]},
+    "decided_at": {"type": ["string", "null"], "format": "date-time"},
+    "decided_by": {"type": ["string", "null"]}
+  }
+}
+

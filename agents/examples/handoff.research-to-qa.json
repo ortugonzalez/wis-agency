@@ -1,0 +1,11 @@
+{
+  "task_id": "WIS-REV-001",
+  "from_agent": "growth-research",
+  "to_agent": "qa-ops",
+  "artifacts": ["Lote comercial de 25 filas"],
+  "evidence": ["Contactos corporativos", "Reseñas negativas accesibles", "Señales de tamaño"],
+  "tests": ["Unicidad", "Formato analizadas/total accesible"],
+  "blockers": [],
+  "next_action": "Validar el lote sin modificar las filas y devolver hallazgos al propietario."
+}
+

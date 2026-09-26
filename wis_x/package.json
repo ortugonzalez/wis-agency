@@ -1,0 +1,17 @@
+{
+  "name": "wis-x-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "test:watch": "node --test --watch \"test/**/*.test.mjs\"",
+    "test:integration": "node src/beta-tester/cli.mjs audit --config config/beta-tester.wis-x.json --staging --out reports/beta-tester-staging",
+    "audit": "node src/beta-tester/cli.mjs audit --config config/beta-tester.wis-x.json --out reports/beta-tester",
+    "audit:staging": "node src/beta-tester/cli.mjs audit --config config/beta-tester.wis-x.json --staging --out reports/beta-tester-staging",
+    "audit:browser": "node src/beta-tester/cli.mjs browser --config config/beta-tester.browser.json --out reports/beta-tester-browser",
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "twitter-text": "^3.1.0"
+  }
+}

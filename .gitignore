@@ -1,0 +1,68 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*secrets*.json
+*storage_state*.json
+*storage-state*.json
+*auth-state*.json
+*cookies*.json
+**/.auth/
+*session*.json
+
+# Runtime and generated artifacts
+node_modules/
+.next/
+dist/
+build/
+coverage/
+reports/
+output/
+tmp/
+.cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.log
+*.har
+*.ndjson
+*.sqlite*
+*.db
+playwright-report/
+test-results/
+
+# Local tooling and virtual environments
+.codex-finalizer/
+.doorslip-venv/
+.venv/
+venv/
+
+# Browser evidence and transient captures
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.har
+
+# Independent or external repositories kept beside WIS BOTS.
+# They keep their own Git history and must not become embedded repos here.
+wis-agency/
+chattermate.chat/
+design-lab/
+pgvector-0.8.6/
+
+# Local spreadsheet build artifacts
+outputs/
+doorslip-test-report-*.md
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

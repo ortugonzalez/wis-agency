@@ -1,0 +1,14 @@
+{
+  "type": "n8n",
+  "name": "WIS X workflows",
+  "source": {
+    "exportPath": "workflows/wis-x-export.json",
+    "baseUrl": ""
+  },
+  "environment": "local",
+  "rules": ["baseline", "n8n", "https", "encoding"],
+  "contract": {
+    "expectedWebhookStatus": 200,
+    "requireExplicitWebhookAuth": true
+  }
+}

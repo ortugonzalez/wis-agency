@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/agent-task.json",
+  "title": "WIS Agent Task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "objective", "owner", "priority", "status", "dependencies", "source_threads", "inputs", "expected_outputs", "write_scope", "approval_required", "acceptance_tests"],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^WIS-[A-Z0-9]+-[0-9]{3,}$"},
+    "objective": {"type": "string", "minLength": 10},
+    "owner": {"type": "string"},
+    "priority": {"enum": ["P0", "P1", "P2", "P3"]},
+    "status": {"enum": ["BACKLOG", "READY", "IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"]},
+    "dependencies": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "source_threads": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "expected_outputs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "write_scope": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "approval_required": {"type": "boolean"},
+    "approval_actions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "acceptance_tests": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}
+

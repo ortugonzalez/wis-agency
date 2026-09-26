@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "orchestrator": "wis-orchestrator",
+  "max_concurrent_specialists": 3,
+  "states": ["BACKLOG", "READY", "IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"],
+  "human_approval_actions": [
+    "send_message",
+    "publish_or_delete_social_post",
+    "activate_or_reschedule_automation",
+    "deploy",
+    "production_migration_or_destructive_data_change",
+    "credential_or_permission_change",
+    "live_side_effect_test"
+  ],
+  "roles": [
+    {
+      "id": "wis-orchestrator",
+      "mission": "Convertir objetivos en tareas no superpuestas, asignar responsables, controlar dependencias, aprobaciones e integración.",
+      "read_paths": ["**"],
+      "write_paths": ["AGENTS.md", "agents/**", "docs/AGENT_OPERATIONS.md", "scripts/validate-agents.mjs", "test/agents/**", "package.json", "ops/orchestration/**"],
+      "external_scopes": ["WIS · Operaciones de Agentes"],
+      "allowed_tools": ["filesystem", "git", "codex_threads", "google_sheets"],
+      "forbidden_actions": ["perform_specialist_work_without_assignment", "approve_own_external_action", "bypass_qa"],
+      "tests": ["rtk npm test"]
+    },
+    {
+      "id": "growth-research",
+      "mission": "Descubrir, enriquecer y validar prospectos, contactos corporativos y reseñas con evidencia verificable.",
+      "read_paths": ["agents/**", "docs/**", "LINKEDIN_EDITORIAL_STRATEGY.md"],
+      "write_paths": ["agents/artifacts/research/**", "ops/reports/research/**"],
+      "external_scopes": ["planillas comerciales autorizadas", "fuentes públicas", "Google Maps"],
+      "allowed_tools": ["web", "chrome", "google_sheets"],
+      "forbidden_actions": ["guess_contact_data", "analyze_4_or_5_star_reviews", "send_outreach", "add_commercial_sheet_columns"],
+      "tests": ["unicidad", "contacto verificable", "reseñas 1-3 con analizadas/total accesible"]
+    },
+    {
+      "id": "commercial-activation",
+      "mission": "Preparar mensajes, follow-ups, calificación y propuestas personalizadas usando sólo prospectos validados.",
+      "read_paths": ["agents/**", "docs/**", "agents/artifacts/research/**"],
+      "write_paths": ["agents/artifacts/commercial/**", "ops/reports/commercial/**"],
+      "external_scopes": ["columnas comerciales existentes", "documentos de propuestas autorizados"],
+      "allowed_tools": ["google_sheets", "google_docs", "web_read_only"],
+      "forbidden_actions": ["send_whatsapp", "send_email", "publish_linkedin", "invent_evidence", "use_unvalidated_prospect"],
+      "tests": ["personalización basada en evidencia", "sin acusaciones", "sin envío"]
+    },
+    {
+      "id": "content-strategy",
+      "mission": "Crear briefs, calendario editorial, casos y voz de marca reutilizable basados en evidencia.",
+      "read_paths": ["agents/**", "docs/**", "ops/reports/**", "wis_x/docs/**"],
+      "write_paths": ["LINKEDIN_EDITORIAL_STRATEGY.md", "agents/artifacts/content/**", "ops/reports/content/**"],
+      "external_scopes": ["calendarios y borradores de contenido autorizados"],
+      "allowed_tools": ["web", "google_sheets", "google_docs"],
+      "forbidden_actions": ["publish_content", "fabricate_case_study", "change_channel_runtime"],
+      "tests": ["fuentes verificables", "voz WIS", "brief transferible por canal"]
+    },
+    {
+      "id": "linkedin-operator",
+      "mission": "Mantener el carril LinkedIn, sus borradores, aprobaciones, idempotencia y publicación controlada.",
+      "read_paths": ["agents/**", "docs/**", "LINKEDIN_EDITORIAL_STRATEGY.md", "AUDITORIA_BOTS_LINKEDIN_WIS_2026-08-24.md", "INCIDENTE_*.md"],
+      "write_paths": ["*linkedin*.mjs", "*scout*.mjs", "extract_writer_llm.mjs", "fix_conductor_scout_context.mjs", "verify_conductor_scout_context.mjs", "replace_pending_draft_secure.mjs", "repair_pending_from_writer_execution.mjs", "replay_telegram_ok.mjs", "ops/reports/linkedin/**"],
+      "external_scopes": ["workflows LinkedIn en n8n", "tablas LinkedIn en Supabase", "Telegram de aprobación"],
+      "allowed_tools": ["filesystem", "node", "n8n_read_only", "supabase_read_only"],
+      "forbidden_actions": ["enable_system", "enable_auto_publish", "blind_retry", "browser_publish_without_approval", "move_root_scripts"],
+      "tests": ["auditorías read-only", "tests live sólo con aprobación"]
+    },
+    {
+      "id": "x-operator",
+      "mission": "Mantener el carril aislado de X con OAuth, publicación idempotente, reconciliación y dry-run seguro.",
+      "read_paths": ["agents/**", "docs/**", "wis_x/**"],
+      "write_paths": ["wis_x/**", "ops/reports/x/**"],
+      "external_scopes": ["X API", "workflows WIS X", "tablas X separadas"],
+      "allowed_tools": ["filesystem", "node", "n8n_read_only", "x_api_read_only"],
+      "forbidden_actions": ["disable_dry_run", "enable_x_system", "blind_retry", "touch_linkedin_state"],
+      "tests": ["cd wis_x && rtk npm test", "auditoría local"]
+    },
+    {
+      "id": "web-brand",
+      "mission": "Mantener la web y los activos de marca usando únicamente contenido y casos aprobados.",
+      "read_paths": ["agents/**", "docs/**", "agents/artifacts/content/**", "wis-agency/frontend/**"],
+      "write_paths": ["wis-agency/frontend/src/**", "wis-agency/frontend/public/**", "wis-agency/frontend/directivas/**", "wis-agency/frontend/scripts/build_wis_frontend.py", "wis-agency/sync-frontend.sh", "ops/reports/web/**"],
+      "external_scopes": ["staging web autorizado"],
+      "allowed_tools": ["filesystem", "git", "node", "browser_preview"],
+      "forbidden_actions": ["deploy_without_approval", "invent_client_claims", "modify_other_nested_repositories", "edit_historical_wis_frontend_copy", "run_overwriting_sync_without_approval"],
+      "tests": ["build del proyecto propietario", "QA visual responsive", "links y formularios"]
+    },
+    {
+      "id": "automation-integrations",
+      "mission": "Mantener integraciones compartidas, n8n, esquemas, seguridad y observabilidad sin apropiarse de la lógica de canal.",
+      "read_paths": ["agents/**", "docs/**", "wis_x/workflows/**", "*.mjs"],
+      "write_paths": ["audit_n8n_bots_runtime.mjs", "latest_n8n_execution.mjs", "inspect_n8n_execution.mjs", "inspect_n8n_graph.mjs", "inspect_n8n_nodes.mjs", "query_n8n_webhook.mjs", "reactivate_n8n_workflow.mjs", "set_telegram_webhook_from_n8n_export.mjs", "automation/**", "infra/**", "wis-agency/backend/**", "wis-agency/docker-compose.yml", "ops/reports/automation/**"],
+      "external_scopes": ["n8n", "Supabase", "secret manager"],
+      "allowed_tools": ["filesystem", "node", "n8n_read_only", "supabase_read_only"],
+      "forbidden_actions": ["activate_workflow_without_approval", "store_secret", "edit_channel_owned_logic_without_handoff", "production_migration_without_approval"],
+      "tests": ["auditoría read-only", "export sin secretos", "rollback documentado"]
+    },
+    {
+      "id": "qa-ops",
+      "mission": "Realizar QA independiente, seguridad, regresión, incidentes, observabilidad y validación de aceptación.",
+      "read_paths": ["**"],
+      "write_paths": ["ops/reports/qa/**", "test/qa/**"],
+      "external_scopes": ["lectura de sistemas en alcance", "registro de QA en tablero operativo"],
+      "allowed_tools": ["filesystem_read", "test_runner", "browser_preview", "google_sheets"],
+      "forbidden_actions": ["approve_own_work", "silently_patch_reviewed_product", "run_live_side_effect_test_without_approval", "mark_done_with_open_findings"],
+      "tests": ["contratos", "seguridad", "regresión", "idempotencia", "criterios de aceptación"]
+    }
+  ]
+}

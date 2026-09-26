@@ -1,0 +1,10 @@
+{
+  "type": "browser",
+  "name": "Browser smoke test",
+  "source": {
+    "baseUrl": ""
+  },
+  "environment": "staging",
+  "rules": ["baseline", "https", "encoding", "browser"],
+  "paths": ["/"]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/agent-handoff.json",
+  "title": "WIS Agent Handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "from_agent", "to_agent", "artifacts", "evidence", "tests", "blockers", "next_action"],
+  "properties": {
+    "task_id": {"type": "string"},
+    "from_agent": {"type": "string"},
+    "to_agent": {"type": "string"},
+    "artifacts": {"type": "array", "items": {"type": "string"}},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "tests": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "string"}},
+    "next_action": {"type": "string", "minLength": 3}
+  }
+}
+

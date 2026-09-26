@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/agent-run.json",
+  "title": "WIS Agent Run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "task_id", "agent", "status", "started_at", "evidence", "tests"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "task_id": {"type": "string"},
+    "agent": {"type": "string"},
+    "status": {"enum": ["IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"]},
+    "branch": {"type": ["string", "null"]},
+    "worktree": {"type": ["string", "null"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": ["string", "null"], "format": "date-time"},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "tests": {"type": "array", "items": {"type": "string"}},
+    "blocker": {"type": ["string", "null"]}
+  }
+}
+

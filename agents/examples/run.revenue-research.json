@@ -1,0 +1,14 @@
+{
+  "run_id": "RUN-WIS-REV-001-001",
+  "task_id": "WIS-REV-001",
+  "agent": "growth-research",
+  "status": "REVIEW",
+  "branch": null,
+  "worktree": null,
+  "started_at": "2026-09-26T12:00:00Z",
+  "finished_at": "2026-09-26T13:00:00Z",
+  "evidence": ["25 filas preparadas", "Fuentes registradas en el tablero operativo"],
+  "tests": ["Duplicados: 0", "Corporaciones grandes: 0", "Cobertura de reseñas registrada: 25/25"],
+  "blocker": null
+}
+

@@ -1,0 +1,11 @@
+{
+  "name": "wis-bots-orchestration",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "agents:validate": "node scripts/validate-agents.mjs",
+    "agents:dry-run": "node scripts/simulate-agent-flow.mjs",
+    "test:agents": "node --test \"test/agents/**/*.test.mjs\"",
+    "test": "npm run agents:validate && npm run agents:dry-run && npm run test:agents"
+  }
+}
