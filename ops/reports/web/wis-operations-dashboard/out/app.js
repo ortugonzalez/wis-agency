@@ -1,5 +1,3 @@
-const OPERATIONS_SHEET = "https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit";
-
 const data = {
   snapshot: "2026-09-27",
   tasks: [
@@ -7,47 +5,49 @@ const data = {
     { id: "WIS-REV-001", stream: "Revenue", title: "Auditar distribuidoras provisionales", priority: "P0", owner: "growth-research", status: "READY", dependency: "WIS-SYS-001", deliverable: "Primer lote validado de 25 filas", scope: "Columnas comerciales existentes", approval: "NO", next: "Auditar filas provisionales y preparar lote 1/25", updated: "26/09/2026 20:05" },
     { id: "WIS-REV-002", stream: "Revenue", title: "Completar 300 distribuidoras argentinas", priority: "P0", owner: "growth-research", status: "BACKLOG", dependency: "WIS-REV-001", deliverable: "300 empresas únicas con QA", scope: "Columnas comerciales existentes", approval: "NO", next: "Procesar lotes de 25", updated: "26/09/2026 12:00" },
     { id: "WIS-LOG-001", stream: "Revenue", title: "Completar 300 logísticas de Latinoamérica", priority: "P1", owner: "growth-research", status: "BACKLOG", dependency: "WIS-REV-002", deliverable: "300 logísticas únicas con QA", scope: "Planilla comercial autorizada", approval: "NO", next: "Comenzar después de distribuidoras", updated: "26/09/2026 12:00" },
-    { id: "WIS-WEB-001", stream: "Operations", title: "Crear dashboard general operativo", priority: "P1", owner: "web-brand", status: "REVIEW", dependency: "WIS-SYS-001", deliverable: "Dashboard responsive e informe de uso", scope: "sites/wis-operations-dashboard/** y docs/WIS_DASHBOARD_OPERATIVO.md", approval: "SI: despliegue", next: "QA independiente y solicitud de despliegue privado", updated: "27/09/2026" }
+    { id: "WIS-WEB-001", stream: "Operations", title: "Crear dashboard general operativo", priority: "P1", owner: "web-brand", status: "WAITING_APPROVAL", dependency: "WIS-SYS-001", deliverable: "Dashboard responsive e informe de uso", scope: "ops/reports/web/**", approval: "SI: despliegue", next: "Aprobar o rechazar despliegue privado owner-only", updated: "27/09/2026" }
   ],
   runs: [
     { id: "RUN-WIS-SYS-001-001", task: "WIS-SYS-001", agent: "wis-orchestrator", status: "DONE", evidence: "Commit f3136c1 · tag baseline-multiagent-v1", tests: "Sistema 3/3 · dry-run OK · WIS X 25/25", finished: "26/09/2026 20:05" },
-    { id: "RUN-WIS-WEB-001-001", task: "WIS-WEB-001", agent: "web-brand", status: "REVIEW", evidence: "Dashboard local y documento de uso preparados", tests: "JavaScript OK · desktop y móvil OK · consola sin errores", finished: "—" }
+    { id: "RUN-WIS-WEB-001-001", task: "WIS-WEB-001", agent: "web-brand", status: "WAITING_APPROVAL", evidence: "Dashboard local y documento de uso preparados", tests: "JavaScript OK · tests 3/3 · desktop y móvil OK · consola sin errores", finished: "—" }
   ],
-  approvals: [],
+  approvals: [
+    { id: "APR-WIS-WEB-001-001", task: "WIS-WEB-001", action: "Desplegar dashboard como Site privado owner-only", impact: "Crea una URL privada sin publicar datos al público", status: "PENDING" }
+  ],
   handoffs: [
     { id: "HOF-WIS-SYS-001-001", task: "WIS-SYS-001", from: "qa-ops", to: "wis-orchestrator", status: "DONE", artifact: "docs/BASELINE_INVENTORY.md", evidence: "Repositorios anidados y artefactos generados identificados", next: "Iniciar WIS-REV-001 desde la planilla comercial" }
   ],
   agents: [
-    { id: "wis-orchestrator", name: "Orquestador", kind: "orchestrator", color: "cyan", mission: "Descompone objetivos, asigna responsables, controla dependencias, aprobaciones e integración.", tags: ["cola", "dependencias", "integración"] },
-    { id: "growth-research", name: "Research", kind: "specialist", color: "violet", mission: "Busca, enriquece y valida prospectos, contactos corporativos y reseñas con evidencia.", tags: ["prospectos", "Maps", "Sheets"] },
-    { id: "commercial-activation", name: "Activación comercial", kind: "specialist", color: "violet", mission: "Prepara mensajes, follow-ups, calificación y propuestas sobre prospectos validados.", tags: ["WhatsApp", "email", "propuestas"] },
-    { id: "content-strategy", name: "Contenido", kind: "specialist", color: "violet", mission: "Produce briefs, calendario editorial, casos y voz de marca basados en evidencia.", tags: ["briefs", "calendario", "casos"] },
-    { id: "linkedin-operator", name: "LinkedIn", kind: "specialist", color: "violet", mission: "Mantiene borradores, aprobaciones, idempotencia y publicación controlada de LinkedIn.", tags: ["dry-run", "n8n", "aprobación"] },
-    { id: "x-operator", name: "X", kind: "specialist", color: "violet", mission: "Mantiene el carril aislado de X con OAuth, reconciliación e idempotencia.", tags: ["X API", "dry-run", "reconciliación"] },
-    { id: "web-brand", name: "Web y marca", kind: "specialist", color: "violet", mission: "Mantiene web, casos aprobados y activos visuales con QA responsive.", tags: ["web", "marca", "responsive"] },
-    { id: "automation-integrations", name: "Automatizaciones", kind: "specialist", color: "violet", mission: "Mantiene n8n, conectores, esquemas, seguridad y observabilidad compartida.", tags: ["n8n", "Supabase", "infra"] },
-    { id: "qa-ops", name: "QA Ops", kind: "qa", color: "amber", mission: "Realiza QA independiente, seguridad, regresiones, incidentes y aceptación.", tags: ["QA", "seguridad", "runbooks"] }
+    { id: "wis-orchestrator", name: "Orquestador", kind: "orchestrator", color: "cyan", mission: "Convertir objetivos en tareas no superpuestas, asignar responsables, controlar dependencias, aprobaciones e integración.", scope: ["AGENTS.md y contratos", "ops/orchestration/**", "tablero operativo"], limits: ["no ejecutar trabajo especialista", "no aprobar acciones propias", "no omitir QA"], tags: ["cola", "dependencias", "integración"] },
+    { id: "growth-research", name: "Research", kind: "specialist", color: "violet", mission: "Descubrir, enriquecer y validar prospectos, contactos corporativos y reseñas con evidencia verificable.", scope: ["ops/reports/research/**", "planillas comerciales autorizadas", "fuentes públicas y Maps"], limits: ["no adivinar contactos", "sólo reseñas 1–3 estrellas", "no enviar outreach"], tags: ["prospectos", "Maps", "Sheets"] },
+    { id: "commercial-activation", name: "Activación comercial", kind: "specialist", color: "violet", mission: "Preparar mensajes, follow-ups, calificación y propuestas personalizadas usando sólo prospectos validados.", scope: ["ops/reports/commercial/**", "columnas comerciales existentes", "propuestas autorizadas"], limits: ["no enviar WhatsApp o email", "no publicar", "no inventar evidencia"], tags: ["WhatsApp", "email", "propuestas"] },
+    { id: "content-strategy", name: "Contenido", kind: "specialist", color: "violet", mission: "Crear briefs, calendario editorial, casos y voz de marca reutilizable basados en evidencia.", scope: ["ops/reports/content/**", "estrategia editorial", "borradores autorizados"], limits: ["no publicar", "no fabricar casos", "no cambiar runtimes"], tags: ["briefs", "calendario", "casos"] },
+    { id: "linkedin-operator", name: "LinkedIn", kind: "specialist", color: "violet", mission: "Mantener el carril LinkedIn, sus borradores, aprobaciones, idempotencia y publicación controlada.", scope: ["scripts LinkedIn asignados", "ops/reports/linkedin/**", "sistemas en modo lectura"], limits: ["no habilitar publicación", "no reintentar a ciegas", "no publicar sin aprobación"], tags: ["dry-run", "n8n", "aprobación"] },
+    { id: "x-operator", name: "X", kind: "specialist", color: "violet", mission: "Mantener el carril aislado de X con OAuth, publicación idempotente, reconciliación y dry-run seguro.", scope: ["wis_x/**", "ops/reports/x/**", "X API en lectura"], limits: ["no desactivar dry-run", "no habilitar el sistema", "no tocar estado LinkedIn"], tags: ["X API", "dry-run", "reconciliación"] },
+    { id: "web-brand", name: "Web y marca", kind: "specialist", color: "violet", mission: "Mantener la web y los activos de marca usando únicamente contenido y casos aprobados.", scope: ["frontend WIS autorizado", "ops/reports/web/**", "preview de navegador"], limits: ["no desplegar sin aprobación", "no inventar casos", "no modificar otros repositorios"], tags: ["web", "marca", "responsive"] },
+    { id: "automation-integrations", name: "Automatizaciones", kind: "specialist", color: "violet", mission: "Mantener integraciones compartidas, n8n, esquemas, seguridad y observabilidad sin apropiarse de la lógica de canal.", scope: ["automation/** e infra/**", "backend WIS autorizado", "n8n y Supabase en lectura"], limits: ["no activar workflows", "no guardar secretos", "no migrar producción sin aprobación"], tags: ["n8n", "Supabase", "infra"] },
+    { id: "qa-ops", name: "QA Ops", kind: "qa", color: "amber", mission: "Realizar QA independiente, seguridad, regresión, incidentes, observabilidad y validación de aceptación.", scope: ["lectura global", "ops/reports/qa/**", "test/qa/**"], limits: ["no aprobar trabajo propio", "no parchear en silencio", "no ejecutar efectos externos"], tags: ["QA", "seguridad", "runbooks"] }
   ],
   conversations: [
-    { title: "BUSQUEDA PROSPECTOS WIS", id: "01a011c6-ec79-7d32-b706-b4b73f9abdcb", agents: ["growth-research", "commercial-activation", "qa-ops"] },
-    { title: "Crear propuesta para Doña Fransica", id: "01a08190-73c2-7090-88b1-8d2ff0463acc", agents: ["commercial-activation"] },
-    { title: "Analiza sheet y plan de mails", id: "01a0654f-a185-7a43-a068-fcd39852b304", agents: ["commercial-activation"] },
-    { title: "BOT PROSPECCION WIS WSP", id: "01a011c8-647b-71c1-8da8-d56f3d6412ae", agents: ["commercial-activation", "automation-integrations", "qa-ops"] },
-    { title: "BOT LINKEDIN WIS", id: "01a011c5-b87b-76d2-9a75-07f9ddecd89f", agents: ["linkedin-operator", "automation-integrations", "qa-ops"] },
-    { title: "Actualizar web de WIS Agency", id: "01a03b5f-4e3e-7de0-a636-def7c052ade9", agents: ["web-brand", "content-strategy"] },
-    { title: "Construir WIS X Bot", id: "01a036e7-12d5-7e90-9215-df846c82d4c0", agents: ["x-operator", "qa-ops"] },
-    { title: "Diseñar bot beta tester", id: "01a03992-3bf7-7bc3-a8b2-c16cce9fc2cf", agents: ["qa-ops"] },
-    { title: "Arma calendario de contenidos WIS", id: "01a03fcf-7b51-7e50-961c-c7d75875f6c2", agents: ["content-strategy"] },
-    { title: "Investiga bots de WhatsApp en GitHub", id: "01a03995-4c1c-7c31-b288-14370d6e62da", agents: ["commercial-activation", "automation-integrations", "qa-ops"] },
-    { title: "Diseñar agente prospección B2B", id: "01a011c7-2686-7f32-8c25-b47ce2fba687", agents: ["growth-research", "commercial-activation"] },
-    { title: "ORQUESTADOR BOT WIS", id: "01a011c8-321c-7ea1-a899-9997cf861579", agents: ["wis-orchestrator", "qa-ops"] }
+    { title: "BUSQUEDA PROSPECTOS WIS", agents: ["growth-research", "commercial-activation", "qa-ops"] },
+    { title: "Crear propuesta para Doña Fransica", agents: ["commercial-activation"] },
+    { title: "Analiza sheet y plan de mails", agents: ["commercial-activation"] },
+    { title: "BOT PROSPECCION WIS WSP", agents: ["commercial-activation", "automation-integrations", "qa-ops"] },
+    { title: "BOT LINKEDIN WIS", agents: ["linkedin-operator", "automation-integrations", "qa-ops"] },
+    { title: "Actualizar web de WIS Agency", agents: ["web-brand", "content-strategy"] },
+    { title: "Construir WIS X Bot", agents: ["x-operator", "qa-ops"] },
+    { title: "Diseñar bot beta tester", agents: ["qa-ops"] },
+    { title: "Arma calendario de contenidos WIS", agents: ["content-strategy"] },
+    { title: "Investiga bots de WhatsApp en GitHub", agents: ["commercial-activation", "automation-integrations", "qa-ops"] },
+    { title: "Diseñar agente prospección B2B", agents: ["growth-research", "commercial-activation"] },
+    { title: "ORQUESTADOR BOT WIS", agents: ["wis-orchestrator", "qa-ops"] }
   ]
 };
 
 const titles = { overview: "Visión general", work: "Trabajo operativo", agents: "Mapa de agentes", sources: "Conversaciones fuente" };
 
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-const statusClass = status => ({ DONE: "pill-done", READY: "pill-ready", REVIEW: "pill-review", BACKLOG: "pill-backlog", WAITING_APPROVAL: "pill-waiting", BLOCKED: "pill-blocked" })[status] || "pill-backlog";
+const statusClass = status => ({ DONE: "pill-done", READY: "pill-ready", IN_PROGRESS: "pill-progress", REVIEW: "pill-review", BACKLOG: "pill-backlog", WAITING_APPROVAL: "pill-waiting", BLOCKED: "pill-blocked", CANCELLED: "pill-cancelled", PENDING: "pill-waiting" })[status] || "pill-backlog";
 const statusLabel = status => status.replaceAll("_", " ");
 
 function renderMetrics() {
@@ -55,7 +55,7 @@ function renderMetrics() {
   const active = data.tasks.filter(task => ["READY", "IN_PROGRESS", "REVIEW"].includes(task.status)).length;
   const metrics = [
     { label: "Tareas totales", value: data.tasks.length, foot: `${done} completada · ${active} lista`, color: "#6ee7d2" },
-    { label: "Aprobaciones", value: data.approvals.length, foot: "Sin acciones externas pendientes", color: "#8fdfa7" },
+    { label: "Aprobaciones", value: data.approvals.length, foot: data.approvals.length ? "Acción externa pendiente" : "Sin acciones externas pendientes", color: "#f2c56b" },
     { label: "Agentes definidos", value: data.agents.length, foot: "Máximo 3 especialistas a la vez", color: "#b3a1ff" },
     { label: "Fuentes conectadas", value: data.conversations.length, foot: "Conversaciones preservadas", color: "#79aefc" }
   ];
@@ -105,6 +105,17 @@ function renderRunsAndHandoffs() {
     <article class="record-item"><div class="record-top"><span class="record-id">${escapeHtml(run.id)}</span><span class="pill ${statusClass(run.status)}">${run.status}</span></div><h3>${escapeHtml(run.agent)}</h3><p>${escapeHtml(run.evidence)}</p><p>${escapeHtml(run.tests)}</p></article>`).join("");
   document.querySelector("#handoffs-list").innerHTML = data.handoffs.map(record => `
     <article class="record-item"><div class="record-top"><span class="record-id">${escapeHtml(record.id)}</span><span class="pill ${statusClass(record.status)}">${record.status}</span></div><h3>${escapeHtml(record.from)} → ${escapeHtml(record.to)}</h3><p>${escapeHtml(record.evidence)}</p><p>Próximo: ${escapeHtml(record.next)}</p></article>`).join("");
+  document.querySelector("#runs-count").textContent = data.runs.length;
+}
+
+function renderApprovals() {
+  const container = document.querySelector("#approval-list");
+  document.querySelector("#approval-count").textContent = data.approvals.length;
+  container.innerHTML = data.approvals.length ? data.approvals.map(approval => `
+    <article class="approval-item">
+      <div class="record-top"><span class="record-id">${escapeHtml(approval.id)}</span><span class="pill ${statusClass(approval.status)}">${escapeHtml(approval.status)}</span></div>
+      <h3>${escapeHtml(approval.action)}</h3><p>${escapeHtml(approval.impact)}</p>
+    </article>`).join("") : `<div class="empty-state"><strong>Sin aprobaciones pendientes</strong><p>Las acciones externas aparecerán acá.</p></div>`;
 }
 
 function renderAgents() {
@@ -115,14 +126,15 @@ function renderAgents() {
       <div class="agent-head"><span class="agent-code">${escapeHtml(agent.id)}</span><span class="agent-kind">${kinds[agent.kind]}</span></div>
       <h3>${escapeHtml(agent.name)}</h3><p>${escapeHtml(agent.mission)}</p>
       <div class="agent-tags">${agent.tags.map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+      <details class="agent-details"><summary>Ver alcance y límites</summary><div><strong>Alcance</strong><ul>${agent.scope.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul><strong>Límites</strong><ul>${agent.limits.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
     </article>`).join("");
 }
 
 function renderSources() {
   const query = document.querySelector("#source-search").value.trim().toLowerCase();
-  const sources = data.conversations.filter(source => [source.title, source.id, ...source.agents].join(" ").toLowerCase().includes(query));
+  const sources = data.conversations.filter(source => [source.title, ...source.agents].join(" ").toLowerCase().includes(query));
   document.querySelector("#source-grid").innerHTML = sources.length ? sources.map(source => `
-    <article class="source-card"><h3>${escapeHtml(source.title)}</h3><span class="source-id">${escapeHtml(source.id)}</span><div class="source-agents">${source.agents.map(agent => `<span>${escapeHtml(agent)}</span>`).join("")}</div></article>`).join("") : `<div class="empty-state"><strong>No hay coincidencias</strong><p>Buscá por nombre, ID o agente asignado.</p></div>`;
+    <article class="source-card"><h3>${escapeHtml(source.title)}</h3><span class="source-id">Contexto preservado · sin copiar conversación</span><div class="source-agents">${source.agents.map(agent => `<span>${escapeHtml(agent)}</span>`).join("")}</div></article>`).join("") : `<div class="empty-state"><strong>No hay coincidencias</strong><p>Buscá por nombre o agente asignado.</p></div>`;
 }
 
 function openTask(taskId) {
@@ -162,6 +174,7 @@ document.addEventListener("keydown", event => {
 
 renderMetrics();
 renderCriticalPath();
+renderApprovals();
 renderTasks();
 renderRunsAndHandoffs();
 renderAgents();

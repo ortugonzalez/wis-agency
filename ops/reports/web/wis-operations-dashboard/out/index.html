@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- WIS Operations Dashboard: local read-only snapshot -->
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -57,13 +58,13 @@
             <h1 id="view-title">Visión general</h1>
           </div>
           <div class="topbar-actions">
-            <div class="system-state" title="No hay bloqueos ni aprobaciones pendientes">
+            <div class="system-state" title="El sistema está estable y tiene una aprobación externa pendiente">
               <span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i></span>
               Sistema estable
             </div>
-            <a class="button button-secondary" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit" target="_blank" rel="noreferrer">
-              Abrir tablero fuente <span aria-hidden="true">↗</span>
-            </a>
+            <span class="button button-secondary source-status" title="La URL del Sheet privado no se incluye en el bundle desplegable">
+              <span class="source-long">Fuente: tablero operativo privado</span><span class="source-short">Sheet privado</span>
+            </span>
           </div>
         </header>
 
@@ -100,13 +101,9 @@
                   <p class="section-kicker">Control humano</p>
                   <h2 id="approval-title">Aprobaciones</h2>
                 </div>
-                <span class="count-badge">0</span>
+                <span class="count-badge" id="approval-count">0</span>
               </div>
-              <div class="empty-state compact">
-                <div class="empty-icon" aria-hidden="true">✓</div>
-                <strong>Sin acciones externas pendientes</strong>
-                <p>El sistema sólo está investigando, validando y preparando borradores.</p>
-              </div>
+              <div id="approval-list"></div>
               <div class="approval-rules">
                 <span>Enviar</span><span>Publicar</span><span>Desplegar</span><span>Activar</span>
               </div>
@@ -120,10 +117,10 @@
                   <p class="section-kicker">Evidencia reciente</p>
                   <h2 id="activity-title">Última ejecución</h2>
                 </div>
-                <span class="pill pill-review">REVIEW</span>
+                <span class="pill pill-waiting">WAITING APPROVAL</span>
               </div>
               <div class="run-summary">
-                <div class="run-line"><span>RUN-WIS-WEB-001-001</span><time>27 sep · revisión</time></div>
+                <div class="run-line"><span>RUN-WIS-WEB-001-001</span><time>27 sep · QA local aprobado</time></div>
                 <h3>Dashboard operativo preparado</h3>
                 <p>Vista ejecutiva, trabajo, agentes y fuentes integrados en un panel responsive.</p>
                 <div class="test-grid">
@@ -171,11 +168,14 @@
                 <span class="sr-only">Filtrar por estado</span>
                 <select id="status-filter">
                   <option value="ALL">Todos los estados</option>
-                  <option value="READY">Ready</option>
                   <option value="BACKLOG">Backlog</option>
-                  <option value="DONE">Done</option>
+                  <option value="READY">Ready</option>
+                  <option value="IN_PROGRESS">In progress</option>
                   <option value="REVIEW">Review</option>
                   <option value="WAITING_APPROVAL">Waiting approval</option>
+                  <option value="BLOCKED">Blocked</option>
+                  <option value="DONE">Done</option>
+                  <option value="CANCELLED">Cancelled</option>
                 </select>
               </label>
             </div>
@@ -195,7 +195,7 @@
 
           <div class="work-secondary-grid">
             <section class="panel" aria-labelledby="runs-title">
-              <div class="panel-heading"><div><p class="section-kicker">Trazabilidad</p><h2 id="runs-title">Ejecuciones</h2></div><span class="count-badge">1</span></div>
+              <div class="panel-heading"><div><p class="section-kicker">Trazabilidad</p><h2 id="runs-title">Ejecuciones</h2></div><span class="count-badge" id="runs-count">0</span></div>
               <div id="runs-list"></div>
             </section>
             <section class="panel" aria-labelledby="handoffs-title">

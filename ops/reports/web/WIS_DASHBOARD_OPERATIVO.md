@@ -1,7 +1,7 @@
 # WIS — Informe de uso del sistema multiagente y dashboard operativo
 
 Fecha del informe: 27 de septiembre de 2026  
-Estado general: Fundación completada; etapa de ingresos lista para comenzar; dashboard en revisión antes de despliegue.
+Estado general: Fundación completada; etapa de ingresos lista para comenzar; dashboard validado localmente y a la espera de aprobación para un despliegue privado.
 
 ## 1. Qué se construyó
 
@@ -51,7 +51,7 @@ Esta vista permite decidir rápidamente a quién corresponde cada pedido y evita
 
 ### Fuentes
 
-Reúne las doce conversaciones históricas asignadas al sistema. Son fuentes de contexto, no ejecutores automáticos. Se pueden buscar por nombre, ID o agente responsable.
+Reúne las doce conversaciones históricas asignadas al sistema. Son fuentes de contexto, no ejecutores automáticos. Se pueden buscar por nombre o agente responsable. El frontend no incluye IDs de conversaciones ni la URL/ID del Sheet privado.
 
 ## 3. Qué podés hacer ahora
 
@@ -144,7 +144,9 @@ Cuando existan patrones validados en prospectos y reseñas:
 
 ## 7. Límites actuales
 
-El dashboard generado es un **snapshot de lectura al 27/09/2026**. No modifica el Sheet ni consulta datos privados desde el navegador. Esta decisión evita exponer credenciales o hacer pública una planilla privada.
+El dashboard generado es un **snapshot de lectura al 27/09/2026**. No modifica el Sheet ni consulta datos privados desde el navegador. El bundle desplegable omite la URL y el identificador del Sheet, además de los IDs internos de las conversaciones. Esta decisión evita exponer credenciales o referencias privadas.
+
+El manifiesto estático no implementa autenticación propia. Por eso el despliegue sólo puede hacerse mediante un Site configurado y verificado como `owner-only`; si la plataforma no confirma ese nivel de acceso, no debe publicarse.
 
 La fuente de verdad continúa siendo el Sheet `WIS · Operaciones de Agentes`. Cuando el volumen operativo aumente, el siguiente paso técnico será automatizar una exportación segura del Sheet al archivo de datos del dashboard o incorporar una API autenticada. Esa ampliación debe diseñarse como una tarea independiente.
 
@@ -176,11 +178,11 @@ No conviene agregar estos indicadores antes de contar con datos consistentes. El
 
 ## 10. Archivos principales
 
-- Dashboard: `sites/wis-operations-dashboard/dist/`
+- Dashboard: `ops/reports/web/wis-operations-dashboard/out/`
 - Registro de agentes: `agents/registry.yaml`
 - Reglas globales: `AGENTS.md`
 - Operación y recuperación: `docs/AGENT_OPERATIONS.md`
 - Inventario baseline: `docs/BASELINE_INVENTORY.md`
-- Este informe: `docs/WIS_DASHBOARD_OPERATIVO.md`
+- Este informe: `ops/reports/web/WIS_DASHBOARD_OPERATIVO.md`
 
-El dashboard queda listo para revisión local. Su despliegue externo debe registrarse como una aprobación humana y no se ejecuta automáticamente.
+El dashboard queda listo para uso local. Su despliegue privado está registrado como aprobación pendiente y no se ejecuta automáticamente.
