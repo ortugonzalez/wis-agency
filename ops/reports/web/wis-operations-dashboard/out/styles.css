@@ -26,3 +26,4 @@ dialog{width:min(39rem,calc(100vw - 2rem));padding:0;border:0;border-radius:1rem
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .wa-optin input[type=datetime-local]{padding:.55rem;border:1px solid #ebd5a9;border-radius:.45rem;background:#fff}
 .drawer-actions{display:grid;grid-template-columns:1fr 1fr}.drawer-actions .button{width:100%}.drawer-send-status{grid-column:1/-1;margin:0;padding:.6rem .7rem;border-radius:.52rem;background:var(--amber-soft);color:#835819;font-size:.65rem}.drawer-send-status.is-ready{background:var(--teal-soft);color:#267363}.wa-optin.is-visible{gap:.28rem}.wa-optin>span{font-size:.56rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.wa-optin>strong{font-size:.72rem}.wa-optin>strong.is-verified{color:#0c806d}.wa-optin>p{margin:.15rem 0 0;color:#866333;font-size:.63rem}
+.queue-surface{margin-bottom:1rem}.queue-list{max-height:27rem;overflow:auto}

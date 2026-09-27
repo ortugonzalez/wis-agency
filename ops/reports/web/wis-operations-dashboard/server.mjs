@@ -1,22 +1,35 @@
 import { createServer } from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  appendOutreachEvent,
+  appendOutreachQueue,
+  appendTaskCommand,
+  buildLiveSnapshot,
+  sheetsLiveConfigured,
+  sheetsWriteConfigured,
+  updateOutreachQueue
+} from "./sheets-live.mjs";
 
-const root = fileURLToPath(new URL("../../../..", import.meta.url));
-const publicDir = join(root, "ops", "reports", "web", "wis-operations-dashboard", "out");
-const configDir = join(root, "ops", "config");
-const runtimeDir = join(root, "ops", "runtime");
+const standaloneRoot=process.env.WIS_STANDALONE_ROOT?resolve(process.env.WIS_STANDALONE_ROOT):null;
+const root = standaloneRoot||fileURLToPath(new URL("../../../..", import.meta.url));
+const publicDir = standaloneRoot?join(root,"out"):join(root, "ops", "reports", "web", "wis-operations-dashboard", "out");
+const configDir = standaloneRoot?join(root,"config"):join(root, "ops", "config");
+const runtimeDir = standaloneRoot?join(root,"runtime"):join(root, "ops", "runtime");
 const commandsPath = join(runtimeDir, "dashboard-commands.ndjson");
 const sheetSnapshotPath = join(runtimeDir, "dashboard-sheet-snapshot.json");
 const outreachEventsPath = join(runtimeDir, "dashboard-outreach-events.ndjson");
 const statePath = join(configDir, "dashboard-state.json");
 const channelVerificationPath = join(configDir, "channel-verification.json");
-const port = Number(process.env.WIS_DASHBOARD_PORT || 4174);
+const port = Number(process.env.PORT || process.env.WIS_DASHBOARD_PORT || 4174);
+const bindHost = process.env.WIS_BIND_HOST || "127.0.0.1";
 const allowedActions = new Set(["CONTINUE_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS"]);
 const mime = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml" };
 const activeSendLocks = new Set();
+let liveSyncPromise=null;
+let lastLiveSyncAt=0;
 
 await mkdir(runtimeDir, { recursive: true });
 
@@ -55,6 +68,40 @@ function hash(value) {
   return createHash("sha256").update(String(value??""),"utf8").digest("hex");
 }
 
+function secureEqual(left,right) {
+  const a=Buffer.from(String(left||""));
+  const b=Buffer.from(String(right||""));
+  return a.length===b.length&&timingSafeEqual(a,b);
+}
+
+function dashboardAuthorized(req) {
+  if(process.env.WIS_REQUIRE_AUTH!=="true") return true;
+  const encoded=String(req.headers.authorization||"").replace(/^Basic\s+/i,"");
+  if(!encoded) return false;
+  let decoded="";
+  try { decoded=Buffer.from(encoded,"base64").toString("utf8"); } catch { return false; }
+  const separator=decoded.indexOf(":");
+  if(separator<0) return false;
+  const username=decoded.slice(0,separator);
+  const password=decoded.slice(separator+1);
+  return secureEqual(username,process.env.WIS_DASHBOARD_USERNAME)&&secureEqual(hash(password),process.env.WIS_DASHBOARD_PASSWORD_SHA256);
+}
+
+async function refreshLiveSheets(force=false) {
+  if(!sheetsLiveConfigured()) return null;
+  const ttl=Math.max(15,Number(process.env.WIS_SHEETS_REFRESH_SECONDS||30))*1000;
+  if(!force&&Date.now()-lastLiveSyncAt<ttl) return null;
+  if(liveSyncPromise) return liveSyncPromise;
+  liveSyncPromise=(async()=>{
+    const snapshot=await buildLiveSnapshot();
+    await writeJsonAtomic(sheetSnapshotPath,snapshot);
+    lastLiveSyncAt=Date.now();
+    return snapshot;
+  })();
+  try { return await liveSyncPromise; }
+  finally { liveSyncPromise=null; }
+}
+
 function key(value) {
   return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
 }
@@ -64,10 +111,19 @@ function isLocalRequest(req) {
   return address==="127.0.0.1"||address==="::1"||address==="::ffff:127.0.0.1";
 }
 
-function assertLocalMutation(req) {
-  if(!isLocalRequest(req)) throw Object.assign(new Error("LOCAL_ONLY"),{status:403});
-  const origin=req.headers.origin;
-  if(origin && !/^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(origin)) throw Object.assign(new Error("ORIGIN_BLOCKED"),{status:403});
+function assertMutationRequest(req) {
+  const origin=String(req.headers.origin||"");
+  if(isLocalRequest(req)) {
+    if(origin&&!/^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(origin)) throw Object.assign(new Error("ORIGIN_BLOCKED"),{status:403});
+    return;
+  }
+  if(process.env.WIS_ALLOW_REMOTE_MUTATIONS!=="true") throw Object.assign(new Error("REMOTE_MUTATIONS_DISABLED"),{status:403});
+  const forwardedHost=String(req.headers["x-forwarded-host"]||req.headers.host||"").split(",")[0].trim();
+  const forwardedProto=String(req.headers["x-forwarded-proto"]||"https").split(",")[0].trim();
+  const expected=`${forwardedProto}://${forwardedHost}`;
+  if(!origin||origin!==expected) throw Object.assign(new Error("ORIGIN_BLOCKED"),{status:403});
+  const fetchSite=String(req.headers["sec-fetch-site"]||"");
+  if(fetchSite&&fetchSite!=="same-origin") throw Object.assign(new Error("CROSS_SITE_MUTATION_BLOCKED"),{status:403});
 }
 
 function normalizeUrl(value) {
@@ -160,7 +216,8 @@ function approvalGate(snapshot, prospect, channel) {
     batchId:approval.batchId,
     messageVersion:qa.messageVersion,
     approvedMessageHash,
-    idempotencyKey
+    idempotencyKey,
+    prospectKey
   };
 }
 
@@ -251,6 +308,7 @@ function channelHealth(verification={}) {
 }
 
 async function dashboardPayload() {
+  try { await refreshLiveSheets(false); } catch { /* keep the last valid snapshot and surface degraded sync below */ }
   const [snapshot,state,localEvents,verification]=await Promise.all([
     readJson(sheetSnapshotPath,{fetchedAt:null,source:"NONE",prospects:[],events:[]}),
     readJson(statePath,{}),
@@ -258,6 +316,7 @@ async function dashboardPayload() {
     readJson(channelVerificationPath,{})
   ]);
   const prospects=(snapshot.prospects||[]).map(normalizeProspect);
+  const queue=Array.isArray(snapshot.outreachQueue)?snapshot.outreachQueue:[];
   const events=[...localEvents,...(snapshot.events||[])].sort((a,b)=>String(b.timestamp||"").localeCompare(String(a.timestamp||"")));
   const sentEvents=events.filter(row=>isSuccessfulSend(row)||/RESPONDIDO/i.test(row.eventType||row.status||""));
   const contactedRows=new Set();
@@ -280,6 +339,7 @@ async function dashboardPayload() {
   return {
     generatedAt:new Date().toISOString(),
     prospects,
+    queue,
     events:events.slice(0,500),
     stats:{
       prospects:prospects.length,
@@ -289,7 +349,10 @@ async function dashboardPayload() {
       events:events.length,
       emailSent,
       whatsappSent,
-      replies
+      replies,
+      queued:queue.length,
+      blocked:queue.filter(row=>/BLOQUEADO|DESCARTADO/i.test(row.status||"")).length,
+      bounced:queue.filter(row=>/REBOTADO|HARD_BOUNCE|SOFT_BOUNCE/i.test(`${row.status||""} ${row.outcome||""}`)).length
     },
     channels:health,
     governance:{
@@ -308,7 +371,9 @@ async function dashboardPayload() {
 
 async function appendEvent(event) {
   const complete={eventId:`EVT-${Date.now()}-${randomUUID().slice(0,8)}`,timestamp:new Date().toISOString(),...event};
-  await appendFile(outreachEventsPath,`${JSON.stringify(complete)}\n`,"utf8");
+  if(sheetsWriteConfigured()) await appendOutreachEvent(complete);
+  try { await appendFile(outreachEventsPath,`${JSON.stringify(complete)}\n`,"utf8"); }
+  catch(error) { if(!sheetsWriteConfigured()) throw error; }
   return complete;
 }
 
@@ -387,6 +452,9 @@ async function processSend(input) {
   const idempotencyKey=gate.idempotencyKey;
   const releaseLocks=acquireSendLocks([`message:${idempotencyKey}`,`channel:${channel}`]);
   if(!releaseLocks) return {status:409,body:{ok:false,error:"SEND_IN_PROGRESS"}};
+  const messageId=`MSG-${Date.now()}-${hash(idempotencyKey).slice(0,10)}`;
+  let queueRowNumber=null;
+  let queueRecord=null;
   try {
     const freshPayload=await dashboardPayload();
     const freshSnapshot=await readJson(sheetSnapshotPath,{});
@@ -399,17 +467,37 @@ async function processSend(input) {
     if(!freshLimitGate.eligible) return {status:409,body:{ok:false,error:freshLimitGate.reason}};
     const previous=freshPayload.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
-    const baseEvent={rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
+    if(!sheetsWriteConfigured()) return {status:409,body:{ok:false,error:"DURABLE_OPERATIONS_WRITE_REQUIRED"}};
+    queueRecord={
+      messageId,idempotencyKey,prospectKey:freshGate.prospectKey,campaignId:freshGate.campaignId,batchId:freshGate.batchId,
+      sourceSheet:"Distribuidoras_300",rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,sequence:1,recipient,
+      messageVersion:freshGate.messageVersion,approvalId:freshGate.approvalId,eligibility:"VERIFIED",status:"EN_COLA",
+      scheduledAt:new Date().toISOString(),attempts:0,nextAction:"Enviar por adaptador aprobado",
+      optInVerified:channel==="WHATSAPP",optInSource:optIn?.source||"",optInRecordedAt:optIn?.recordedAt||"",
+      within24hAtEvaluation:channel==="WHATSAPP",templateId:""
+    };
+    const queued=await appendOutreachQueue(queueRecord);
+    queueRowNumber=queued.rowNumber;
+    if(!queueRowNumber) throw new Error("OUTREACH_QUEUE_APPEND_UNCONFIRMED");
+    const baseEvent={messageId,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
     await appendEvent({...baseEvent,eventType:"SEND_ATTEMPT"});
     const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey}):await sendWhatsapp({prospect,message,idempotencyKey});
     if(!result.ok) {
-      await appendEvent({...baseEvent,eventType:"SEND_BLOCKED",detail:result.error,providerStatus:result.providerStatus||null});
+      queueRecord={...queueRecord,status:"BLOQUEADO",lastError:result.error,attempts:1,nextAction:"Corregir configuración; no reintentar automáticamente"};
+      await updateOutreachQueue(queueRowNumber,queueRecord);
+      await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"BLOQUEADO",eventType:"SEND_BLOCKED",detail:result.error,providerStatus:result.providerStatus||null});
       return {status:result.status||409,body:{ok:false,error:result.error}};
     }
-    const event=await appendEvent({...baseEvent,eventType:"SENT",providerMessageIdHash:hash(result.providerMessageId)});
+    queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
+    await updateOutreachQueue(queueRowNumber,queueRecord);
+    const event=await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
     return {status:200,body:{ok:true,eventId:event.eventId,idempotencyKey}};
   } catch(error) {
-    const event=await appendEvent({rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR"});
+    if(queueRowNumber&&queueRecord) {
+      queueRecord={...queueRecord,status:"OUTCOME_UNKNOWN",lastError:error.name||"NETWORK_ERROR",attempts:1,nextAction:"Reconciliar proveedor antes de reintentar"};
+      try { await updateOutreachQueue(queueRowNumber,queueRecord); } catch { /* preserve original uncertain result */ }
+    }
+    const event=await appendEvent({messageId,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"});
     return {status:502,body:{ok:false,error:"OUTCOME_UNKNOWN",eventId:event.eventId,detail:"Resultado incierto: no se reintentará hasta reconciliar."}};
   } finally {
     releaseLocks();
@@ -417,6 +505,14 @@ async function processSend(input) {
 }
 
 async function syncFromProxy() {
+  if(sheetsLiveConfigured()) {
+    try {
+      const snapshot=await refreshLiveSheets(true);
+      return {status:200,body:{ok:true,rows:snapshot.prospects.length,queue:snapshot.outreachQueue.length,events:snapshot.events.length,fetchedAt:snapshot.fetchedAt}};
+    } catch(error) {
+      return {status:502,body:{ok:false,error:"GOOGLE_SHEETS_SYNC_FAILED",detail:error.message}};
+    }
+  }
   if(!process.env.WIS_SHEETS_PROXY_URL) return {status:409,body:{ok:false,error:"SHEETS_PROXY_NOT_CONFIGURED",detail:"La vista usa el último snapshot real; falta conectar el proxy de actualización automática."}};
   const response=await fetch(process.env.WIS_SHEETS_PROXY_URL,{headers:process.env.WIS_SHEETS_PROXY_TOKEN?{authorization:`Bearer ${process.env.WIS_SHEETS_PROXY_TOKEN}`}:{},signal:AbortSignal.timeout(30_000)});
   if(!response.ok) return {status:502,body:{ok:false,error:"SHEETS_PROXY_FAILED",detail:`HTTP ${response.status}`}};
@@ -431,14 +527,19 @@ async function syncFromProxy() {
 const server=createServer(async(req,res)=>{
   try {
     const url=new URL(req.url,`http://${req.headers.host}`);
+    if(url.pathname==="/health"&&req.method==="GET") return json(res,200,{status:"ok",sheetsConfigured:sheetsLiveConfigured(),authRequired:process.env.WIS_REQUIRE_AUTH==="true"});
+    if(!dashboardAuthorized(req)) {
+      res.writeHead(401,{"www-authenticate":"Basic realm=\"WIS Command Center\"","content-type":"application/json; charset=utf-8","cache-control":"no-store"});
+      return res.end(JSON.stringify({error:"AUTH_REQUIRED"}));
+    }
     if(url.pathname==="/api/dashboard"&&req.method==="GET") return json(res,200,await dashboardPayload());
     if(url.pathname==="/api/sync"&&req.method==="POST") {
-      assertLocalMutation(req);
+      assertMutationRequest(req);
       const result=await syncFromProxy();
       return json(res,result.status,result.body);
     }
     if(url.pathname==="/api/snapshots/sheets"&&req.method==="POST") {
-      assertLocalMutation(req);
+      if(!isLocalRequest(req)) throw Object.assign(new Error("LOCAL_ONLY"),{status:403});
       const configuredToken=process.env.WIS_DASHBOARD_INGEST_TOKEN;
       if(!configuredToken) return json(res,503,{ok:false,error:"INGEST_DISABLED"});
       if(req.headers["x-wis-dashboard-token"]!==configuredToken) return json(res,401,{ok:false,error:"INGEST_TOKEN_INVALID"});
@@ -450,19 +551,25 @@ const server=createServer(async(req,res)=>{
       return json(res,200,{ok:true,rows:snapshot.prospects.length,fetchedAt:snapshot.fetchedAt});
     }
     if(url.pathname==="/api/outreach/send"&&req.method==="POST") {
-      assertLocalMutation(req);
+      assertMutationRequest(req);
       const result=await processSend(await requestBody(req));
       return json(res,result.status,result.body);
     }
     if(url.pathname==="/api/actions"&&req.method==="POST") {
-      assertLocalMutation(req);
+      assertMutationRequest(req);
       const input=await requestBody(req);
       if(!allowedActions.has(input.action)) return json(res,400,{ok:false,error:"ACTION_NOT_ALLOWED"});
       const idempotencyKey=String(input.idempotencyKey||`${input.action}:${new Date().toISOString().slice(0,16)}`).slice(0,180);
-      const existing=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
+      const liveSnapshot=sheetsLiveConfigured()?await refreshLiveSheets(true):await readJson(sheetSnapshotPath,{});
+      const existingSheet=(liveSnapshot?.commands||[]).find(item=>(item.idempotency_key||item.idempotencyKey)===idempotencyKey);
+      const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
+      const existing=existingSheet||existingLocal;
       if(existing) return json(res,200,{ok:true,command:existing,deduplicated:true});
-      const command={commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,createdAt:new Date().toISOString(),action:input.action,scope:String(input.scope||"NEXT_PENDING_BATCH").slice(0,120),source:"WIS_DASHBOARD",requestedBy:"human-local",status:"NEW",idempotencyKey};
-      await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8");
+      const command={commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,createdAt:new Date().toISOString(),action:input.action,scope:String(input.scope||"NEXT_PENDING_BATCH").slice(0,120),source:"WIS_DASHBOARD",requestedBy:"human-dashboard",status:"NEW",idempotencyKey,evidence:"Comando creado desde el panel autenticado; pendiente de ejecutor"};
+      if(sheetsWriteConfigured()) await appendTaskCommand(command);
+      else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
+      try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
+      catch(error) { if(!sheetsWriteConfigured()) throw error; }
       return json(res,202,{ok:true,command});
     }
     const requested=url.pathname==="/"? "index.html":url.pathname.slice(1);
@@ -478,6 +585,6 @@ const server=createServer(async(req,res)=>{
 });
 
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
-if(isMain) server.listen(port,"127.0.0.1",()=>process.stdout.write(`WIS Command Center: http://127.0.0.1:${port}/#prospects\n`));
+if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, channelHealth, channelLimitGate, explicitE164, normalizeProspect, prospectStopGate, server, whatsappOptInGate };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate };

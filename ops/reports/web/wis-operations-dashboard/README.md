@@ -25,14 +25,18 @@ Abrir `http://127.0.0.1:4174/#prospects`.
 
 ## Google Sheets en vivo
 
-El runtime lee `ops/runtime/dashboard-sheet-snapshot.json`. Un adaptador autenticado puede actualizarlo mediante:
+El servicio puede leer directamente las planillas comercial y operativa con una cuenta de servicio. La planilla comercial se comparte como lectora y la operativa como editora. Los comandos del panel, la cola y los eventos se escriben únicamente en la planilla operativa.
 
-```text
-POST /api/snapshots/sheets
-X-WIS-Dashboard-Token: <WIS_DASHBOARD_INGEST_TOKEN>
-```
+Variables:
 
-También puede configurarse `WIS_SHEETS_PROXY_URL` y, opcionalmente, `WIS_SHEETS_PROXY_TOKEN`; el botón “Actualizar desde Sheets” consultará ese proxy. No se guardan credenciales en Git ni en el navegador.
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64`
+- `WIS_COMMERCIAL_SHEET_ID`
+- `WIS_OPERATIONS_SHEET_ID`
+- `WIS_SHEETS_REFRESH_SECONDS=30`
+- `WIS_SHEETS_WRITES_ENABLED=true`
+
+La clave privada nunca se guarda en Git ni se entrega al navegador. Sin escritura habilitada, el panel continúa en modo lectura y los envíos siguen bloqueados.
 
 ## Envío de email
 
@@ -64,4 +68,4 @@ El snapshot operativo acepta `qa`, `approvals`, `outreachQueue` y `providerRecon
 
 ## Seguridad
 
-El servidor escucha sólo en `127.0.0.1`, valida origen para mutaciones, deriva destinatarios desde el snapshot del Sheet y guarda eventos append-only en `ops/runtime/dashboard-outreach-events.ndjson`. El dashboard no contiene tokens, cookies ni contraseñas.
+En local el servidor escucha en `127.0.0.1`. En producción usa autenticación Basic con contraseña hasheada, HTTPS del proxy y validación estricta de mismo origen. `WIS_ALLOW_REMOTE_MUTATIONS=true` habilita los botones autenticados; no elimina QA, aprobación, consentimiento ni reconciliación. Los destinatarios siempre se derivan del Sheet y los eventos se registran de forma durable. El dashboard no contiene tokens, cookies ni contraseñas.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acquireSendLocks, approvalGate, channelHealth, channelLimitGate, explicitE164, prospectStopGate, whatsappOptInGate } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
+import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, prospectStopGate, whatsappOptInGate } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
 
 const prospect={rowNumber:42};
 const approvedBodyHash="52ad4a85f158f776d1385ac66f4536ff32c4020a5153847566c29bb89d51d7fa";
@@ -72,6 +72,38 @@ test("la salud del canal exige identidad, firma y pausa levantada",()=>{
     assert.equal(health.whatsapp.canSend,false);
   } finally {
     for(const name of names) previous[name]===undefined?delete process.env[name]:process.env[name]=previous[name];
+  }
+});
+
+test("la consola desplegada exige credenciales con contraseña hasheada",()=>{
+  const names=["WIS_REQUIRE_AUTH","WIS_DASHBOARD_USERNAME","WIS_DASHBOARD_PASSWORD_SHA256"];
+  const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+  Object.assign(process.env,{WIS_REQUIRE_AUTH:"true",WIS_DASHBOARD_USERNAME:"ortu",WIS_DASHBOARD_PASSWORD_SHA256:"19899365d5dd42bd5d7884b38041f9381f960b2e1a9fe80899a1175096d9dc02"});
+  try {
+    const good=Buffer.from("ortu:wis-seguro").toString("base64");
+    const bad=Buffer.from("ortu:incorrecta").toString("base64");
+    assert.equal(dashboardAuthorized({headers:{authorization:`Basic ${good}`}}),true);
+    assert.equal(dashboardAuthorized({headers:{authorization:`Basic ${bad}`}}),false);
+    assert.equal(dashboardAuthorized({headers:{}}),false);
+  } finally {
+    for(const name of names) previous[name]===undefined?delete process.env[name]:process.env[name]=previous[name];
+  }
+});
+
+test("las mutaciones remotas requieren habilitación y origen exacto",()=>{
+  const previous=process.env.WIS_ALLOW_REMOTE_MUTATIONS;
+  const request={
+    socket:{remoteAddress:"10.0.0.42"},
+    headers:{origin:"https://ops.wis-agency.com",host:"internal:4174","x-forwarded-host":"ops.wis-agency.com","x-forwarded-proto":"https","sec-fetch-site":"same-origin"}
+  };
+  try {
+    delete process.env.WIS_ALLOW_REMOTE_MUTATIONS;
+    assert.throws(()=>assertMutationRequest(request),/REMOTE_MUTATIONS_DISABLED/);
+    process.env.WIS_ALLOW_REMOTE_MUTATIONS="true";
+    assert.doesNotThrow(()=>assertMutationRequest(request));
+    assert.throws(()=>assertMutationRequest({...request,headers:{...request.headers,origin:"https://evil.example"}}),/ORIGIN_BLOCKED/);
+  } finally {
+    previous===undefined?delete process.env.WIS_ALLOW_REMOTE_MUTATIONS:process.env.WIS_ALLOW_REMOTE_MUTATIONS=previous;
   }
 });
 

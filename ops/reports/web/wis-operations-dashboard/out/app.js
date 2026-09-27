@@ -5,7 +5,7 @@ const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300
 const PAGE_SIZE = 18;
 
 const store = {
-  data: { prospects:[], events:[], stats:{}, channels:{}, sync:{} },
+  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{} },
   filtered: [],
   page: 1,
   selected: null,
@@ -69,10 +69,10 @@ function renderMetrics() {
     metric("Contactados",s.contacted ?? 0,"Historial consolidado","red")
   ].join("");
   $("#activity-metrics").innerHTML=[
-    metric("Eventos",s.events ?? store.data.events.length,"Ledger consolidado","blue"),
+    metric("Cola",s.queued ?? store.data.queue.length,"Outreach_Queue en vivo","blue"),
     metric("Emails enviados",s.emailSent ?? 0,"Histórico + nuevos"),
-    metric("WhatsApp enviados",s.whatsappSent ?? 0,"Sólo con opt-in","amber"),
-    metric("Respuestas",s.replies ?? 0,"Métrica principal","red")
+    metric("Bloqueados",s.blocked ?? 0,"Sin riesgo de salida","amber"),
+    metric("Rebotados",s.bounced ?? 0,"Requieren revisión","red")
   ].join("");
   $("#nav-prospect-count").textContent=s.prospects ?? store.data.prospects.length;
   $("#nav-activity-count").textContent=s.events ?? store.data.events.length;
@@ -157,6 +157,18 @@ function renderEvents() {
   }).join("") : '<div class="empty-state">Todavía no hay eventos para este filtro.</div>';
 }
 
+function renderQueue() {
+  const queue=(store.data.queue||[]).slice().sort((a,b)=>String(b.sentAt||b.scheduledAt||"").localeCompare(String(a.sentAt||a.scheduledAt||"")));
+  $("#queue-count").textContent=`${queue.length} mensajes importados`;
+  $("#queue-list").innerHTML=queue.length ? queue.map(item=>{
+    const channel=item.channel||"SYSTEM";
+    const icon=channel==="EMAIL"?"@":channel==="WHATSAPP"?"WA":"•";
+    const klass=channel==="WHATSAPP"?"wa":channel==="EMAIL"?"":"system";
+    const moment=item.sentAt||item.scheduledAt;
+    return `<article class="activity-item"><span class="activity-icon ${klass}">${icon}</span><div><strong>${esc(item.empresa||item.recipient||"Mensaje")}</strong><p>${esc([item.status,item.recipient,item.outcome,item.nextAction].filter(Boolean).join(" · "))}</p></div><time>${esc(moment?relativeDate(moment):"sin fecha")}</time></article>`;
+  }).join("") : '<div class="empty-state">Outreach_Queue todavía no tiene registros.</div>';
+}
+
 function renderChannels() {
   const channels=store.data.channels||{};
   $("#channel-grid").innerHTML=["email","whatsapp"].map(key=>{
@@ -182,6 +194,7 @@ function renderAll() {
   populateRubroFilter();
   applyFilters(false);
   renderEvents();
+  renderQueue();
   renderChannels();
   renderSync();
 }
