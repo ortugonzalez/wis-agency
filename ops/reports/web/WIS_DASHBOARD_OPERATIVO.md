@@ -1,6 +1,6 @@
 # WIS — Informe de uso del sistema multiagente y dashboard operativo
 
-Fecha del informe: 27 de septiembre de 2026  
+Fecha del informe: 27 de septiembre de 2026
 Estado general: Fundación completada; etapa de ingresos lista para comenzar; dashboard validado localmente y a la espera de aprobación para un despliegue privado.
 
 ## 1. Qué se construyó
