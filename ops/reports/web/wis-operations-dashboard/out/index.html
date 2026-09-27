@@ -3,104 +3,115 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Centro de control comercial WIS: research, QA, outreach e historial." />
+  <meta name="description" content="WIS Command Center: prospectos, mensajes y actividad comercial en una sola interfaz." />
   <meta name="color-scheme" content="light" />
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23091322'/%3E%3Cpath d='M14 19h8l5 24 5-17h7l5 17 5-24h7L48 47h-9l-4-14-4 14h-9z' fill='%2365dbc4'/%3E%3C/svg%3E" />
-  <title>WIS · Revenue Operations</title>
+  <title>WIS · Command Center</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="./app.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Saltar al contenido</a>
+  <a class="skip-link" href="#workspace">Saltar a prospectos</a>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Navegación principal">
-      <a class="brand" href="#overview" data-view="overview" aria-label="WIS Revenue Operations">
-        <span class="brand-mark" aria-hidden="true">W</span><span><strong>WIS</strong><small>Revenue Operations</small></span>
-      </a>
-      <div class="nav-label">Centro de control</div>
-      <nav class="side-nav">
-        <button class="nav-item is-active" data-view="overview"><span class="nav-icon">◫</span><span>Resumen</span></button>
-        <button class="nav-item" data-view="data"><span class="nav-icon">▦</span><span>Datos</span><b>149</b></button>
-        <button class="nav-item" data-view="activity"><span class="nav-icon">↗</span><span>Actividad</span><b>50</b></button>
-        <button class="nav-item" data-view="pipeline"><span class="nav-icon">⇢</span><span>Pipeline</span><b>4</b></button>
-        <button class="nav-item" data-view="channels"><span class="nav-icon">⌁</span><span>Canales</span><b>2</b></button>
-        <button class="nav-item" data-view="controls"><span class="nav-icon">◎</span><span>Controles</span></button>
-        <button class="nav-item" data-view="readiness"><span class="nav-icon">✓</span><span>Activación</span><b class="nav-alert">3</b></button>
+    <aside class="sidebar">
+      <a class="brand" href="#prospects" aria-label="WIS Command Center"><span class="brand-mark">W</span><span><strong>WIS</strong><small>Command Center</small></span></a>
+      <nav aria-label="Navegación principal">
+        <button class="nav-item is-active" data-view="prospects"><span>⌘</span>Prospectos <b id="nav-prospect-count">—</b></button>
+        <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
+        <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
       </nav>
       <div class="sidebar-spacer"></div>
-      <section class="environment-card" aria-label="Estado de seguridad">
-        <div class="environment-head"><span class="signal signal-amber"></span><strong>Modo protegido</strong></div>
-        <p>Research, QA y colas funcionan. Los proveedores de envío siguen bloqueados.</p>
-        <span class="environment-meta">Canario postergado para mañana</span>
+      <section class="sync-card" aria-label="Sincronización con Google Sheets">
+        <div><span class="pulse" id="sync-dot"></span><strong id="sync-label">Conectando…</strong></div>
+        <p id="sync-detail">Leyendo la fuente comercial.</p>
+        <button class="link-button" id="sync-button">Sincronizar ahora</button>
       </section>
-      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit" target="_blank" rel="noreferrer">Abrir operaciones <span>↗</span></a>
-      <a class="sheet-link sheet-link-muted" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit" target="_blank" rel="noreferrer">Abrir prospectos <span>↗</span></a>
-      <div class="sidebar-foot">Última lectura<br /><strong id="snapshot-date">Conectando…</strong></div>
+      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer">Abrir fuente en Sheets <span>↗</span></a>
+      <div class="sidebar-foot">Refresco del panel cada 30 segundos<br><strong id="last-sync">—</strong></div>
     </aside>
 
-    <main id="main">
+    <main>
       <header class="topbar">
-        <div><p class="breadcrumb">WIS / Operaciones comerciales</p><h1 id="page-title">Resumen ejecutivo</h1></div>
-        <div class="topbar-actions"><div class="live-pill"><span class="signal signal-teal"></span><span id="connection-label">LOCAL LIVE</span></div><button class="button button-secondary" id="refresh-button">Actualizar</button></div>
+        <div><p class="eyebrow">WIS / Operaciones comerciales</p><h1 id="page-title">Prospectos</h1></div>
+        <div class="top-actions">
+          <label class="global-search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar empresa, rubro, ubicación…" autocomplete="off" /><kbd>Ctrl K</kbd></label>
+          <button class="icon-button" id="refresh-button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
+        </div>
       </header>
 
-      <section class="view is-active" id="overview">
-        <div class="command-card">
-          <div class="command-copy"><p class="section-kicker">Decisión prioritaria</p><h2>Sanear el primer lote antes del canario</h2><p>La infraestructura de WhatsApp quedó endurecida y el sender de email ya tiene una base aislada. El lote de datos todavía no pasa QA: hoy conviene reemplazar corporaciones, recapturar reseñas 1–3 y rehacer el copy.</p><div class="command-actions"><button class="button button-primary" data-action="CONTINUE_RESEARCH">Continuar research</button><button class="text-button" data-view="data">Ver evidencia <span>→</span></button></div></div>
-          <div class="readiness-brief"><div class="readiness-top"><span>Lote auditado</span><strong>0 / 25 aprobados</strong></div><div class="progress-track danger-track"><span></span></div><div class="readiness-stats"><div><strong>0</strong><span>PASS</span></div><div><strong>8</strong><span>REVIEW</span></div><div><strong>17</strong><span>DISCARD</span></div></div><p><span class="signal signal-red"></span>No habilitar envíos con este lote</p></div>
+      <section class="view is-active" id="prospects">
+        <div class="hero-row">
+          <div><p class="eyebrow">Base comercial unificada</p><h2>Todo el trabajo, sin volver a la planilla</h2><p>Filtrá, revisá el análisis, copiá contactos y gestioná cada canal desde una única pantalla.</p></div>
+          <div class="hero-actions"><button class="button button-secondary" id="continue-research">Continuar research</button><button class="button button-primary" id="hero-sync">Actualizar desde Sheets</button></div>
         </div>
         <div class="metrics" id="metrics"></div>
-        <div class="dashboard-grid dashboard-grid-primary">
-          <section class="surface"><div class="surface-head"><div><p class="section-kicker">Historial consolidado</p><h2>Email previo</h2></div><span class="meta-pill">Importado al nuevo ledger</span></div><div class="history-hero" id="history-summary"></div></section>
-          <section class="surface decision-surface"><div class="surface-head"><div><p class="section-kicker">Nueva campaña</p><h2>Cola operativa</h2></div><span class="counter">0</span></div><div class="decision-empty"><span class="decision-icon">⌛</span><strong>No hay mensajes nuevos en cola</strong><p>Los 50 envíos visibles pertenecen al historial previo. No se realizó ningún envío nuevo durante esta implementación.</p></div><div class="scope-row"><span><b>59</b> registros</span><span><b>52</b> eventos</span><span><b>0</b> nuevos</span></div></section>
-        </div>
-        <div class="dashboard-grid dashboard-grid-secondary">
-          <section class="surface"><div class="surface-head"><div><p class="section-kicker">Canales</p><h2>Salud actual</h2></div></div><div id="channel-mini"></div></section>
-          <section class="surface"><div class="surface-head"><div><p class="section-kicker">Control humano</p><h2>Qué queda para mañana</h2></div></div><div class="guardrails"><article class="guardrail"><span>01</span><strong>Firma y alias</strong><p>Validar Gmail/Brevo con acceso autenticado.</p></article><article class="guardrail"><span>02</span><strong>Elegir canario</strong><p>5 emails y hasta 2 WhatsApp elegibles.</p></article><article class="guardrail"><span>03</span><strong>Aprobar lote</strong><p>Registrar alcance exacto antes de enviar.</p></article></div></section>
-        </div>
-      </section>
-
-      <section class="view" id="data">
-        <div class="view-intro"><div><p class="section-kicker">Fuente unificada</p><h2>Datos comerciales y calidad</h2><p>La planilla comercial conserva sus 12 columnas. La evidencia operativa, historial y controles viven en el centro operativo.</p></div></div>
-        <div class="coverage-grid" id="coverage-grid"></div>
-        <div class="dashboard-grid dashboard-grid-primary">
-          <section class="surface"><div class="surface-head"><div><p class="section-kicker">QA independiente</p><h2>Primer lote · filas 2–26</h2></div><span class="status status-blocked">0 PASS</span></div><div class="qa-bars" id="qa-bars"></div><div class="finding-list" id="qa-notes"></div></section>
-          <section class="surface source-card"><p class="section-kicker">Google Sheets</p><h2>Fuentes de verdad</h2><a href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer"><strong>Distribuidoras_300</strong><span>149 prospectos · 12 columnas ↗</span></a><a href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit?gid=717298635#gid=717298635" target="_blank" rel="noreferrer"><strong>Outreach_Queue</strong><span>59 registros históricos ↗</span></a><a href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit?gid=351422744#gid=351422744" target="_blank" rel="noreferrer"><strong>Outreach_Events</strong><span>52 eventos inmutables ↗</span></a><a href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit?gid=1760001001#gid=1760001001" target="_blank" rel="noreferrer"><strong>Dashboard_Snapshot</strong><span>Métricas consolidadas ↗</span></a></section>
-        </div>
+        <section class="workspace" id="workspace">
+          <div class="workspace-head">
+            <div><h3>Directorio comercial</h3><p id="result-count">Cargando…</p></div>
+            <div class="filters">
+              <label>Rubro<select id="filter-rubro"><option value="">Todos</option></select></label>
+              <label>Contacto<select id="filter-contact"><option value="">Todos</option><option value="email">Con email</option><option value="whatsapp">Con WhatsApp</option><option value="both">Ambos canales</option><option value="missing">Contacto incompleto</option></select></label>
+              <label>Estado<select id="filter-status"><option value="">Todos</option><option value="ready">Listo para revisar</option><option value="sent">Contactado</option><option value="needs-work">Requiere trabajo</option></select></label>
+              <button class="clear-filters" id="clear-filters">Limpiar</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro / ubicación</th><th>Contacto</th><th>Señal detectada</th><th>Estado</th><th></th></tr></thead><tbody id="prospect-body"></tbody></table></div>
+          <div class="pagination"><span id="page-label">—</span><div><button id="page-prev" aria-label="Página anterior">←</button><button id="page-next" aria-label="Página siguiente">→</button></div></div>
+        </section>
       </section>
 
       <section class="view" id="activity">
-        <div class="view-intro"><div><p class="section-kicker">Trazabilidad</p><h2>Emails, eventos y comandos</h2><p>El historial previo está separado de toda actividad nueva para evitar dobles conteos.</p></div></div>
-        <div class="metrics compact-metrics" id="activity-metrics"></div>
-        <section class="surface table-surface"><div class="surface-head"><div><p class="section-kicker">Historial previo</p><h2>Actividad importada</h2></div><a class="text-button" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit?gid=717298635#gid=717298635" target="_blank" rel="noreferrer">Ver las 59 filas ↗</a></div><div class="table-wrap"><table><thead><tr><th>Evento</th><th>Cantidad</th><th>Interpretación</th></tr></thead><tbody id="activity-body"></tbody></table></div></section>
-        <section class="surface table-surface"><div class="surface-head"><div><p class="section-kicker">Comandos locales</p><h2>Últimas órdenes</h2></div><span class="meta-pill">No envían mensajes</span></div><div id="command-log" class="command-log"></div></section>
-      </section>
-
-      <section class="view" id="pipeline">
-        <div class="view-intro"><div><p class="section-kicker">Producción continua</p><h2>Pipeline paralelo por lote</h2><p>Research, copy, email y WhatsApp trabajan sobre lotes distintos sin pisar filas.</p></div></div>
-        <section class="surface table-surface"><div class="table-wrap"><table><thead><tr><th>Lote</th><th>Carril</th><th>Responsable</th><th>Estado</th><th>Siguiente acción</th></tr></thead><tbody id="pipeline-body"></tbody></table></div></section>
-        <section class="surface lifecycle-surface"><div class="surface-head"><div><p class="section-kicker">Gobernanza</p><h2>Recorrido de cada contacto</h2></div><span class="meta-pill">Sin saltos</span></div><div class="state-flow" id="state-flow"></div></section>
+        <div class="section-intro"><div><p class="eyebrow">Historial vivo</p><h2>Actividad comercial</h2><p>Cada intento, entrega, respuesta, rebote y baja queda trazado.</p></div></div>
+        <div class="metrics" id="activity-metrics"></div>
+        <section class="workspace activity-surface">
+          <div class="workspace-head"><div><h3>Últimos eventos</h3><p>Más recientes primero</p></div><select id="event-filter"><option value="">Todos los eventos</option><option value="EMAIL">Email</option><option value="WHATSAPP">WhatsApp</option><option value="SYSTEM">Sistema</option></select></div>
+          <div id="activity-list" class="activity-list"></div>
+        </section>
       </section>
 
       <section class="view" id="channels">
-        <div class="view-intro"><div><p class="section-kicker">Infraestructura</p><h2>Canales independientes</h2><p>Email y WhatsApp permanecen desactivados. La línea 5679 usa conexión no oficial y no depende de plantillas de Meta.</p></div></div>
-        <div class="channel-grid" id="channel-grid"></div>
-        <section class="governance-note"><span>i</span><p><strong>Importante:</strong> fuera de la ventana operativa, la conexión no oficial bloquea el envío. No intenta simular plantillas ni sortear políticas.</p></section>
-      </section>
-
-      <section class="view" id="controls">
-        <div class="view-intro"><div><p class="section-kicker">Operación asistida</p><h2>Botones y automatizaciones</h2><p>Los botones registran órdenes idempotentes. No envían mensajes ni activan proveedores.</p></div><span class="status status-ready">LOCAL QUEUE</span></div>
-        <div class="control-grid"><button class="control-card" data-action="CONTINUE_RESEARCH"><span>01</span><strong>Continuar research</strong><p>Toma el próximo lote pendiente.</p></button><button class="control-card" data-action="RUN_QA"><span>02</span><strong>Ejecutar QA</strong><p>Revisa el último lote preparado.</p></button><button class="control-card" data-action="PREPARE_DRAFTS"><span>03</span><strong>Preparar borradores</strong><p>No envía: sólo redacta.</p></button><button class="control-card" data-action="REFRESH_SNAPSHOT"><span>04</span><strong>Actualizar snapshot</strong><p>Solicita una nueva sincronización.</p></button></div>
-        <section class="surface"><div class="surface-head"><div><p class="section-kicker">Programación</p><h2>Diaria o cada X minutos</h2></div><span class="meta-pill">Todo inicia PAUSADO</span></div><div id="schedule-grid" class="schedule-grid"></div></section>
-        <div class="notice" id="action-notice" role="status" aria-live="polite">Seleccioná una acción para registrarla.</div>
-      </section>
-
-      <section class="view" id="readiness">
-        <div class="view-intro"><div><p class="section-kicker">Puesta en marcha</p><h2>Lo que falta antes del primer envío</h2><p>Los pasos 7 y 8 quedan expresamente para mañana.</p></div><span class="status status-blocked">3 bloqueos</span></div>
-        <div class="readiness-layout"><section class="surface checklist-surface"><div id="readiness-list"></div></section><aside class="surface launch-summary"><p class="section-kicker">Canario de mañana</p><h2>Alcance controlado</h2><dl><div><dt>Email</dt><dd>5 contactos</dd></div><div><dt>WhatsApp</dt><dd>Hasta 2 con opt-in</dd></div><div><dt>Estado hoy</dt><dd>No seleccionado</dd></div><div><dt>Envíos nuevos</dt><dd>0</dd></div></dl></aside></div>
+        <div class="section-intro"><div><p class="eyebrow">Infraestructura</p><h2>Canales conectados</h2><p>El dashboard sólo habilita un envío cuando identidad, autorización e idempotencia están verificadas.</p></div></div>
+        <div id="channel-grid" class="channel-grid"></div>
+        <section class="workspace guide-card">
+          <div><span class="guide-number">01</span><strong>Elegí un prospecto</strong><p>Abrí la ficha desde cualquier fila.</p></div>
+          <div><span class="guide-number">02</span><strong>Revisá el mensaje</strong><p>El texto del Sheet aparece listo para controlar.</p></div>
+          <div><span class="guide-number">03</span><strong>Confirmá el canal</strong><p>Un segundo clic registra la aprobación y evita duplicados.</p></div>
+        </section>
       </section>
     </main>
   </div>
-  <nav class="mobile-nav" aria-label="Navegación móvil"><button class="is-active" data-view="overview">Resumen</button><button data-view="data">Datos</button><button data-view="activity">Actividad</button><button data-view="controls">Controles</button></nav>
+
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head"><div><span class="drawer-kicker" id="drawer-rubro">—</span><h2 id="drawer-company">—</h2><p id="drawer-location">—</p></div><button class="close-button" data-close="drawer" aria-label="Cerrar ficha">×</button></div>
+    <div class="drawer-scroll">
+      <section class="contact-panel"><h3>Contacto</h3><div id="drawer-contacts"></div></section>
+      <section class="detail-section"><div class="section-title"><h3>Análisis del negocio</h3><span id="drawer-rating" class="rating"></span></div><p id="drawer-analysis"></p></section>
+      <section class="detail-section"><div class="section-title"><h3>Reseñas críticas</h3><span id="drawer-reviews" class="meta-tag"></span></div><p id="drawer-problems"></p></section>
+      <section class="message-tabs">
+        <div class="tab-list"><button class="is-active" data-message-tab="EMAIL">Email</button><button data-message-tab="WHATSAPP">WhatsApp</button></div>
+        <div class="message-card"><div class="message-meta"><span id="message-channel">EMAIL</span><button id="copy-message">Copiar mensaje</button></div><pre id="message-preview"></pre></div>
+      </section>
+    </div>
+    <div class="drawer-actions"><p id="drawer-send-status" class="drawer-send-status">Verificando requisitos…</p><button class="button button-secondary" id="drawer-web">Abrir web ↗</button><button class="button button-primary" id="open-send">Revisar y enviar</button></div>
+  </aside>
+  <div class="scrim" id="scrim" data-close="drawer"></div>
+
+  <dialog id="send-dialog">
+    <form method="dialog" class="send-modal" id="send-form">
+      <div class="modal-head"><div><p class="eyebrow">Confirmación humana</p><h2 id="send-title">Enviar mensaje</h2></div><button type="button" class="close-button" data-modal-close aria-label="Cerrar">×</button></div>
+      <div class="recipient-box"><span>Destinatario</span><strong id="send-recipient">—</strong><button type="button" id="copy-recipient">Copiar</button></div>
+      <label class="message-editor">Mensaje<textarea id="send-message" rows="10"></textarea></label>
+      <div class="wa-optin" id="wa-optin">
+        <span>Consentimiento de WhatsApp</span>
+        <strong id="optin-status">Sin opt-in inbound durable y reconciliado</strong>
+        <p>El consentimiento se importa desde un evento entrante verificable; no puede autodeclararse en el dashboard.</p>
+      </div>
+      <div class="send-guard"><span>✓</span><p>Se enviará una sola vez. Si el proveedor devuelve un resultado incierto, el sistema bloqueará el reintento.</p></div>
+      <div class="modal-error" id="send-error" role="alert"></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-modal-close>Cancelar</button><button type="submit" class="button button-primary" id="confirm-send">Confirmar envío</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button></nav>
 </body>
 </html>

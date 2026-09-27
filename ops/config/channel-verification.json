@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-09-27T12:24:00-03:00",
+  "email": {
+    "aliasVerified": true,
+    "signatureApproved": false,
+    "defaultSender": true,
+    "sender": "Ortu - WIS <ortu@wis-agency.com>",
+    "transport": "smtp-relay.brevo.com:587 TLS"
+  },
+  "whatsapp": {
+    "identityVerified": true,
+    "sessionConnected": true,
+    "phoneSuffix": "5679",
+    "transport": "Baileys local",
+    "outboundPaused": true
+  }
+}

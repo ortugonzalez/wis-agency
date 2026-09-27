@@ -81,6 +81,7 @@ test("copy changes, duplicate keys, Gravatar, unverified aliases and CC are bloc
   const enabled = structuredClone(config);
   Object.assign(enabled, { enabled: true, dry_run: false, deployment_mode: "canary" });
   enabled.signature = { ...enabled.signature, approval_status: "APPROVED", sha256: sha256(signature) };
+  enabled.sender.alias_verification = "PENDING";
   assert.equal(preflightEmail({ config: enabled, candidate, approval, context, approvedBodyHtml: body, signatureHtml: signature }).reason, "ALIAS_NOT_VERIFIED");
   enabled.sender.alias_verification = "VERIFIED";
   assert.equal(preflightEmail({ config: enabled, candidate: { ...candidate, approved_subject: "Asunto alterado" }, approval, context, approvedBodyHtml: body, signatureHtml: signature }).reason, "APPROVED_SUBJECT_HASH_MISMATCH");

@@ -4,7 +4,7 @@ Implementación local y versionada del canal de email WIS. No instala, activa ni
 
 ## Contenido
 
-- `config.disabled.json`: configuración segura por defecto. El alias y la firma quedan pendientes.
+- `config.disabled.json`: configuración segura por defecto. El alias WIS fue revalidado en Gmail el 27/09/2026; la firma y el transporte siguen pendientes.
 - `config.schema.json`: contrato estricto de configuración.
 - `runtime.mjs`: preflight y construcción offline de un único sobre, sin transporte de red.
 - `health-check.mjs`: auditoría pública de DNS y, sólo con `--live-read-only`, inventario GET de n8n/Brevo. Nunca imprime credenciales.

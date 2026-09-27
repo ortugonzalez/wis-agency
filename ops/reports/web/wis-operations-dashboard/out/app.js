@@ -1,113 +1,388 @@
-const fallback = {
-  generatedAt: "2026-09-27T00:00:00-03:00", mode: "DRY_RUN",
-  commercial: { prospects:149, whatsapp:88, web:148, email:94, reviews:149, analysis:149, whatsappDrafts:149, emailDrafts:149 },
-  legacyEmail: { managed:59, sent:50, withoutKnownBounce:49, softBounces:1, hardBounces:0, duplicatesSkipped:1, positiveReplies:0, meetings:0 },
-  newPipeline: { queued:0, sent:0, activeApprovals:0, outcomeUnknown:0 },
-  qa: { batch:"Distribuidoras_300 · filas 2–26", pass:0, review:8, discard:17, notes:["25/25 registros no expresan reseñas como analizadas/total accesible.","25/25 borradores requieren adaptación al contrato comercial vigente.","17/25 registros son corporaciones o quedan fuera del foco mediana/chica."] },
-  channels: {
-    email:{ provider:"Gmail / Brevo", account:"Ortu - WIS <ortu@wis-agency.com>", health:"BLOCKED", enabled:false, canSend:false, detail:"Alias, DKIM/SPF y firma aprobada aún no verificables." },
-    whatsapp:{ provider:"Baileys · conexión no oficial", account:"línea •••• 5679", health:"HARDENED_OFF", enabled:false, canSend:false, detail:"Controles listos; sesión y transporte desactivados." }
-  },
-  sheets:{ queueRows:59, eventRows:52 }, schedules:[], commands:[]
+const $ = selector => document.querySelector(selector);
+const $$ = selector => [...document.querySelectorAll(selector)];
+const esc = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
+const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const PAGE_SIZE = 18;
+
+const store = {
+  data: { prospects:[], events:[], stats:{}, channels:{}, sync:{} },
+  filtered: [],
+  page: 1,
+  selected: null,
+  messageChannel: "EMAIL",
+  loading: false
 };
 
-const staticData = {
-  lanes: [
-    { lot:"N", name:"Research", owner:"prospect-research", status:"IN_PROGRESS", next:"Reemplazar 17 filas y recapturar 8" },
-    { lot:"N−1", name:"Copy", owner:"outreach-copy", status:"BLOCKED", next:"Esperar research validado" },
-    { lot:"N−2", name:"Email", owner:"email-sender", status:"BLOCKED", next:"Verificar alias, DNS y firma" },
-    { lot:"N−2+", name:"WhatsApp", owner:"whatsapp-sender", status:"READY_OFF", next:"Conectar transporte y probar sesión 5679" }
-  ],
-  states: ["NUEVO","RESEARCH_EN_CURSO","RESEARCH_VALIDADO","BORRADOR","QA","ESPERANDO_APROBACION","APROBADO","EN_COLA","ENVIADO","RESPONDIDO / CERRADO"],
-  readiness: [
-    { group:"Listo", status:"DONE", title:"Historial cargado", detail:"59 registros y 52 eventos importados con fuente de origen." },
-    { group:"Listo", status:"DONE", title:"WhatsApp endurecido", detail:"Idempotencia, opt-in, bajas, límites y OUTCOME_UNKNOWN implementados; disabled." },
-    { group:"Listo", status:"DONE", title:"Sender email aislado", detail:"Runtime y workflow desactivados, fail-closed y con pruebas offline." },
-    { group:"Antes del canario", status:"CRITICAL", title:"Revalidar Gmail/Brevo con acceso autenticado", detail:"Alias, credencial exclusiva, firma HTML, SPF/DKIM y transporte." },
-    { group:"Antes del canario", status:"CRITICAL", title:"Sanear el lote de 25", detail:"0 PASS, 8 REVIEW y 17 DISCARD en el primer corte." },
-    { group:"Antes del canario", status:"CRITICAL", title:"Conectar el transporte WhatsApp 5679", detail:"La implementación no contiene adaptador ni secretos y permanece apagada." },
-    { group:"Mañana", status:"PENDING", title:"Elegir el canario", detail:"Seleccionar 5 emails y hasta 2 WhatsApp con opt-in." },
-    { group:"Mañana", status:"PENDING", title:"Registrar aprobación humana", detail:"Alcance exacto, variantes, destinatarios y follow-ups." }
-  ]
-};
-
-const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[c]);
-const statusClass = status => /DONE|READY|ACTIVE|HARDENED/.test(status) ? "status-ready" : /BLOCKED|CRITICAL|REVALID|DISCARD/.test(status) ? "status-blocked" : "status-backlog";
-const pct = (value,total) => total ? Math.round(value / total * 100) : 0;
-let state = fallback;
-
-function metric(label,value,note,tone="teal") { return `<article class="metric ${tone}"><div class="metric-head"><span class="metric-label">${esc(label)}</span></div><strong class="metric-value">${esc(value)}</strong><span class="metric-note">${esc(note)}</span></article>`; }
-
-function render() {
-  const c=state.commercial, l=state.legacyEmail, n=state.newPipeline, q=state.qa;
-  document.querySelector("#snapshot-date").textContent = new Date(state.serverTime || state.generatedAt).toLocaleString("es-AR",{dateStyle:"medium",timeStyle:"short"});
-  document.querySelector("#metrics").innerHTML = [metric("Prospectos cargados",c.prospects,"Distribuidoras_300","teal"),metric("Emails históricos",l.sent,"Actividad previa importada","blue"),metric("Lote QA aprobado",`${q.pass}/25`,`${q.review} revisar · ${q.discard} descartar`,"red"),metric("Envíos nuevos",n.sent,"Proveedores bloqueados","amber")].join("");
-  document.querySelector("#activity-metrics").innerHTML = [metric("Gestionados",l.managed,"Historial previo","blue"),metric("Sin rebote conocido",l.withoutKnownBounce,"No equivale a inbox","teal"),metric("Rebotes blandos",l.softBounces,"No reenviar sin validar","red"),metric("Respuestas positivas",l.positiveReplies,"Objetivo principal","amber")].join("");
-  document.querySelector("#history-summary").innerHTML = `<div class="history-number"><strong>${l.sent}</strong><span>enviados</span></div><div class="history-stat"><b>${l.withoutKnownBounce}</b><span>sin rebote registrado</span></div><div class="history-stat"><b>${l.softBounces}</b><span>rebote blando</span></div><div class="history-stat"><b>${l.duplicatesSkipped}</b><span>duplicado omitido</span></div>`;
-  const channels=Object.entries(state.channels);
-  document.querySelector("#channel-mini").innerHTML = channels.map(([key,x])=>`<article class="mini-health"><span class="signal ${x.canSend?"signal-teal":"signal-red"}"></span><div><strong>${esc(key === "email" ? "Email" : "WhatsApp · 5679")}</strong><p>${esc(x.detail)}</p></div><em class="status ${statusClass(x.health)}">${esc(x.health)}</em></article>`).join("");
-  document.querySelector("#coverage-grid").innerHTML = [["WhatsApp",c.whatsapp],["Web",c.web],["Email",c.email],["Reseñas",c.reviews],["Análisis",c.analysis],["Borrador WA",c.whatsappDrafts],["Borrador email",c.emailDrafts]].map(([name,value])=>`<article class="coverage-card"><div><strong>${esc(value)}</strong><span>/ ${c.prospects}</span></div><p>${esc(name)}</p><div class="coverage-track"><span style="width:${pct(value,c.prospects)}%"></span></div></article>`).join("");
-  document.querySelector("#qa-bars").innerHTML = [["PASS",q.pass,"pass"],["REVIEW",q.review,"review"],["DISCARD",q.discard,"discard"]].map(([label,value,kind])=>`<div class="qa-row"><span>${label}</span><div><i class="${kind}" style="width:${pct(value,25)}%"></i></div><strong>${value}</strong></div>`).join("");
-  document.querySelector("#qa-notes").innerHTML = q.notes.map((note,i)=>`<article><span>0${i+1}</span><p>${esc(note)}</p></article>`).join("");
-  document.querySelector("#activity-body").innerHTML = [["Emails enviados",l.sent,"Historial previo importado"],["Entregas sin rebote",l.withoutKnownBounce,"No confirma bandeja de entrada"],["Rebote blando",l.softBounces,"Brevo / reputación IP"],["Duplicado omitido",l.duplicatesSkipped,"Protección idempotente"],["Eventos del ledger",state.sheets?.eventRows || 0,"Registro append-only"],["Mensajes nuevos",n.sent,"Desde este sistema"]].map(row=>`<tr><td><strong>${esc(row[0])}</strong></td><td>${esc(row[1])}</td><td>${esc(row[2])}</td></tr>`).join("");
-  document.querySelector("#pipeline-body").innerHTML = staticData.lanes.map(x=>`<tr><td><strong>Lote ${esc(x.lot)}</strong></td><td>${esc(x.name)}</td><td><code>${esc(x.owner)}</code></td><td><span class="status ${statusClass(x.status)}">${esc(x.status)}</span></td><td>${esc(x.next)}</td></tr>`).join("");
-  document.querySelector("#state-flow").innerHTML = staticData.states.map((x,i)=>`${i?'<span class="state-arrow">→</span>':''}<span class="state-node"><b>${String(i+1).padStart(2,"0")}</b>${esc(x)}</span>`).join("");
-  document.querySelector("#channel-grid").innerHTML = channels.map(([key,x])=>`<article class="channel-card"><div class="channel-head"><div><p class="channel-provider">${esc(x.provider)}</p><h3>${key === "email" ? "Email" : "WhatsApp"}</h3></div><span class="status ${statusClass(x.health)}">${esc(x.health)}</span></div><div class="channel-stats"><div><strong>${esc(x.account)}</strong><span>Cuenta</span></div><div><strong>${x.canSend?"Sí":"No"}</strong><span>Puede enviar</span></div></div><p class="risk-note">${esc(x.detail)}</p></article>`).join("");
-  renderCommands(); renderSchedules(); renderReadiness();
+function toast(message, error=false) {
+  const node=$("#toast");
+  node.textContent=message;
+  node.classList.toggle("is-error",error);
+  node.classList.add("is-visible");
+  clearTimeout(toast.timer);
+  toast.timer=setTimeout(()=>node.classList.remove("is-visible"),3200);
 }
 
-function renderCommands() {
-  const list=state.commands || [];
-  document.querySelector("#command-log").innerHTML = list.length ? list.map(x=>`<article><span class="status status-backlog">${esc(x.status)}</span><div><strong>${esc(x.action)}</strong><p>${esc(x.scope)} · ${new Date(x.createdAt).toLocaleString("es-AR")}</p></div><code>${esc(x.commandId)}</code></article>`).join("") : `<div class="empty-row">Todavía no hay órdenes registradas desde el panel.</div>`;
+async function copy(value, label="Dato") {
+  if (!value) return toast(`${label} no disponible`,true);
+  try { await navigator.clipboard.writeText(value); toast(`${label} copiado al portapapeles`); }
+  catch { toast("El navegador no permitió copiar automáticamente.",true); }
 }
 
-function renderSchedules() {
-  const schedules=state.schedules || [];
-  document.querySelector("#schedule-grid").innerHTML = schedules.length ? schedules.map(x=>`<article class="schedule-card"><div><span class="status ${x.status === "ACTIVE" ? "status-ready" : "status-backlog"}">${esc(x.status)}</span><strong>${esc(x.name)}</strong><p>${x.mode === "DAILY" ? `Todos los días · ${esc(x.dailyTime)}` : `Cada ${esc(x.intervalMinutes)} minutos`}</p></div><div class="schedule-actions"><button data-schedule="${esc(x.id)}" data-status="${x.status === "ACTIVE" ? "PAUSED" : "ACTIVE"}" class="button button-secondary">${x.status === "ACTIVE" ? "Pausar" : "Activar"}</button></div></article>`).join("") : `<div class="empty-row">Abrí el panel con <code>npm run dashboard:start</code> para administrar horarios.</div>`;
-  document.querySelectorAll("[data-schedule]").forEach(button=>button.addEventListener("click",()=>updateSchedule(button.dataset.schedule,button.dataset.status)));
+function relativeDate(value) {
+  if (!value) return "sin sincronizar";
+  const date=new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  const seconds=Math.round((date-Date.now())/1000);
+  const formatter=new Intl.RelativeTimeFormat("es",{numeric:"auto"});
+  if (Math.abs(seconds)<60) return formatter.format(seconds,"second");
+  const minutes=Math.round(seconds/60);
+  if (Math.abs(minutes)<60) return formatter.format(minutes,"minute");
+  const hours=Math.round(minutes/60);
+  if (Math.abs(hours)<24) return formatter.format(hours,"hour");
+  return date.toLocaleString("es-AR",{dateStyle:"medium",timeStyle:"short"});
 }
 
-function renderReadiness() {
-  const groups=staticData.readiness.reduce((a,x)=>((a[x.group] ||= []).push(x),a),{});
-  document.querySelector("#readiness-list").innerHTML = Object.entries(groups).map(([name,items])=>`<section class="check-group"><div class="check-group-title"><h3>${esc(name)}</h3><span>${items.filter(x=>x.status==="DONE").length}/${items.length}</span></div>${items.map(x=>`<article class="check-item ${x.status === "DONE" ? "is-done" : x.status === "CRITICAL" ? "is-critical" : ""}"><span class="check-marker">${x.status === "DONE" ? "✓" : x.status === "CRITICAL" ? "!" : "○"}</span><div><strong>${esc(x.title)}</strong><p>${esc(x.detail)}</p></div><span class="status ${statusClass(x.status)}">${esc(x.status)}</span></article>`).join("")}</section>`).join("");
+function prospectStatus(prospect) {
+  if (/ENVIADO|DELIVERED|SENT|RESPONDIDO|CERRADO/i.test(prospect.lastStatus || "")) return "sent";
+  const coverage=/^\s*\d+\s*\/\s*\d+\s*$/.test(prospect.reviewsAnalyzed || "");
+  if (coverage && prospect.analysis && prospect.problems && (prospect.emailMessage || prospect.whatsappMessage)) return "ready";
+  return "needs-work";
 }
 
-async function loadState() {
+function statusBadge(prospect) {
+  const status=prospectStatus(prospect);
+  if(status==="sent") return '<span class="status status-sent">Contactado</span>';
+  if(status==="ready") return '<span class="status status-ready">Listo para revisar</span>';
+  return '<span class="status status-review">Requiere trabajo</span>';
+}
+
+function metric(label,value,note,tone="") {
+  return `<article class="metric ${tone}"><span class="metric-label">${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`;
+}
+
+function renderMetrics() {
+  const s=store.data.stats || {};
+  $("#metrics").innerHTML=[
+    metric("Prospectos",s.prospects ?? store.data.prospects.length,"Fuente: Distribuidoras_300"),
+    metric("Con ambos canales",s.bothChannels ?? 0,"Email + WhatsApp","blue"),
+    metric("Listos para revisar",s.ready ?? 0,"Cobertura de reseñas completa","amber"),
+    metric("Contactados",s.contacted ?? 0,"Historial consolidado","red")
+  ].join("");
+  $("#activity-metrics").innerHTML=[
+    metric("Eventos",s.events ?? store.data.events.length,"Ledger consolidado","blue"),
+    metric("Emails enviados",s.emailSent ?? 0,"Histórico + nuevos"),
+    metric("WhatsApp enviados",s.whatsappSent ?? 0,"Sólo con opt-in","amber"),
+    metric("Respuestas",s.replies ?? 0,"Métrica principal","red")
+  ].join("");
+  $("#nav-prospect-count").textContent=s.prospects ?? store.data.prospects.length;
+  $("#nav-activity-count").textContent=s.events ?? store.data.events.length;
+}
+
+function populateRubroFilter() {
+  const current=$("#filter-rubro").value;
+  const rubros=[...new Set(store.data.prospects.map(row=>row.rubro).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
+  $("#filter-rubro").innerHTML='<option value="">Todos</option>'+rubros.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  if(rubros.includes(current)) $("#filter-rubro").value=current;
+}
+
+function applyFilters(resetPage=true) {
+  if(resetPage) store.page=1;
+  const query=normalize($("#search").value);
+  const rubro=$("#filter-rubro").value;
+  const contact=$("#filter-contact").value;
+  const status=$("#filter-status").value;
+  store.filtered=store.data.prospects.filter(row=>{
+    const haystack=normalize([row.empresa,row.rubro,row.ubicacion,row.email,row.whatsapp,row.problems,row.analysis].join(" "));
+    const contactMatch=!contact || (contact==="email"&&row.email) || (contact==="whatsapp"&&row.whatsapp) ||
+      (contact==="both"&&row.email&&row.whatsapp) || (contact==="missing"&&(!row.email||!row.whatsapp));
+    return (!query||haystack.includes(query)) && (!rubro||row.rubro===rubro) && contactMatch && (!status||prospectStatus(row)===status);
+  });
+  renderTable();
+}
+
+function waCopyValue(prospect) {
+  return prospect.whatsappE164 || String(prospect.whatsapp||"").split("(")[0].trim();
+}
+
+function sendBlocker(prospect,channelName) {
+  const isWa=channelName==="WHATSAPP";
+  const recipient=isWa?prospect.whatsapp:prospect.email;
+  if(!recipient) return "RECIPIENT_MISSING";
+  if(isWa&&!prospect.whatsappE164) return "WHATSAPP_PHONE_INVALID";
+  const gate=prospect.eligibility?.[channelName]||{eligible:false,reason:"INDEPENDENT_QA_REQUIRED"};
+  if(!gate.eligible) return gate.reason;
+  if(isWa&&!prospect.whatsappOptIn?.eligible) return prospect.whatsappOptIn?.reason||"DURABLE_OPTIN_REQUIRED";
+  const channel=store.data.channels?.[isWa?"whatsapp":"email"]||{};
+  if(!channel.canSend) return isWa?"WHATSAPP_PROVIDER_NOT_CONFIGURED":"EMAIL_PROVIDER_NOT_CONFIGURED";
+  return "";
+}
+
+function contactChip(type,value,row,copyValue=value) {
+  if(!value) return "";
+  const label=type==="email"?"Email":"WhatsApp";
+  return `<button class="copy-chip" data-copy="${esc(copyValue)}" data-copy-label="${label}" data-row="${row}"><i>${type==="email"?"@":"◉"}</i><span>${esc(value)}</span></button>`;
+}
+
+function renderTable() {
+  const pages=Math.max(1,Math.ceil(store.filtered.length/PAGE_SIZE));
+  store.page=Math.min(store.page,pages);
+  const start=(store.page-1)*PAGE_SIZE;
+  const rows=store.filtered.slice(start,start+PAGE_SIZE);
+  $("#result-count").textContent=`${store.filtered.length} de ${store.data.prospects.length} prospectos`;
+  $("#page-label").textContent=`Página ${store.page} de ${pages} · ${store.filtered.length} resultados`;
+  $("#page-prev").disabled=store.page<=1;
+  $("#page-next").disabled=store.page>=pages;
+  $("#prospect-body").innerHTML=rows.length ? rows.map(row=>`
+    <tr data-open-row="${row.rowNumber}">
+      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>Fila ${esc(row.rowNumber)}</small></div></div></td>
+      <td><div class="rubric-cell"><strong>${esc(row.rubro||"Sin rubro")}</strong><span>${esc(row.ubicacion||"Sin ubicación")}</span></div></td>
+      <td><div class="contact-stack">${contactChip("email",row.email,row.rowNumber)}${contactChip("whatsapp",row.whatsapp,row.rowNumber,waCopyValue(row))}${!row.email&&!row.whatsapp?'<span>Sin contacto verificable</span>':""}</div></td>
+      <td><div class="problem-cell"><p>${esc(row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
+      <td>${statusBadge(row)}</td>
+      <td><button class="row-button" data-open="${row.rowNumber}" aria-label="Abrir ficha de ${esc(row.empresa)}">→</button></td>
+    </tr>`).join("") : '<tr><td colspan="6" class="empty-state">No hay prospectos que coincidan con estos filtros.</td></tr>';
+  $$("[data-copy]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();copy(button.dataset.copy,button.dataset.copyLabel);}));
+  $$("[data-open-row]").forEach(row=>row.addEventListener("click",()=>openDrawer(Number(row.dataset.openRow))));
+  $$("[data-open]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openDrawer(Number(button.dataset.open));}));
+}
+
+function renderEvents() {
+  const filter=$("#event-filter").value;
+  const events=(store.data.events||[]).filter(event=>!filter || event.channel===filter || (filter==="SYSTEM"&&!["EMAIL","WHATSAPP"].includes(event.channel))).slice(0,100);
+  $("#activity-list").innerHTML=events.length ? events.map(event=>{
+    const channel=event.channel||"SYSTEM";
+    const icon=channel==="EMAIL"?"@":channel==="WHATSAPP"?"WA":"•";
+    const klass=channel==="WHATSAPP"?"wa":channel==="EMAIL"?"":"system";
+    return `<article class="activity-item"><span class="activity-icon ${klass}">${icon}</span><div><strong>${esc(event.eventType||event.status||"Evento")}</strong><p>${esc([event.empresa,event.recipient,event.detail].filter(Boolean).join(" · ")||"Actividad del sistema")}</p></div><time>${esc(relativeDate(event.timestamp))}</time></article>`;
+  }).join("") : '<div class="empty-state">Todavía no hay eventos para este filtro.</div>';
+}
+
+function renderChannels() {
+  const channels=store.data.channels||{};
+  $("#channel-grid").innerHTML=["email","whatsapp"].map(key=>{
+    const channel=channels[key]||{};
+    const ready=channel.canSend===true;
+    const title=key==="email"?"Email":"WhatsApp";
+    const label=ready?"Listo":channel.connected?"Conectado · pausado":"Requiere conexión";
+    return `<article class="channel-card"><div class="channel-top"><span class="channel-icon ${key==="whatsapp"?"wa":""}">${key==="email"?"@":"WA"}</span><span class="status ${ready?"status-ready":"status-review"}">${label}</span></div><h3>${title}</h3><p>${esc(channel.account||"Sin cuenta verificada")}</p><div class="channel-details"><div><span>Proveedor</span><strong>${esc(channel.provider||"Pendiente")}</strong></div><div><span>Modo</span><strong>${ready?"Envío con confirmación":"Bloqueado seguro"}</strong></div></div>${ready?"":`<div class="blocker">${esc(channel.detail||"Falta configurar el adaptador del canal.")}</div>`}</article>`;
+  }).join("");
+}
+
+function renderSync() {
+  const sync=store.data.sync||{};
+  const live=sync.status==="LIVE";
+  $("#sync-dot").className=`pulse ${live?"is-live":sync.status==="ERROR"?"is-error":""}`;
+  $("#sync-label").textContent=live?"Sheets conectado":sync.status==="SNAPSHOT"?"Datos del Sheet":"Conexión pendiente";
+  $("#sync-detail").textContent=sync.detail||"Snapshot local de la fuente comercial.";
+  $("#last-sync").textContent=relativeDate(sync.fetchedAt);
+}
+
+function renderAll() {
+  renderMetrics();
+  populateRubroFilter();
+  applyFilters(false);
+  renderEvents();
+  renderChannels();
+  renderSync();
+}
+
+async function loadData(silent=false) {
+  if(store.loading) return;
+  store.loading=true;
+  if(!silent) $("#refresh-button").textContent="…";
   try {
-    const response=await fetch("/api/state",{cache:"no-store"});
-    if(!response.ok) throw new Error("offline");
-    state=await response.json();
-    document.querySelector("#connection-label").textContent="LOCAL LIVE";
-  } catch {
-    state=fallback;
-    document.querySelector("#connection-label").textContent="SNAPSHOT";
+    const response=await fetch("/api/dashboard",{cache:"no-store"});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error||"No se pudo cargar el dashboard");
+    store.data=payload;
+    renderAll();
+  } catch(error) {
+    toast(error.message||"No se pudo conectar con el servidor local.",true);
+    $("#sync-dot").className="pulse is-error";
+    $("#sync-label").textContent="Dashboard desconectado";
+  } finally {
+    store.loading=false;
+    $("#refresh-button").textContent="↻";
   }
-  render();
 }
 
-async function enqueue(action) {
-  const notice=document.querySelector("#action-notice");
-  notice.textContent="Registrando orden…";
+function openDrawer(rowNumber) {
+  const prospect=store.data.prospects.find(row=>row.rowNumber===rowNumber);
+  if(!prospect) return;
+  store.selected=prospect;
+  $("#drawer-rubro").textContent=prospect.rubro||"Sin rubro";
+  $("#drawer-company").textContent=prospect.empresa||"Sin nombre";
+  $("#drawer-location").textContent=prospect.ubicacion||"Sin ubicación";
+  $("#drawer-rating").textContent=prospect.rating?`★ ${prospect.rating}`:"Sin rating";
+  $("#drawer-reviews").textContent=prospect.reviewsAnalyzed||"Cobertura pendiente";
+  $("#drawer-analysis").textContent=prospect.analysis||"Análisis pendiente.";
+  $("#drawer-problems").textContent=prospect.problems||"No se registraron problemas.";
+  $("#drawer-contacts").innerHTML=[
+    {label:"Email",value:prospect.email,copy:prospect.email},{label:"WhatsApp",value:prospect.whatsapp,copy:waCopyValue(prospect)}
+  ].map(item=>`<article class="contact-card"><div><span>${item.label}</span><strong>${esc(item.value||"No disponible")}</strong></div>${item.value?`<button data-drawer-copy="${esc(item.copy)}" data-label="${item.label}">Copiar</button>`:""}</article>`).join("");
+  $$("[data-drawer-copy]").forEach(button=>button.addEventListener("click",()=>copy(button.dataset.drawerCopy,button.dataset.label)));
+  $("#drawer-web").disabled=!prospect.web;
+  store.messageChannel=prospect.email?"EMAIL":"WHATSAPP";
+  renderMessagePreview();
+  $("#drawer").classList.add("is-open");
+  $("#drawer").setAttribute("aria-hidden","false");
+  $("#scrim").classList.add("is-open");
+}
+
+function closeDrawer() {
+  $("#drawer").classList.remove("is-open");
+  $("#drawer").setAttribute("aria-hidden","true");
+  $("#scrim").classList.remove("is-open");
+}
+
+function renderMessagePreview() {
+  const prospect=store.selected;
+  if(!prospect) return;
+  $$("[data-message-tab]").forEach(button=>button.classList.toggle("is-active",button.dataset.messageTab===store.messageChannel));
+  $("#message-channel").textContent=store.messageChannel;
+  $("#message-preview").textContent=store.messageChannel==="EMAIL" ? (prospect.emailMessage||"Borrador de email pendiente.") : (prospect.whatsappMessage||"Borrador de WhatsApp pendiente.");
+  const recipient=store.messageChannel==="EMAIL"?prospect.email:prospect.whatsapp;
+  const blocker=sendBlocker(prospect,store.messageChannel);
+  $("#open-send").disabled=!recipient;
+  $("#open-send").textContent=!recipient?"Canal no disponible":blocker?"Ver requisitos de envío":`Revisar y enviar ${store.messageChannel==="EMAIL"?"email":"WhatsApp"}`;
+  $("#open-send").classList.toggle("button-primary",!blocker&&Boolean(recipient));
+  $("#open-send").classList.toggle("button-secondary",Boolean(blocker)||!recipient);
+  $("#drawer-send-status").textContent=blocker?(sendErrors[blocker]||blocker):"Listo para una confirmación final antes del envío.";
+  $("#drawer-send-status").classList.toggle("is-ready",!blocker);
+}
+
+function openSendDialog() {
+  const prospect=store.selected;
+  if(!prospect) return;
+  const isWa=store.messageChannel==="WHATSAPP";
+  const recipient=isWa?waCopyValue(prospect):prospect.email;
+  const message=isWa?prospect.whatsappMessage:prospect.emailMessage;
+  if(!recipient) return toast("Este prospecto no tiene un contacto verificable para el canal.",true);
+  $("#send-title").textContent=`Enviar ${isWa?"WhatsApp":"email"} a ${prospect.empresa}`;
+  $("#send-recipient").textContent=recipient;
+  $("#send-message").value=message||"";
+  $("#wa-optin").classList.toggle("is-visible",isWa);
+  if(isWa) {
+    const optIn=prospect.whatsappOptIn||{};
+    $("#optin-status").textContent=optIn.eligible?`Opt-in inbound verificado · ${relativeDate(optIn.recordedAt)}`:"Sin opt-in inbound durable y reconciliado";
+    $("#optin-status").classList.toggle("is-verified",optIn.eligible===true);
+  }
+  const blocker=sendBlocker(prospect,store.messageChannel);
+  $("#send-error").textContent=blocker?(sendErrors[blocker]||blocker):"";
+  $("#send-error").classList.toggle("is-visible",Boolean(blocker));
+  $("#confirm-send").disabled=Boolean(blocker);
+  $("#confirm-send").textContent=blocker?"Envío bloqueado":"Confirmar envío";
+  $("#send-dialog").showModal();
+}
+
+const sendErrors={
+  EMAIL_PROVIDER_NOT_CONFIGURED:"Falta conectar el webhook exclusivo de Gmail/Brevo.",
+  WHATSAPP_PROVIDER_NOT_CONFIGURED:"Falta cargar el token local de la línea WIS terminada en 5679.",
+  WHATSAPP_PHONE_INVALID:"El número publicado no está en formato internacional verificable (+54…). Corregilo en el Sheet antes de enviar.",
+  CHANNEL_BLOCKED:"El canal todavía está bloqueado por su verificación de seguridad.",
+  INDEPENDENT_QA_REQUIRED:"Este mensaje todavía no tiene QA independiente aprobado.",
+  BATCH_APPROVAL_REQUIRED:"Falta una aprobación de lote vigente que incluya este destinatario, canal y versión.",
+  DURABLE_IDEMPOTENCY_SNAPSHOT_REQUIRED:"Falta reconciliar la cola y el proveedor antes de habilitar el envío.",
+  APPROVED_MESSAGE_HASH_REQUIRED:"La versión aprobada no tiene una huella verificable del mensaje.",
+  APPROVAL_RECIPIENT_LIMIT_REACHED:"La aprobación ya consumió el número exacto de destinatarios autorizado.",
+  DURABLE_OPTIN_REQUIRED:"WhatsApp exige un opt-in inbound durable y reconciliado; no puede cargarse manualmente desde este panel.",
+  SERVICE_WINDOW_EXPIRED:"El opt-in quedó fuera de la ventana de 24 horas y no hay una plantilla aprobada seleccionada.",
+  EMAIL_FIRST_REQUIRED:"Primero debe existir un email inicial enviado a este prospecto.",
+  DAILY_LIMIT_REACHED:"El canal alcanzó su límite diario y quedó pausado.",
+  MINIMUM_INTERVAL_NOT_REACHED:"Todavía no transcurrieron 15 minutos desde el último envío del canal.",
+  EMAIL_WINDOW_CLOSED:"Los emails sólo se envían de 09:30 a 17:30 de Buenos Aires.",
+  PROSPECT_STOPPED:"El prospecto está detenido por respuesta, baja, reunión, rebote duro o resultado incierto.",
+  SIMULTANEOUS_CHANNEL_BLOCKED:"Hay una operación activa en el otro canal para este prospecto.",
+  DUPLICATE_IDEMPOTENCY_KEY:"Este mismo mensaje ya fue procesado. No se duplicó.",
+  SEND_IN_PROGRESS:"Ya hay una operación de este canal en curso. Esperá su resultado antes de reintentar.",
+  PROVIDER_REJECTED:"El proveedor rechazó el envío. Revisá la salud del canal.",
+  EMAIL_SIGNATURE_NOT_APPROVED:"Falta aprobar y cargar la firma HTML WIS sin Gravatar.",
+  RECIPIENT_MISSING:"Este prospecto no tiene un destinatario verificable para el canal.",
+  PROSPECT_NOT_FOUND:"El prospecto ya no existe en la última sincronización.",
+  MESSAGE_CHANGED:"El borrador cambió desde la última lectura. Actualizá antes de enviar."
+};
+
+async function sendMessage(event) {
+  event.preventDefault();
+  const prospect=store.selected;
+  const isWa=store.messageChannel==="WHATSAPP";
+  const errorNode=$("#send-error");
+  errorNode.classList.remove("is-visible");
+  const button=$("#confirm-send");
+  button.disabled=true;
+  button.textContent="Enviando…";
   try {
-    const response=await fetch("/api/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,scope:"NEXT_PENDING_BATCH"})});
-    const result=await response.json();
-    if(!response.ok) throw new Error(result.error || "ERROR");
-    notice.textContent=`Orden ${result.command.commandId} registrada. No se realizó ningún envío.`;
-    await loadState();
-  } catch { notice.textContent="Para usar los botones, iniciá el panel con: npm run dashboard:start"; }
+    const response=await fetch("/api/outreach/send",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+      rowNumber:prospect.rowNumber,
+      channel:store.messageChannel,
+      message:$("#send-message").value,
+      confirmed:true
+    })});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(sendErrors[payload.error]||payload.detail||payload.error||"No se pudo enviar");
+    $("#send-dialog").close();
+    toast(`${isWa?"WhatsApp":"Email"} enviado y registrado sin duplicados.`);
+    await loadData(true);
+  } catch(error) {
+    errorNode.textContent=error.message;
+    errorNode.classList.add("is-visible");
+  } finally {
+    const blocker=sendBlocker(prospect,store.messageChannel);
+    button.disabled=Boolean(blocker);
+    button.textContent=blocker?"Envío bloqueado":"Confirmar envío";
+  }
 }
 
-async function updateSchedule(id,status) {
-  const current=(state.schedules || []).find(x=>x.id===id);
-  if(!current) return;
-  const response=await fetch(`/api/schedules/${encodeURIComponent(id)}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({...current,status})});
-  if(response.ok) await loadState();
+async function requestSync() {
+  $("#sync-button").textContent="Sincronizando…";
+  try {
+    const response=await fetch("/api/sync",{method:"POST",headers:{"content-type":"application/json"},body:"{}"});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.detail||payload.error);
+    toast("Datos actualizados desde Google Sheets.");
+    await loadData(true);
+  } catch(error) {
+    toast(error.message==="SHEETS_PROXY_NOT_CONFIGURED"?"La vista ya contiene el último snapshot real. Falta conectar el refresco automático de Sheets.":error.message,true);
+  } finally { $("#sync-button").textContent="Sincronizar ahora"; }
 }
 
-const titles={overview:"Resumen ejecutivo",data:"Datos unificados",activity:"Actividad e historial",pipeline:"Pipeline por lote",channels:"Salud de canales",controls:"Controles y automatización",readiness:"Puesta en marcha"};
-function switchView(id){document.querySelectorAll(".view").forEach(x=>x.classList.toggle("is-active",x.id===id));document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("is-active",x.dataset.view===id));document.querySelector("#page-title").textContent=titles[id];history.replaceState(null,"",`#${id}`);window.scrollTo({top:0,behavior:"smooth"});}
-document.querySelectorAll("[data-view]").forEach(x=>x.addEventListener("click",e=>{e.preventDefault();switchView(x.dataset.view);}));
-document.querySelectorAll("[data-action]").forEach(x=>x.addEventListener("click",()=>enqueue(x.dataset.action)));
-document.querySelector("#refresh-button").addEventListener("click",loadState);
-if(titles[location.hash.slice(1)]) switchView(location.hash.slice(1));
-loadState();
+async function enqueueResearch() {
+  try {
+    const response=await fetch("/api/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"CONTINUE_RESEARCH",scope:"NEXT_PENDING_BATCH",idempotencyKey:`CONTINUE_RESEARCH:${new Date().toISOString().slice(0,10)}`})});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error);
+    toast(payload.deduplicated?"La tarea de hoy ya estaba registrada.":"Próximo lote de research registrado.");
+  } catch(error) { toast(error.message||"No se pudo registrar la tarea.",true); }
+}
+
+function switchView(id) {
+  $$(".view").forEach(view=>view.classList.toggle("is-active",view.id===id));
+  $$("[data-view]").forEach(button=>button.classList.toggle("is-active",button.dataset.view===id));
+  $("#page-title").textContent={prospects:"Prospectos",activity:"Actividad",channels:"Canales"}[id]||"Prospectos";
+  history.replaceState(null,"",`#${id}`);
+}
+
+$$("[data-view]").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
+["#search","#filter-rubro","#filter-contact","#filter-status"].forEach(selector=>$(selector).addEventListener(selector==="#search"?"input":"change",()=>applyFilters()));
+$("#clear-filters").addEventListener("click",()=>{$("#search").value="";$("#filter-rubro").value="";$("#filter-contact").value="";$("#filter-status").value="";applyFilters();});
+$("#page-prev").addEventListener("click",()=>{store.page--;renderTable();});
+$("#page-next").addEventListener("click",()=>{store.page++;renderTable();});
+$("#event-filter").addEventListener("change",renderEvents);
+$("#refresh-button").addEventListener("click",()=>loadData());
+$("#sync-button").addEventListener("click",requestSync);
+$("#hero-sync").addEventListener("click",requestSync);
+$("#continue-research").addEventListener("click",enqueueResearch);
+$$("[data-close]").forEach(node=>node.addEventListener("click",closeDrawer));
+$$("[data-modal-close]").forEach(node=>node.addEventListener("click",()=>$("#send-dialog").close()));
+$$("[data-message-tab]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.messageTab;renderMessagePreview();}));
+$("#copy-message").addEventListener("click",()=>copy($("#message-preview").textContent,"Mensaje"));
+$("#copy-recipient").addEventListener("click",()=>copy($("#send-recipient").textContent,"Destinatario"));
+$("#drawer-web").addEventListener("click",()=>store.selected?.web&&window.open(store.selected.web,"_blank","noopener"));
+$("#open-send").addEventListener("click",openSendDialog);
+$("#send-form").addEventListener("submit",sendMessage);
+document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
+
+const initialView=["prospects","activity","channels"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+switchView(initialView);
+loadData();
+setInterval(()=>loadData(true),30_000);

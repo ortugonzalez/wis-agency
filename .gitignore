@@ -33,6 +33,7 @@ __pycache__/
 *.har
 *.ndjson
 ops/runtime/*.local.json
+ops/runtime/dashboard-sheet-snapshot.json
 *.sqlite*
 *.db
 playwright-report/
