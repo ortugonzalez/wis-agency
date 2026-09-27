@@ -3,31 +3,40 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { validateConfiguration } from "../../scripts/validate-agents.mjs";
 
-test("registry defines nine valid roles and four contracts", async () => {
+test("registry defines six commercial roles and seven contracts", async () => {
   const result = await validateConfiguration();
-  assert.equal(result.roleCount, 9);
-  assert.equal(result.contractCount, 4);
-  assert.equal(result.conversationCount, 12);
+  assert.equal(result.roleCount, 6);
+  assert.equal(result.contractCount, 7);
+  assert.equal(result.conversationCount, 6);
 });
 
-test("all external side effects have human approval gates", async () => {
+test("only commercial external effects remain behind human approval", async () => {
   const registry = JSON.parse(await fs.readFile(new URL("../../agents/registry.yaml", import.meta.url), "utf8"));
-  const required = [
-    "send_message",
-    "publish_or_delete_social_post",
+  assert.deepEqual(registry.human_approval_actions, [
+    "send_email",
+    "send_whatsapp",
     "activate_or_reschedule_automation",
     "deploy",
     "production_migration_or_destructive_data_change",
     "credential_or_permission_change",
-    "live_side_effect_test",
-  ];
-  assert.deepEqual(registry.human_approval_actions, required);
-});
-
-test("safe defaults are explicit in project instructions", async () => {
-  const instructions = await fs.readFile(new URL("../../AGENTS.md", import.meta.url), "utf8");
-  for (const flag of ["SYSTEM_ENABLED=false", "AUTO_PUBLISH=false", "X_SYSTEM_ENABLED=false", "X_AUTO_PUBLISH_ONE_SHOT=false", "X_DRY_RUN=true"]) {
-    assert.match(instructions, new RegExp(flag.replaceAll("_", "[_]")));
+    "live_side_effect_test"
+  ]);
+  const active = new Set(registry.roles.map(role => role.id));
+  for (const retired of ["content-strategy", "linkedin-operator", "x-operator", "web-brand", "automation-integrations"]) {
+    assert.equal(active.has(retired), false);
   }
 });
 
+test("retired code is preserved but documented as inactive", async () => {
+  const separation = await fs.readFile(new URL("../../docs/PROJECT_SEPARATION.md", import.meta.url), "utf8");
+  for (const role of ["LinkedIn", "X", "contenido", "web"]) assert.match(separation.toLowerCase(), new RegExp(role.toLowerCase()));
+});
+
+test("commercial sheet contract keeps exactly twelve columns", async () => {
+  const policy = JSON.parse(await fs.readFile(new URL("../../agents/outreach-policy.json", import.meta.url), "utf8"));
+  assert.deepEqual(policy.commercial_sheet.columns, [
+    "Rubro", "Empresa", "Ubicación", "WhatsApp", "Web", "Email",
+    "Rating", "Reseñas analizadas", "Problemas", "ANALISIS NEGOCIO",
+    "Mensaje WhatsApp", "Mensaje Email"
+  ]);
+});

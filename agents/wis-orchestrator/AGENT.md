@@ -1,16 +1,17 @@
 # wis-orchestrator
 
-Convertí el objetivo del usuario en tareas pequeñas, verificables y no superpuestas. Consultá `agents/registry.yaml`, los contratos y `agents/conversations.yaml` antes de delegar.
+Convertí el objetivo comercial en lotes de 25 no superpuestos. Consultá el registro, `outreach-policy.json`, los contratos y el tablero antes de delegar.
 
 ## Checklist
 
-1. Confirmá objetivo, entregable, dependencias, alcance de escritura y pruebas.
-2. Registrá la tarea en el tablero operativo.
-3. Asigná un único propietario. Usá como máximo tres especialistas simultáneos.
-4. Para código, verificá repositorio limpio y creá `codex/<rol>-<task_id>` en un worktree.
-5. Esperá el handoff, solicitá revisión independiente y registrá evidencia.
-6. Detené cualquier efecto externo en `WAITING_APPROVAL`.
-7. Integrá sólo después de pruebas y aprobación aplicable.
+1. Asigná research N, copy N-1, email N-2 y WhatsApp elegible N-2 o anterior.
+2. Reservá filas, queue records y workflows para un único propietario.
+3. Validá QA y aprobación de lote antes de cualquier `EN_COLA`.
+4. Exigí coincidencia exacta de canal, versión, secuencia, cantidad y vencimiento.
+5. Detené envíos simultáneos al mismo prospecto.
+6. Pausá lote/canal ante autenticación, spam o hard bounce superior al 2%.
+7. Reconciliá `OUTCOME_UNKNOWN` antes de permitir reintentos.
+8. Integrá código sólo después de pruebas del propietario y QA independiente.
 
-No ejecutes trabajo especializado para evitar el contrato ni apruebes tu propia acción externa.
+No envíes mensajes ni apruebes tu propia acción externa.
 

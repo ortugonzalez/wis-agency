@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "commercial_sheet": {
+    "name": "Distribuidoras_300",
+    "columns": ["Rubro", "Empresa", "Ubicación", "WhatsApp", "Web", "Email", "Rating", "Reseñas analizadas", "Problemas", "ANALISIS NEGOCIO", "Mensaje WhatsApp", "Mensaje Email"]
+  },
+  "operations_sheets": {
+    "Outreach_Queue": ["message_id", "idempotency_key", "prospect_key", "campaign_id", "batch_id", "source_sheet", "source_row", "empresa", "channel", "sequence", "recipient", "message_version", "approval_id", "eligibility", "status", "scheduled_at", "sent_at", "provider_ref", "outcome", "last_error", "attempts", "next_action", "opt_in_verified", "opt_in_source", "opt_in_recorded_at", "within_24h_at_evaluation", "template_id"],
+    "Outreach_Events": ["event_id", "message_id", "timestamp", "channel", "from_status", "to_status", "event_type", "provider_ref", "reason", "reconciled", "actor", "evidence"]
+  },
+  "batch_size": 25,
+  "channel_sequence": ["EMAIL", "WHATSAPP"],
+  "outreach_states": ["NUEVO", "RESEARCH_EN_CURSO", "RESEARCH_VALIDADO", "BORRADOR", "QA", "ESPERANDO_APROBACION", "APROBADO", "EN_COLA", "ENVIADO", "RESPONDIDO", "CERRADO", "BLOQUEADO", "REBOTADO", "OPTOUT", "OUTCOME_UNKNOWN", "DESCARTADO"],
+  "email": {
+    "sender": "Ortu - WIS <ortu@wis-agency.com>",
+    "daily_cap": 25,
+    "interval_minutes": 15,
+    "window": {"start": "09:30", "end": "17:30", "timezone": "America/Buenos_Aires"},
+    "followup_days": [3, 7],
+    "max_followups": 2,
+    "individual_only": true,
+    "cc_bcc_allowed": false,
+    "signature_html_without_gravatar": true
+  },
+  "whatsapp": {
+    "daily_cap": 10,
+    "interval_minutes": 15,
+    "max_followups": 1,
+    "verified_opt_in_required": true,
+    "cold_outreach_allowed": false,
+    "customer_service_window_hours": 24,
+    "approved_template_outside_window": true,
+    "excluded_workflows": ["DUGAS", "QH"]
+  },
+  "pause_rules": {
+    "authentication_error": true,
+    "spam_complaint": true,
+    "hard_bounce_rate_above": 0.02,
+    "outcome_unknown_requires_reconciliation": true
+  },
+  "copy": {
+    "reference_sheet": "Prospectos potables - A B",
+    "variant_a_anchor": "Sé que no nos conocemos…",
+    "variant_b_anchor": "problema e idea concreta",
+    "single_variable_per_test": true,
+    "rules": [
+      "tono argentino cercano y espontáneo",
+      "un solo problema concreto",
+      "empresa mencionada una sola vez y sin razón social completa",
+      "sin dirección",
+      "no usar En WIS armamos automatizaciones",
+      "no repetir que se trabaja con IA",
+      "sin signos iniciales de interrogación",
+      "sin copiar acusaciones textuales de reseñas",
+      "ofrecer un prototipo aplicado al problema",
+      "aclarar que la idea se entrega aunque no continúen",
+      "cerrar con dos horarios concretos",
+      "la firma la agrega el agente de envío"
+    ]
+  }
+}

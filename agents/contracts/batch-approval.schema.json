@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/batch-approval.json",
+  "title": "WIS Outreach Batch Approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id", "task_id", "campaign_id", "batch_id", "channels", "message_versions", "sequences", "recipient_limit", "requested_at", "expires_at", "decision", "evidence"],
+  "properties": {
+    "approval_id": {"type": "string", "minLength": 8},
+    "task_id": {"type": "string"},
+    "campaign_id": {"type": "string"},
+    "batch_id": {"type": "string"},
+    "channels": {"type": "array", "items": {"enum": ["EMAIL", "WHATSAPP"]}, "minItems": 1, "uniqueItems": true},
+    "message_versions": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+    "sequences": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 3}, "minItems": 1, "uniqueItems": true},
+    "recipient_limit": {"type": "integer", "minimum": 1, "maximum": 25},
+    "requested_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "decision": {"enum": ["PENDING", "APPROVED", "REJECTED", "EXPIRED", "CANCELLED"]},
+    "decided_at": {"type": ["string", "null"], "format": "date-time"},
+    "decided_by": {"type": ["string", "null"]},
+    "evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}

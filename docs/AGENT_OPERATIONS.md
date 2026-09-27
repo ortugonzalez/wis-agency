@@ -1,67 +1,81 @@
-# Operación de agentes WIS
+# Operación comercial multiagente WIS
 
-## Propósito
+## Objetivo
 
-Este sistema separa responsabilidades sin reemplazar los bots existentes. Codex crea subagentes temporales a partir de contratos versionados; el orquestador combina resultados, controla dependencias y evita efectos externos no aprobados.
+Mantener cuatro carriles comerciales ocupados sin superponer filas ni canales:
+
+1. `prospect-research` prepara el lote N.
+2. `outreach-copy` redacta el lote N-1 ya validado.
+3. `email-sender` procesa el lote N-2 aprobado.
+4. `whatsapp-sender` procesa únicamente contactos con opt-in del lote N-2 o anterior.
+
+`qa-ops` controla transiciones; no investiga, redacta ni envía. `wis-orchestrator` asigna lotes y registra aprobaciones.
 
 ## Fuentes de verdad
 
-- Repositorio: roles, permisos, contratos, pruebas y runbooks.
-- `WIS · Operaciones de Agentes`: backlog, ejecuciones, aprobaciones e incidentes.
-- Planillas comerciales existentes: prospectos y borradores. No se agregan columnas por iniciativa de un agente.
-- Sistemas de canal: Supabase, n8n, LinkedIn, X y web conservan sus propios estados.
+- Repositorio: roles, política, contratos, pruebas y runbooks.
+- `WIS · Operaciones de Agentes`: `Backlog`, `Runs`, `Approvals`, `Handoffs_Incidents`, `Outreach_Queue` y `Outreach_Events`.
+- Planilla comercial: sólo las 12 columnas existentes de `Distribuidoras_300`.
+- Proveedores de canal: estado de entrega y respuesta, reconciliado en eventos.
 
-## Flujo de una tarea
+## Lotes y propiedad
 
-1. El orquestador crea un `Task` con objetivo, propietario, entradas, entregables, alcance de escritura y pruebas.
-2. La tarea pasa de `BACKLOG` a `READY` cuando sus dependencias están completas.
-3. Para código, el orquestador crea `codex/<rol>-<task_id>` en un worktree aislado.
-4. El especialista ejecuta sólo dentro de su alcance y entrega un `Handoff` con evidencia y pruebas.
-5. `qa-ops` revisa de forma independiente y registra hallazgos.
-6. Si existe una acción externa, la tarea queda en `WAITING_APPROVAL`. Sin aprobación no se envía, publica, despliega ni activa nada.
-7. El orquestador integra y marca `DONE` sólo cuando todas las pruebas y aprobaciones requeridas están registradas.
+- Tamaño normal: 25 prospectos.
+- Cada fila tiene un único propietario por etapa.
+- Cada mensaje tiene `prospect_key`, `campaign_id`, `batch_id`, canal, secuencia y versión.
+- La clave `prospect_key|campaign_id|channel|sequence` debe ser inédita en la cola y en el proveedor. El sender reconstruye ese índice durable antes de cada lote.
+- El sender no cambia el copy aprobado; sólo agrega firma y metadatos de canal.
 
-## Paralelismo
+## Aprobación por lote
 
-Máximo: un orquestador y tres especialistas activos. El trabajo se paraleliza únicamente cuando no comparte rutas, filas, rangos, workflows o recursos externos. En el pipeline comercial se usan lotes de 25:
+Una aprobación válida fija lote, campaña, canales, versiones, secuencias, cantidad máxima, vencimiento y evidencia de QA. Sin coincidencia exacta, el mensaje permanece en `ESPERANDO_APROBACION`.
 
-1. `growth-research` prepara el lote.
-2. `qa-ops` valida identidad, tamaño, contactos y cobertura de reseñas.
-3. `commercial-activation` prepara mensajes sobre filas validadas.
-4. `qa-ops` revisa la personalización final.
+Canario inicial:
 
-El siguiente lote de research puede avanzar mientras comercial trabaja sobre el lote anterior, siempre que escriban rangos diferentes.
+- 5 emails individuales.
+- 0–2 WhatsApp, sólo si existe opt-in verificable.
+- Ningún contacto recibe ambos canales en simultáneo.
 
-## Prioridad de ejecución
+## Email
 
-1. Auditar la base existente de distribuidoras como datos provisionales.
-2. Completar 300 distribuidoras argentinas medianas o chicas.
-3. Completar 300 logísticas de Latinoamérica.
-4. Consolidar mensajes, follow-ups y propuestas sin enviarlos.
-5. Continuar con contenido, LinkedIn, X, web e infraestructura compartida.
+- Gmail/Brevo con alias verificado `Ortu - WIS <ortu@wis-agency.com>`.
+- 25 por día, uno cada 15 minutos, 09:30–17:30 Buenos Aires.
+- Follow-ups en días 3 y 7 sólo si la aprobación los incluye.
+- Sin CC/BCC. Firma HTML WIS sin Gravatar.
+- Respuesta, baja, reunión, hard bounce u outcome incierto detienen la secuencia.
 
-## Recuperación
+## WhatsApp
 
-- Cada lote se confirma antes de comenzar el siguiente.
-- Una reanudación parte del último `Run` exitoso y verifica idempotencia antes de escribir.
-- Un timeout de publicación se registra como `outcome_unknown`; nunca se reintenta a ciegas.
-- Un conflicto de ruta, fila o workflow pasa a `BLOCKED` y vuelve al orquestador.
-- Un secreto expuesto exige detener la tarea, rotar el secreto fuera del repositorio y revisar logs.
+- Email primero; WhatsApp sólo después de que el prospecto lo inicia o entrega consentimiento verificable.
+- Fuera de la ventana de 24 horas se exige una plantilla aprobada.
+- 10 conversaciones por día, una cada 15 minutos, máximo un follow-up aprobado.
+- Usar únicamente el carril WIS Kapso-MundoVera. DUGAS y QH están fuera de alcance.
+- Los workflows permanecen inactivos hasta auditoría, dry-run y canario aprobado.
 
-## Límites por sistema
+## Recuperación e incidentes
 
-- LinkedIn: scripts actuales permanecen en la raíz. Las pruebas live/controladas requieren aprobación previa.
-- X: `wis_x` se mantiene autocontenido; conservar gates, claim atómico e idempotencia.
-- Web: `wis-agency` es un repositorio independiente y usa su propio branch/worktree.
-- Repositorios externos (`chattermate.chat`, `design-lab`, `pgvector-0.8.6`) son referencias y no forman parte del baseline raíz.
+- `OUTCOME_UNKNOWN`: bloquear reintento, consultar proveedor, registrar reconciliación y recién después decidir.
+- Error de autenticación o queja de spam: pausar el lote completo.
+- Hard bounce superior al 2%: pausar lote/canal y auditar destinatarios.
+- Opt-out o bloqueo: detener toda secuencia futura del prospecto.
+- Error de fila o conflicto de propiedad: pasar a `BLOQUEADO` y devolver al orquestador.
+- Cada consentimiento, intento, respuesta, rebote, baja, reunión y recuperación se agrega a `Outreach_Events`; no se reescribe historia. El consentimiento conserva fuente, fecha y template aplicable.
 
-## Comandos de verificación
+## Secuencia de habilitación
+
+1. Validar contratos y simulación local de 25 fixtures.
+2. Auditar Gmail/Brevo y workflows WIS en lectura.
+3. Reemplazar proveedores por stubs en el dry-run.
+4. Ejecutar QA independiente.
+5. Solicitar aprobación humana del canario.
+6. Enviar sólo después de registrar la aprobación.
+7. Reconciliar resultados antes de habilitar lotes normales.
+
+## Comandos
 
 ```powershell
 rtk npm test
-Set-Location wis_x
-rtk npm test
+rtk npm run outreach:dry-run
 ```
 
-Las auditorías de staging, tests LinkedIn live, activaciones y despliegues sólo se ejecutan mediante una tarea aprobada que describa sus efectos.
-
+Estas pruebas no realizan llamadas a proveedores ni envían mensajes.

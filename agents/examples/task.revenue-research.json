@@ -1,7 +1,7 @@
 {
   "task_id": "WIS-REV-001",
   "objective": "Auditar la base provisional de distribuidoras y entregar el primer lote validado de 25 empresas medianas o chicas.",
-  "owner": "growth-research",
+  "owner": "prospect-research",
   "priority": "P0",
   "status": "BACKLOG",
   "dependencies": [],

@@ -1,0 +1,32 @@
+{
+  "message_id": "MSG-WA-DIST-001",
+  "idempotency_key": "dist-001|dist-ar-2026-01|WHATSAPP|1",
+  "prospect_key": "dist-001",
+  "campaign_id": "dist-ar-2026-01",
+  "batch_id": "DIST-AR-B001",
+  "source_sheet": "Distribuidoras_300",
+  "source_row": 2,
+  "empresa": "Ejemplo QA",
+  "channel": "WHATSAPP",
+  "sequence": 1,
+  "recipient": "+5491100000000",
+  "message_version": "A-v1",
+  "approval_id": "APR-WIS-WA-001-CANARY",
+  "eligibility": "ELIGIBLE",
+  "status": "ESPERANDO_APROBACION",
+  "scheduled_at": null,
+  "sent_at": null,
+  "provider_ref": null,
+  "outcome": null,
+  "last_error": null,
+  "attempts": 0,
+  "next_action": "Esperar aprobación humana del canario",
+  "opt_in": {
+    "verified": true,
+    "source": "El prospecto inició la conversación",
+    "recorded_at": "2026-09-27T10:00:00Z",
+    "within_24h": true,
+    "approved_template": false,
+    "template_id": null
+  }
+}

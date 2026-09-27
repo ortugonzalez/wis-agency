@@ -12,7 +12,7 @@
     "impact": {"type": "string", "minLength": 5},
     "evidence": {"type": "array", "items": {"type": "string"}},
     "requested_at": {"type": "string", "format": "date-time"},
-    "decision": {"enum": ["PENDING", "APPROVED", "REJECTED", "EXPIRED"]},
+    "decision": {"enum": ["PENDING", "APPROVED", "REJECTED", "EXPIRED", "CANCELLED"]},
     "decided_at": {"type": ["string", "null"], "format": "date-time"},
     "decided_by": {"type": ["string", "null"]}
   }

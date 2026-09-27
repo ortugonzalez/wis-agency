@@ -1,0 +1,14 @@
+{
+  "event_id": "EVT-MSG-EMAIL-001-002",
+  "message_id": "MSG-EMAIL-001",
+  "timestamp": "2026-09-27T10:15:00Z",
+  "channel": "EMAIL",
+  "from_status": "EN_COLA",
+  "to_status": "OUTCOME_UNKNOWN",
+  "event_type": "OUTCOME_UNKNOWN",
+  "provider_ref": null,
+  "reason": "Timeout antes de recibir confirmación del proveedor",
+  "reconciled": false,
+  "actor": "email-sender",
+  "evidence": ["No se ejecutó reintento automático"]
+}

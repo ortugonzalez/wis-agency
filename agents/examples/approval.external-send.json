@@ -1,8 +1,8 @@
 {
-  "approval_id": "APR-WIS-REV-001-001",
-  "task_id": "WIS-REV-001",
-  "action": "send_message",
-  "impact": "Enviar un mensaje real a un prospecto fuera de WIS.",
+  "approval_id": "APR-WIS-EMAIL-001-001",
+  "task_id": "WIS-EMAIL-001",
+  "action": "send_email",
+  "impact": "Enviar emails reales a un lote aprobado de prospectos.",
   "evidence": ["Borrador revisado por QA"],
   "requested_at": "2026-09-26T13:30:00Z",
   "decision": "PENDING",

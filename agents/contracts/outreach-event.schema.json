@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis.agency/schemas/outreach-event.json",
+  "title": "WIS Immutable Outreach Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "message_id", "timestamp", "channel", "from_status", "to_status", "event_type", "reconciled", "actor", "evidence"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "message_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "channel": {"enum": ["EMAIL", "WHATSAPP"]},
+    "from_status": {"type": ["string", "null"]},
+    "to_status": {"type": "string"},
+    "event_type": {"enum": ["OPT_IN_RECORDED", "QUEUED", "ATTEMPTED", "DELIVERED", "REPLIED", "MEETING", "BOUNCED", "OPTOUT", "ERROR", "OUTCOME_UNKNOWN", "RECONCILED", "CLOSED"]},
+    "provider_ref": {"type": ["string", "null"]},
+    "reason": {"type": ["string", "null"]},
+    "reconciled": {"type": "boolean"},
+    "actor": {"type": "string"},
+    "evidence": {"type": "array", "items": {"type": "string"}}
+  }
+}

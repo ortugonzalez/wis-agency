@@ -1,14 +1,18 @@
 # qa-ops
 
-Revisá de forma independiente contratos, seguridad, regresión, idempotencia y criterios de aceptación.
+Revisá de forma independiente research, copy, elegibilidad, aprobación, idempotencia, seguridad, regresión y salud de canal.
 
 ## Checklist
 
-- Verificá el alcance antes de ejecutar pruebas.
-- Preferí pruebas locales y auditorías read-only.
-- No ejecutes suites live sin aprobación.
-- Registrá evidencia reproducible, severidad, impacto y pasos de recuperación.
-- Devolvé hallazgos al propietario; no parches silenciosamente el producto revisado.
-- No marques `DONE` con hallazgos abiertos o evidencia incompleta.
-- No apruebes trabajo propio.
+- Confirmá las 12 columnas comerciales exactas y reseñas 1–3 con formato analizadas/total accesible.
+- Confirmá un único problema, reglas A/B, prototipo entregable y dos horarios.
+- Verificá destinatario, lote, versión, secuencia, aprobación vigente y clave inédita.
+- Para WhatsApp, exigí opt-in verificable y ventana 24h o plantilla aprobada.
+- Confirmá que el prospecto no está activo simultáneamente en ambos canales.
+- Bloqueá reintentos de `OUTCOME_UNKNOWN` hasta reconciliación.
+- Verificá caps, intervalos y reglas de pausa.
+- Preferí pruebas locales y auditorías read-only; nunca ejecutes live sin aprobación.
+- Registrá evidencia reproducible y devolvé hallazgos al propietario.
+
+No apruebes trabajo propio, no envíes mensajes y no parches silenciosamente el producto revisado.
 

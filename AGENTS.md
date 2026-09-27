@@ -1,61 +1,82 @@
-# WIS BOTS multi-agent operating rules
+# WIS BOTS commercial outreach operating rules
 
-This repository coordinates WIS commercial, content, channel, web, automation, and QA work. Role definitions live in `agents/registry.yaml` and `agents/<role>/AGENT.md`.
+This repository coordinates one commercial pipeline: prospect research, personalized copy, approved email delivery, opted-in WhatsApp delivery, orchestration, and independent QA. Active roles live in `agents/registry.yaml`.
 
 ## Operating model
 
 - The root agent is `wis-orchestrator`.
-- Use no more than three active specialist subagents at a time.
-- Delegate only independent tasks with an explicit expected output and write scope.
-- Keep short or dependency-bound steps in the orchestrator.
-- Never assign two agents to the same writable path, spreadsheet range, workflow, or external record.
-- Definitions in this repository are authoritative. Live queue and execution state belong in the `WIS · Operaciones de Agentes` Google Sheet.
-- Use the existing Codex conversations only as source context. Do not archive, duplicate, or send messages to them unless the user requests it.
+- Codex may run at most three specialist subagents at once. The business pipeline exposes four concurrent lanes: research, copy, email, and WhatsApp.
+- Work moves in lots of 25: research handles N, copy handles N-1, and senders handle approved N-2 records.
+- Never assign two agents to the same row, queue record, workflow, or external destination.
+- Repository contracts are authoritative. Live operational state belongs in `WIS · Operaciones de Agentes`.
+- Existing conversations are reference-only. Do not archive, duplicate, or message them unless the user requests it.
+
+## Commercial data invariant
+
+`Distribuidoras_300` keeps exactly these 12 columns, in this order:
+
+`Rubro`, `Empresa`, `Ubicación`, `WhatsApp`, `Web`, `Email`, `Rating`, `Reseñas analizadas`, `Problemas`, `ANALISIS NEGOCIO`, `Mensaje WhatsApp`, `Mensaje Email`.
+
+- Do not add operational columns to commercial Sheets.
+- Research 300 Argentine distributors first, then 300 logistics companies across LATAM.
+- Exclude large corporations and prefer medium or small companies with real operating signals.
+- Analyze only 1–3 star reviews and record `analizadas/total accesible`.
+- Never guess contacts, review counts, problems, consent, or completion.
+
+## Outreach gates
+
+The message lifecycle is separate from the agent task lifecycle:
+
+`NUEVO → RESEARCH_EN_CURSO → RESEARCH_VALIDADO → BORRADOR → QA → ESPERANDO_APROBACION → APROBADO → EN_COLA → ENVIADO → RESPONDIDO/CERRADO`
+
+Alternates: `BLOQUEADO`, `REBOTADO`, `OPTOUT`, `OUTCOME_UNKNOWN`, and `DESCARTADO`.
+
+- Every external send requires independent QA and an unexpired batch approval covering the exact channel, version, sequence, and recipient count.
+- Idempotency key: `prospect_key + campaign_id + channel + sequence`. Before every enqueue, rebuild the key index from `Outreach_Queue` and provider reconciliation; an in-memory-only index is insufficient.
+- A prospect cannot receive email and WhatsApp simultaneously. Email is first.
+- WhatsApp requires verified opt-in. A number published on Maps or a website is not consent. Outside 24 hours, use only an approved template.
+- A timeout or ambiguous provider result becomes `OUTCOME_UNKNOWN`; require a durable `RECONCILED` event with evidence before retrying.
+- Stop a prospect after response, opt-out, meeting, hard bounce, or uncertain outcome.
+
+## Channel limits
+
+- Email: `Ortu - WIS <ortu@wis-agency.com>`, individual messages only, no CC/BCC, WIS HTML signature without Gravatar, 25/day, 15-minute interval, 09:30–17:30 America/Buenos_Aires, at most follow-ups on days 3 and 7 when approved.
+- WhatsApp: WIS Kapso-MundoVera workflows only, 10/day, 15-minute interval, at most one approved follow-up.
+- Never touch DUGAS or QH workflows.
+- Pause the affected lot/channel on authentication failure, spam complaint, or hard-bounce rate above 2%.
+
+## Copy contract
+
+- Use `Prospectos potables - A B` as the reference.
+- A starts with “Sé que no nos conocemos…”. B starts from the problem and concrete idea.
+- Change only one variable per A/B test.
+- Use an Argentine, close, spontaneous tone; one verifiable problem; company once without full legal name; no address.
+- Do not use “En WIS armamos automatizaciones”, repeat AI claims, use opening question marks, or reproduce accusations.
+- Offer a prototype, state that the idea is delivered even without a later engagement, and close with two concrete times.
+- The sender adds the signature after approval; the copy agent does not.
 
 ## Human approval gates
 
-The following actions must stop in `WAITING_APPROVAL` with evidence and a clear description of impact:
+Stop in `WAITING_APPROVAL` before:
 
-- sending WhatsApp, email, Telegram, LinkedIn, or X messages;
-- publishing or deleting social posts;
-- activating or changing schedules, n8n workflows, production flags, webhooks, or automations;
-- deploying a website or service;
-- applying production database migrations or destructive data changes;
-- changing credentials, permissions, billing, or external account settings;
-- running a test that creates live executions, messages, records, or browser publication attempts.
+- sending any email or WhatsApp;
+- activating/changing schedules, n8n workflows, webhooks, or production flags;
+- deploying a service;
+- destructive production changes, credentials/permissions, or live side-effect tests.
 
-Research, drafting, local tests, read-only inspection, and writes explicitly requested in business or operations Sheets are allowed when they remain inside the task's declared scope.
+Research, drafting, read-only audits, local simulations, and explicitly requested operations-Sheet writes are allowed.
 
-## Safety invariants
+## Safety, Git, and QA
 
-- Never place credentials, cookies, tokens, browser state, QR codes, or secret-bearing logs in Git, Sheets, task handoffs, or chat.
-- Keep LinkedIn production gates disabled unless a human approves the exact action: `SYSTEM_ENABLED=false` and `AUTO_PUBLISH=false`.
-- Keep X safe defaults: `X_SYSTEM_ENABLED=false`, `X_AUTO_PUBLISH_ONE_SHOT=false`, and `X_DRY_RUN=true`.
-- Preserve idempotency. Treat timeouts or ambiguous publishing results as `outcome_unknown`; reconcile before any retry.
-- Do not guess WhatsApp numbers, email addresses, review counts, research evidence, or task completion.
-- Prospect review analysis covers only 1–3 star reviews and records `analizadas/total accesible`.
-- Do not add columns to commercial Sheets without explicit user instruction.
-
-## Git and worktrees
-
-- The root repository owns orchestration, LinkedIn root scripts, and `wis_x`.
-- `wis-agency` and other nested repositories retain their own Git history and are not tracked by the root repository.
-- Code tasks use an isolated worktree and a branch named `codex/<role>-<task_id>`.
-- Do not create a worktree from a dirty repository. Preserve user changes and report overlaps.
-- The orchestrator integrates only after owner tests and an independent `qa-ops` review.
-- `qa-ops` writes findings and test artifacts; it does not silently patch the code it reviews.
-
-## Commands
-
+- Never store credentials, cookies, tokens, browser state, QR codes, or secret-bearing logs in Git, Sheets, handoffs, or chat.
+- Code tasks use isolated `codex/<role>-<task_id>` worktrees.
+- Preserve retired LinkedIn, X, content, web, and general automation code unchanged for later migration; it is not active in this pipeline.
 - Prefix shell commands with `rtk`.
-- Prefer read-only audits before live or side-effectful tests.
-- Run `rtk npm test` at repository root after changing agent definitions.
-- For X changes, also run `rtk npm test` inside `wis_x`.
-- LinkedIn live/control scripts require an approved task because they may create n8n, Supabase, or Telegram activity even when publication is blocked.
+- Run `rtk npm test` after changing contracts or orchestration.
+- The owner tests first; `qa-ops` reviews independently and never silently patches reviewed work.
 
 ## Task lifecycle
 
-Allowed states are `BACKLOG`, `READY`, `IN_PROGRESS`, `REVIEW`, `WAITING_APPROVAL`, `DONE`, `BLOCKED`, and `CANCELLED`.
+Agent tasks use only `BACKLOG`, `READY`, `IN_PROGRESS`, `REVIEW`, `WAITING_APPROVAL`, `DONE`, `BLOCKED`, and `CANCELLED`.
 
-Only `wis-orchestrator` assigns an owner or changes lifecycle state. Specialists append evidence and a handoff. `qa-ops` records an independent review. A human decides external side effects.
-
+Only `wis-orchestrator` assigns owners or changes task lifecycle state. A human decides external side effects.

@@ -19,8 +19,8 @@ function move(current, next) {
 let status = task.status;
 for (const next of ["READY", "IN_PROGRESS", "REVIEW"]) status = move(status, next);
 
-const externalAction = "send_message";
-if (externalAction === "send_message") status = move(status, "WAITING_APPROVAL");
+const externalAction = "send_email";
+if (externalAction === "send_email") status = move(status, "WAITING_APPROVAL");
 if (status !== "WAITING_APPROVAL") throw new Error("El efecto externo no quedó bloqueado para aprobación");
 
 console.log(`Dry-run valid: ${task.task_id} reached ${status} without external side effects.`);

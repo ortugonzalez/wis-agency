@@ -1,0 +1,16 @@
+{
+  "approval_id": "APR-WIS-EMAIL-001-CANARY",
+  "task_id": "WIS-EMAIL-001",
+  "campaign_id": "DIST-AR-2026-01",
+  "batch_id": "DIST-AR-B001",
+  "channels": ["EMAIL"],
+  "message_versions": ["A-v1", "B-v1"],
+  "sequences": [1],
+  "recipient_limit": 5,
+  "requested_at": "2026-09-27T09:00:00Z",
+  "expires_at": "2026-10-04T09:00:00Z",
+  "decision": "PENDING",
+  "decided_at": null,
+  "decided_by": null,
+  "evidence": ["QA del dry-run pendiente; no habilita envíos mientras decision sea PENDING"]
+}

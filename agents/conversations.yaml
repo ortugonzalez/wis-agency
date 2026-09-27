@@ -1,20 +1,13 @@
 {
-  "version": 1,
+  "version": 2,
   "project_id": "2723732a-1011-4812-a25e-afc392b3bac0",
   "policy": "reference_only_keep_open",
   "conversations": [
-    {"title": "BUSQUEDA PROSPECTOS WIS", "thread_id": "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "agents": ["growth-research", "commercial-activation", "qa-ops"]},
-    {"title": "Crear propuesta para Doña Fransica", "thread_id": "01a08190-73c2-7090-88b1-8d2ff0463acc", "agents": ["commercial-activation"]},
-    {"title": "Analiza sheet y plan de mails", "thread_id": "01a0654f-a185-7a43-a068-fcd39852b304", "agents": ["commercial-activation"]},
-    {"title": "BOT PROSPECCION WIS WSP", "thread_id": "01a011c8-647b-71c1-8da8-d56f3d6412ae", "agents": ["commercial-activation", "automation-integrations", "qa-ops"]},
-    {"title": "BOT LINKEDIN WIS", "thread_id": "01a011c5-b87b-76d2-9a75-07f9ddecd89f", "agents": ["linkedin-operator", "automation-integrations", "qa-ops"]},
-    {"title": "Actualizar web de WIS Agency", "thread_id": "01a03b5f-4e3e-7de0-a636-def7c052ade9", "agents": ["web-brand", "content-strategy"]},
-    {"title": "Construir WIS X Bot", "thread_id": "01a036e7-12d5-7e90-9215-df846c82d4c0", "agents": ["x-operator", "qa-ops"]},
-    {"title": "Diseñar bot beta tester", "thread_id": "01a03992-3bf7-7bc3-a8b2-c16cce9fc2cf", "agents": ["qa-ops"]},
-    {"title": "Arma calendario de contenidos WIS", "thread_id": "01a03fcf-7b51-7e50-961c-c7d75875f6c2", "agents": ["content-strategy"]},
-    {"title": "Investiga bots de WhatsApp en GitHub", "thread_id": "01a03995-4c1c-7c31-b288-14370d6e62da", "agents": ["commercial-activation", "automation-integrations", "qa-ops"]},
-    {"title": "Diseñar agente prospección B2B", "thread_id": "01a011c7-2686-7f32-8c25-b47ce2fba687", "agents": ["growth-research", "commercial-activation"]},
+    {"title": "BUSQUEDA PROSPECTOS WIS", "thread_id": "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "agents": ["prospect-research", "outreach-copy", "qa-ops"]},
+    {"title": "Analiza sheet y plan de mails", "thread_id": "01a0654f-a185-7a43-a068-fcd39852b304", "agents": ["outreach-copy", "email-sender", "qa-ops"]},
+    {"title": "BOT PROSPECCION WIS WSP", "thread_id": "01a011c8-647b-71c1-8da8-d56f3d6412ae", "agents": ["whatsapp-sender", "qa-ops"]},
+    {"title": "Investiga bots de WhatsApp en GitHub", "thread_id": "01a03995-4c1c-7c31-b288-14370d6e62da", "agents": ["whatsapp-sender", "qa-ops"]},
+    {"title": "Diseñar agente prospección B2B", "thread_id": "01a011c7-2686-7f32-8c25-b47ce2fba687", "agents": ["prospect-research", "outreach-copy"]},
     {"title": "ORQUESTADOR BOT WIS", "thread_id": "01a011c8-321c-7ea1-a899-9997cf861579", "agents": ["wis-orchestrator", "qa-ops"]}
   ]
 }
-
