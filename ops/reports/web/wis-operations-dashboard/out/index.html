@@ -3,92 +3,112 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Control operativo del pipeline comercial WIS." />
-  <meta name="color-scheme" content="dark" />
-  <title>WIS · Pipeline Comercial</title>
+  <meta name="description" content="Centro ejecutivo de operaciones comerciales WIS." />
+  <meta name="color-scheme" content="light" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23091322'/%3E%3Cpath d='M14 19h8l5 24 5-17h7l5 17 5-24h7L48 47h-9l-4-14-4 14h-9z' fill='%2365dbc4'/%3E%3C/svg%3E" />
+  <title>WIS · Revenue Operations</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="./app.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Saltar al contenido</a>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">W</span><div><strong>WIS</strong><small>Pipeline comercial</small></div></div>
-      <nav>
-        <button class="nav is-active" data-view="overview">Resumen</button>
-        <button class="nav" data-view="pipeline">Pipeline <span>4</span></button>
-        <button class="nav" data-view="channels">Canales <span>2</span></button>
-        <button class="nav" data-view="agents">Agentes <span>6</span></button>
+
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegación principal">
+      <a class="brand" href="#overview" data-view="overview" aria-label="WIS Revenue Operations">
+        <span class="brand-mark" aria-hidden="true">W</span>
+        <span><strong>WIS</strong><small>Revenue Operations</small></span>
+      </a>
+
+      <div class="nav-label">Workspace</div>
+      <nav class="side-nav">
+        <button class="nav-item is-active" data-view="overview"><span class="nav-icon" aria-hidden="true">◫</span><span>Resumen ejecutivo</span></button>
+        <button class="nav-item" data-view="pipeline"><span class="nav-icon" aria-hidden="true">⇢</span><span>Pipeline</span><b>4</b></button>
+        <button class="nav-item" data-view="channels"><span class="nav-icon" aria-hidden="true">⌁</span><span>Canales</span><b>2</b></button>
+        <button class="nav-item" data-view="agents"><span class="nav-icon" aria-hidden="true">◎</span><span>Equipo agente</span><b>6</b></button>
+        <button class="nav-item" data-view="readiness"><span class="nav-icon" aria-hidden="true">✓</span><span>Puesta en marcha</span><b class="nav-alert">4</b></button>
       </nav>
+
       <div class="sidebar-spacer"></div>
-      <div class="safe-card"><span class="dot"></span><strong>Envíos bloqueados</strong><p>Sin aprobación de lote ni validación técnica no sale ningún mensaje.</p></div>
-      <small class="snapshot">Snapshot · 27 sep 2026</small>
+      <section class="environment-card" aria-label="Estado de seguridad">
+        <div class="environment-head"><span class="signal signal-amber"></span><strong>Modo protegido</strong></div>
+        <p>Los envíos están bloqueados hasta validar canales y aprobar el canario.</p>
+        <span class="environment-meta">0 mensajes enviados</span>
+      </section>
+      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit" target="_blank" rel="noreferrer">Abrir centro operativo <span aria-hidden="true">↗</span></a>
+      <div class="sidebar-foot">Snapshot manual verificado<br /><strong id="snapshot-date">27 sep 2026 · no sincroniza en vivo</strong></div>
     </aside>
 
     <main id="main">
       <header class="topbar">
-        <div><p class="eyebrow">Operaciones de prospección</p><h1 id="page-title">Resumen comercial</h1></div>
-        <div class="mode"><span></span>DRY-RUN · 0 envíos nuevos</div>
+        <div><p class="breadcrumb">WIS / Operaciones comerciales</p><h1 id="page-title">Resumen ejecutivo</h1></div>
+        <div class="topbar-actions">
+          <div class="live-pill"><span class="signal signal-amber"></span>DRY-RUN</div>
+          <a class="button button-secondary" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit?gid=717298635#gid=717298635" target="_blank" rel="noreferrer">Ver cola <span aria-hidden="true">↗</span></a>
+        </div>
       </header>
 
-      <section class="view is-active" id="overview">
-        <article class="hero">
-          <div><p class="eyebrow">Prioridad actual</p><h2>Cerrar bloqueos del canario</h2><p>La arquitectura ya separa research, copy, email y WhatsApp. Falta validar salud actual de Gmail/Brevo y endurecer los workflows WIS antes de pedir aprobación de envío.</p></div>
-          <span class="status status-blocked">BLOQUEADO TÉCNICAMENTE</span>
-        </article>
+      <section class="view is-active" id="overview" aria-labelledby="overview-title">
+        <div class="command-card">
+          <div class="command-copy">
+            <p class="section-kicker">Decisión prioritaria</p>
+            <h2 id="overview-title">Preparar un canario seguro antes de abrir el canal</h2>
+            <p>La operación ya separa research, redacción, email y WhatsApp. El siguiente hito no es “enviar más”: es validar la infraestructura, aprobar un lote pequeño y medir su calidad.</p>
+            <div class="command-actions"><button class="button button-primary" data-view="readiness">Ver plan de activación</button><button class="text-button" data-view="channels">Revisar canales <span aria-hidden="true">→</span></button></div>
+          </div>
+          <div class="readiness-brief">
+            <div class="readiness-top"><span>Preparación del sistema</span><strong>Fundación lista</strong></div>
+            <div class="progress-track" aria-label="Tres fundamentos completados y cuatro bloqueos abiertos"><span></span></div>
+            <div class="readiness-stats"><div><strong>3</strong><span>fundamentos listos</span></div><div><strong>4</strong><span>bloqueos técnicos</span></div><div><strong>0</strong><span>aprobaciones activas</span></div></div>
+            <p><span class="signal signal-red"></span>Canales reales todavía bloqueados</p>
+          </div>
+        </div>
 
-        <div class="metrics" id="metrics"></div>
+        <div class="metrics" id="metrics" aria-label="Indicadores principales"></div>
 
-        <div class="grid-main">
-          <section class="panel">
-            <div class="panel-head"><div><p class="eyebrow">Línea continua</p><h2>Los cuatro carriles</h2></div><span class="muted">Lotes de 25</span></div>
-            <div class="lanes" id="lanes"></div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><div><p class="eyebrow">Control humano</p><h2>Aprobación del canario</h2></div><span class="count">0</span></div>
-            <div class="approval-empty"><strong>Todavía no solicitada</strong><p>Primero deben cerrarse 4 bloqueos técnicos. Después se aprobarán 5 emails y hasta 2 WhatsApp con opt-in.</p></div>
-            <div class="chips"><span>5 emails</span><span>0–2 WhatsApp</span><span>1 lote</span></div>
+        <div class="dashboard-grid dashboard-grid-primary">
+          <section class="surface workflow-surface"><div class="surface-head"><div><p class="section-kicker">Producción continua</p><h2>Flujo por lotes</h2></div><span class="meta-pill">25 prospectos / lote</span></div><div class="workflow" id="lanes"></div></section>
+          <section class="surface decision-surface">
+            <div class="surface-head"><div><p class="section-kicker">Control humano</p><h2>Próxima aprobación</h2></div><span class="counter">0</span></div>
+            <div class="decision-empty"><span class="decision-icon" aria-hidden="true">⌛</span><strong>Canario todavía no solicitado</strong><p>Se habilitará cuando cierren los cuatro bloqueos técnicos y exista un lote con QA aprobado.</p></div>
+            <div class="scope-row"><span><b>5</b> emails</span><span><b>0–2</b> WhatsApp</span><span><b>1</b> lote</span></div>
           </section>
         </div>
 
-        <div class="grid-main lower">
-          <section class="panel">
-            <div class="panel-head"><div><p class="eyebrow">Antes de enviar</p><h2>Bloqueos abiertos</h2></div><span class="count danger">4</span></div>
-            <ol class="blockers">
-              <li><span>01</span><div><strong>Sender email WIS aislado</strong><p>No reutilizar flujos pertenecientes a otros proyectos.</p></div></li>
-              <li><span>02</span><div><strong>Salud Gmail/Brevo</strong><p>Revalidar alias, firma, reply-to, SPF, DKIM y DMARC.</p></div></li>
-              <li><span>03</span><div><strong>Idempotencia y reconciliación</strong><p>Timeout implica OUTCOME_UNKNOWN, nunca reintento ciego.</p></div></li>
-              <li><span>04</span><div><strong>WhatsApp 24h y plantillas</strong><p>Confirmar opt-in y template aprobado fuera de ventana.</p></div></li>
-            </ol>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><div><p class="eyebrow">Reglas duras</p><h2>Qué detiene el sistema</h2></div></div>
-            <div class="stop-grid"><div><strong>Auth</strong><span>Pausa lote</span></div><div><strong>Spam</strong><span>Pausa lote</span></div><div><strong>&gt;2%</strong><span>Hard bounce</span></div><div><strong>Opt-out</strong><span>Cierra contacto</span></div></div>
-          </section>
+        <div class="dashboard-grid dashboard-grid-secondary">
+          <section class="surface"><div class="surface-head"><div><p class="section-kicker">Riesgo operativo</p><h2>Bloqueos antes del canario</h2></div><span class="counter counter-danger">4</span></div><div class="blocker-list" id="blocker-list"></div></section>
+          <section class="surface"><div class="surface-head"><div><p class="section-kicker">Guardrails</p><h2>El sistema se detiene si…</h2></div></div><div class="guardrails" id="guardrails"></div></section>
         </div>
       </section>
 
-      <section class="view" id="pipeline">
-        <div class="section-intro"><div><p class="eyebrow">Trabajo coordinado</p><h2>Pipeline por lote</h2><p>Cada carril opera sobre un lote distinto y nunca modifica la misma fila.</p></div><label>Filtrar <select id="pipeline-filter"><option value="ALL">Todos</option><option value="READY">Listos</option><option value="BLOCKED">Bloqueados</option><option value="BACKLOG">Backlog</option></select></label></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Lote</th><th>Carril</th><th>Responsable</th><th>Estado</th><th>Entrada</th><th>Próxima acción</th></tr></thead><tbody id="pipeline-body"></tbody></table></div></div>
-        <section class="panel state-map"><div class="panel-head"><div><p class="eyebrow">Máquina de estados</p><h2>Recorrido de un mensaje</h2></div></div><div class="state-flow" id="state-flow"></div></section>
+      <section class="view" id="pipeline" aria-labelledby="pipeline-title">
+        <div class="view-intro"><div><p class="section-kicker">Orquestación</p><h2 id="pipeline-title">Pipeline paralelo por lote</h2><p>Cuatro operadores trabajan en simultáneo sobre lotes diferentes. Ninguno modifica la misma fila.</p></div><label class="filter-control">Estado<select id="pipeline-filter"><option value="ALL">Todos</option><option value="READY">Listos</option><option value="BLOCKED">Bloqueados</option><option value="BACKLOG">Backlog</option></select></label></div>
+        <section class="surface table-surface"><div class="table-wrap"><table><thead><tr><th>Lote</th><th>Carril</th><th>Responsable</th><th>Estado</th><th>Objetivo</th><th>Próximo movimiento</th></tr></thead><tbody id="pipeline-body"></tbody></table></div></section>
+        <section class="surface lifecycle-surface"><div class="surface-head"><div><p class="section-kicker">Gobernanza</p><h2>Recorrido de cada contacto</h2></div><span class="meta-pill">Sin saltos de estado</span></div><div class="state-flow" id="state-flow"></div></section>
       </section>
 
-      <section class="view" id="channels">
-        <div class="section-intro"><div><p class="eyebrow">Salud y elegibilidad</p><h2>Canales separados</h2><p>Email inicia la secuencia. WhatsApp sólo continúa con opt-in verificable.</p></div></div>
+      <section class="view" id="channels" aria-labelledby="channels-title">
+        <div class="view-intro"><div><p class="section-kicker">Salud y elegibilidad</p><h2 id="channels-title">Canales independientes</h2><p>Email abre la relación. WhatsApp sólo continúa cuando existe consentimiento verificable.</p></div></div>
         <div class="channel-grid" id="channel-grid"></div>
-        <section class="panel">
-          <div class="panel-head"><div><p class="eyebrow">Trazabilidad</p><h2>Cola y eventos</h2></div></div>
-          <div class="queue-grid"><article><strong>Outreach_Queue</strong><p>Una fila por mensaje y canal, con aprobación, elegibilidad, opt-in, estado e idempotencia durable.</p><code>prospect | campaign | channel | sequence</code></article><article><strong>Outreach_Events</strong><p>Historial inmutable de consentimientos, intentos, respuestas, rebotes, bajas y reconciliaciones.</p><code>append-only · sin reescribir historia</code></article></div>
-        </section>
+        <section class="surface trace-surface"><div class="surface-head"><div><p class="section-kicker">Fuente de verdad</p><h2>Trazabilidad de punta a punta</h2></div></div><div class="trace-grid"><article><div class="trace-number">01</div><div><strong>Outreach_Queue</strong><p>Una fila por mensaje y canal, con elegibilidad, aprobación, opt-in e idempotencia.</p><code>prospect · campaign · channel · sequence</code></div></article><article><div class="trace-number">02</div><div><strong>Outreach_Events</strong><p>Registro inmutable de intentos, entregas, respuestas, rebotes, bajas y reconciliaciones.</p><code>append-only · evidencia durable</code></div></article></div></section>
       </section>
 
-      <section class="view" id="agents">
-        <div class="section-intro"><div><p class="eyebrow">Sólo alcance comercial</p><h2>Seis roles activos</h2><p>Los demás proyectos quedan preservados fuera del registro y de la cola activa.</p></div></div>
+      <section class="view" id="agents" aria-labelledby="agents-title">
+        <div class="view-intro"><div><p class="section-kicker">Modelo operativo</p><h2 id="agents-title">Seis roles, una sola misión comercial</h2><p>Responsabilidades claras, permisos acotados y revisión independiente antes de cada envío.</p></div></div>
         <div class="agent-grid" id="agent-grid"></div>
+        <section class="governance-note"><span aria-hidden="true">i</span><p><strong>Gobernanza:</strong> QA no aprueba su propio trabajo y ningún agente puede enviar, publicar o activar automatizaciones sin aprobación humana registrada.</p></section>
+      </section>
+
+      <section class="view" id="readiness" aria-labelledby="readiness-title">
+        <div class="view-intro"><div><p class="section-kicker">Plan de activación</p><h2 id="readiness-title">Qué falta para ponerlo en marcha</h2><p>Orden recomendado para pasar de dry-run a un primer lote real sin comprometer reputación ni duplicar contactos.</p></div><span class="status status-blocked">4 bloqueos críticos</span></div>
+        <div class="readiness-layout">
+          <section class="surface checklist-surface"><div id="readiness-list"></div></section>
+          <aside class="surface launch-summary"><p class="section-kicker">Hito de salida</p><h2>Canario controlado</h2><p>La primera ejecución real será deliberadamente pequeña y medible.</p><dl><div><dt>Email</dt><dd>5 contactos</dd></div><div><dt>WhatsApp</dt><dd>Hasta 2 con opt-in</dd></div><div><dt>Ventana</dt><dd>Horario BA</dd></div><div><dt>Aprobación</dt><dd>Lote + alcance exacto</dd></div></dl><div class="launch-rule"><span class="signal signal-red"></span><p>Si hay error de autenticación, queja de spam, hard bounce &gt;2% o resultado incierto, el lote se pausa.</p></div></aside>
+        </div>
       </section>
     </main>
   </div>
-  <nav class="mobile-nav"><button class="is-active" data-view="overview">Resumen</button><button data-view="pipeline">Pipeline</button><button data-view="channels">Canales</button><button data-view="agents">Agentes</button></nav>
+
+  <nav class="mobile-nav" aria-label="Navegación móvil"><button class="is-active" data-view="overview">Resumen</button><button data-view="pipeline">Pipeline</button><button data-view="channels">Canales</button><button data-view="agents">Agentes</button><button data-view="readiness">Activación</button></nav>
 </body>
 </html>

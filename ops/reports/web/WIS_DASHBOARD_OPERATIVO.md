@@ -2,6 +2,19 @@
 
 Fecha: 27 de septiembre de 2026
 
+## Experiencia del dashboard
+
+El frente fue rediseñado como un centro ejecutivo de Revenue Operations. La primera pantalla prioriza decisiones, salud del sistema y riesgos; las vistas secundarias separan pipeline, canales, equipo agente y puesta en marcha.
+
+- Lenguaje visual corporativo con jerarquía clara, alta legibilidad y contraste.
+- Resumen ejecutivo con indicadores, flujo por lotes y próxima aprobación.
+- Vista específica `Puesta en marcha` con fundamentos completos, bloqueos críticos y activación controlada.
+- Navegación responsive para escritorio y móvil.
+- Acceso directo al centro operativo y a la cola de mensajes.
+- Ninguna métrica simulada: el dashboard muestra el último snapshot manual verificado, con su fecha de corte y sin presentarlo como información sincronizada en vivo.
+
+El checklist completo para habilitar la operación está en `docs/OUTREACH_LAUNCH_CHECKLIST.md`.
+
 ## Qué quedó armado
 
 El proyecto ahora está centrado exclusivamente en prospección y outreach. Los únicos seis roles activos son:
@@ -29,7 +42,7 @@ La planilla comercial conserva exactamente sus 12 columnas. Toda la operación d
 
 ## Controles que ya existen
 
-- Aprobación humana por lote.
+- Aprobación humana por combinación exacta de lote, canal, versión, secuencia, vencimiento y destinatarios.
 - Clave idempotente `prospect + campaña + canal + secuencia`.
 - Email primero; WhatsApp nunca se dispara en simultáneo.
 - WhatsApp bloqueado sin opt-in verificable.
@@ -65,4 +78,4 @@ La auditoría fue de sólo lectura.
 - Confirmar templates aprobados y ventana de 24 horas.
 - Ejecutar el canario sólo después de aprobación humana registrada.
 
-El dashboard muestra este estado sin inventar métricas: 0 mensajes nuevos en cola, 0 envíos nuevos y 4 bloqueos técnicos. No fue desplegado porque el despliegue también requiere aprobación.
+El dashboard muestra el snapshot manual verificado: 0 mensajes nuevos en cola, 0 envíos nuevos y 4 bloqueos técnicos. No fue desplegado porque el despliegue también requiere aprobación.
