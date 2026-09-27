@@ -31,14 +31,14 @@
     "opt_in": {
       "type": ["object", "null"],
       "additionalProperties": false,
-      "required": ["verified", "source", "recorded_at", "within_24h", "approved_template", "template_id"],
+      "required": ["verified", "source", "recorded_at", "within_24h"],
       "properties": {
         "verified": {"type": "boolean"},
         "source": {"type": "string"},
         "recorded_at": {"type": "string", "format": "date-time"},
         "within_24h": {"type": "boolean"},
-        "approved_template": {"type": "boolean"},
-        "template_id": {"type": ["string", "null"]}
+        "approved_template": {"type": "boolean", "deprecated": true},
+        "template_id": {"type": ["string", "null"], "deprecated": true}
       }
     }
   }

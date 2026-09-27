@@ -25,11 +25,10 @@ DUGAS y QH están separados por nombre, ID y contenido. No fueron tocados y no d
 1. Crear un sender de email WIS aislado.
 2. Agregar la clave idempotente canónica a cola y proveedor.
 3. Implementar reconciliación antes de reintentar resultados inciertos.
-4. Validar plantillas aprobadas y ventana de 24 horas de WhatsApp.
+4. Validar sesión WIS 5679 y bloquear cualquier envío fuera de la ventana de 24 horas; el canal Baileys no usa plantillas oficiales.
 5. Revalidar salud actual de Gmail/Brevo.
 6. Ejecutar 25 fixtures con proveedores sustituidos por stubs.
 
 Conclusión: las integraciones están correctamente separadas, pero aún no están listas para envío real. El canario debe permanecer en `WAITING_APPROVAL` hasta cerrar estos bloqueos.
-
 
 

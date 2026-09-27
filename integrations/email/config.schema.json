@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wis-agency.com/schemas/email-sender-config.schema.json",
+  "title": "WIS email sender configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "deployment_mode",
+    "enabled",
+    "dry_run",
+    "provider",
+    "sender",
+    "signature",
+    "credential_reference",
+    "limits",
+    "required_snapshots"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "deployment_mode": { "enum": ["disabled", "canary", "production"] },
+    "enabled": { "type": "boolean" },
+    "dry_run": { "type": "boolean" },
+    "provider": { "enum": ["gmail", "brevo"] },
+    "sender": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "email", "reply_to", "alias_verification"],
+      "properties": {
+        "name": { "const": "Ortu - WIS" },
+        "email": { "const": "ortu@wis-agency.com" },
+        "reply_to": { "const": "ortu@wis-agency.com" },
+        "alias_verification": { "enum": ["PENDING", "VERIFIED"] }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approval_status", "html_path", "sha256", "forbid_gravatar"],
+      "properties": {
+        "approval_status": { "enum": ["PENDING", "APPROVED"] },
+        "html_path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "forbid_gravatar": { "const": true }
+      }
+    },
+    "credential_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n8n_type", "id_env", "name_env"],
+      "properties": {
+        "n8n_type": { "enum": ["gmailOAuth2", "sendInBlueApi"] },
+        "id_env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+        "name_env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["daily_cap", "interval_minutes", "timezone", "window_start", "window_end", "max_followups", "followup_days"],
+      "properties": {
+        "daily_cap": { "const": 25 },
+        "interval_minutes": { "const": 15 },
+        "timezone": { "const": "America/Buenos_Aires" },
+        "window_start": { "const": "09:30" },
+        "window_end": { "const": "17:30" },
+        "max_followups": { "const": 2 },
+        "followup_days": {
+          "type": "array",
+          "prefixItems": [{ "const": 3 }, { "const": 7 }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "required_snapshots": {
+      "type": "array",
+      "items": { "enum": ["Outreach_Queue", "provider_reconciliation"] },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "deployment_mode": { "const": "disabled" } } },
+      "then": {
+        "properties": {
+          "enabled": { "const": false },
+          "dry_run": { "const": true }
+        }
+      }
+    }
+  ]
+}

@@ -23,7 +23,7 @@ Este documento define qué falta para pasar del dry-run a una operación real de
 - [ ] Confirmar que WIS 01/02/03 permanezcan separados de DUGAS y QH.
 - [ ] Registrar la evidencia de opt-in con fuente y fecha; un número publicado no cuenta como consentimiento.
 - [ ] Calcular la ventana de 24 horas desde el evento real de consentimiento o conversación.
-- [ ] Obtener un snapshot de las plantillas aprobadas y validar cada `template_id` contra el proveedor.
+- [x] Documentar que Baileys no soporta plantillas oficiales y bloquear fuera de la ventana con `SERVICE_WINDOW_EXPIRED`.
 - [ ] Conectar eventos de entrega, respuesta, baja, bloqueo y resultado incierto.
 - [ ] Aplicar límites de 10 conversaciones iniciadas por día, intervalos de 15 minutos y un único follow-up aprobado.
 

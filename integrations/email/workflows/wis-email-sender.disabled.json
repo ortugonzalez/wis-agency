@@ -1,0 +1,71 @@
+{
+  "name": "WIS Email Sender v1 - DISABLED",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Buenos_Aires",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger-only",
+      "name": "Manual Trigger Only",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "hard-disabled-gate",
+      "name": "Hard Disabled Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0],
+      "parameters": {
+        "jsCode": "const ENABLED = false;\nconst DRY_RUN = true;\nif (!ENABLED || DRY_RUN) throw new Error('WIS_EMAIL_SENDER_DISABLED');\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "gmail-send-disabled",
+      "name": "Gmail Send Individual - DISABLED",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [540, 0],
+      "disabled": true,
+      "parameters": {
+        "sendTo": "={{ $json.recipient }}",
+        "subject": "={{ $json.approved_subject }}",
+        "emailType": "html",
+        "message": "={{ $json.approved_body_html + $json.approved_signature_html }}",
+        "options": {
+          "senderName": "Ortu - WIS",
+          "replyTo": "ortu@wis-agency.com",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__WIS_GMAIL_CREDENTIAL_ID__",
+          "name": "__WIS_GMAIL_CREDENTIAL_NAME__"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger Only": {
+      "main": [[{ "node": "Hard Disabled Gate", "type": "main", "index": 0 }]]
+    },
+    "Hard Disabled Gate": {
+      "main": [[{ "node": "Gmail Send Individual - DISABLED", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "wis_scope": "integrations/email",
+    "deployment_mode": "disabled",
+    "requires_human_approval": true,
+    "notes": "Import remains inactive. Credential placeholders, hard gate and Gmail node must not be enabled until independent QA and exact batch approval."
+  },
+  "tags": []
+}

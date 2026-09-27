@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "channel_id": "wis-whatsapp-5679",
+  "connection_id": "wis-5679",
+  "owner": "WIS",
+  "transport": "unofficial-baileys-local",
+  "official_api": false,
+  "enabled": false,
+  "account_suffix": "5679",
+  "daily_limit": 10,
+  "minimum_interval_minutes": 15,
+  "maximum_sequence": 2,
+  "service_window_hours": 24,
+  "forbidden_namespaces": ["DUGAS", "QH"]
+}

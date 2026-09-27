@@ -23,13 +23,16 @@
     "signature_html_without_gravatar": true
   },
   "whatsapp": {
+    "connection_type": "unofficial_baileys_session",
+    "account_last4": "5679",
     "daily_cap": 10,
     "interval_minutes": 15,
     "max_followups": 1,
     "verified_opt_in_required": true,
     "cold_outreach_allowed": false,
     "customer_service_window_hours": 24,
-    "approved_template_outside_window": true,
+    "outside_service_window_action": "BLOCK",
+    "official_templates_supported": false,
     "excluded_workflows": ["DUGAS", "QH"]
   },
   "pause_rules": {

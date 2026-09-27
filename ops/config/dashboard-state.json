@@ -1,0 +1,72 @@
+{
+  "version": 2,
+  "generatedAt": "2026-09-27T00:00:00-03:00",
+  "mode": "DRY_RUN",
+  "sources": {
+    "commercialSheet": "https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit",
+    "operationsSheet": "https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit"
+  },
+  "commercial": {
+    "prospects": 149,
+    "whatsapp": 88,
+    "web": 148,
+    "email": 94,
+    "reviews": 149,
+    "analysis": 149,
+    "whatsappDrafts": 149,
+    "emailDrafts": 149
+  },
+  "legacyEmail": {
+    "managed": 59,
+    "sent": 50,
+    "withoutKnownBounce": 49,
+    "softBounces": 1,
+    "hardBounces": 0,
+    "duplicatesSkipped": 1,
+    "positiveReplies": 0,
+    "meetings": 0
+  },
+  "newPipeline": {
+    "queued": 0,
+    "sent": 0,
+    "activeApprovals": 0,
+    "outcomeUnknown": 0
+  },
+  "qa": {
+    "batch": "Distribuidoras_300 · filas 2–26",
+    "pass": 0,
+    "review": 8,
+    "discard": 17,
+    "notes": [
+      "25/25 registros no expresan reseñas como analizadas/total accesible.",
+      "25/25 borradores requieren adaptación al contrato comercial vigente.",
+      "17/25 registros son corporaciones o quedan fuera del foco mediana/chica."
+    ]
+  },
+  "channels": {
+    "email": {
+      "provider": "Gmail / Brevo",
+      "account": "Ortu - WIS <ortu@wis-agency.com>",
+      "health": "BLOCKED_AUTH_DNS",
+      "enabled": false,
+      "canSend": false,
+      "detail": "Sender aislado listo en dry-run; alias, credencial WIS, firma, SPF/DKIM y transporte no pudieron verificarse con el acceso read-only disponible."
+    },
+    "whatsapp": {
+      "provider": "Baileys · conexión no oficial",
+      "account": "línea •••• 5679",
+      "health": "HARDENED_OFF",
+      "enabled": false,
+      "canSend": false,
+      "detail": "Idempotencia, opt-in, bajas, límites y reconciliación listos; transporte y sesión permanecen desactivados."
+    }
+  },
+  "sheets": {
+    "queueRows": 59,
+    "eventRows": 52,
+    "snapshotTab": "Dashboard_Snapshot",
+    "automationTab": "Automation_Control",
+    "commandsTab": "Task_Commands",
+    "healthTab": "Channel_Health"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "timezone": "America/Buenos_Aires",
+  "schedules": [
+    {"id":"AUTO-SNAPSHOT-005","name":"Actualizar panel","action":"REFRESH_SNAPSHOT","mode":"EVERY_N_MINUTES","intervalMinutes":5,"dailyTime":null,"status":"PAUSED"},
+    {"id":"AUTO-RESEARCH-060","name":"Continuar research","action":"CONTINUE_RESEARCH","mode":"EVERY_N_MINUTES","intervalMinutes":60,"dailyTime":null,"status":"PAUSED"},
+    {"id":"AUTO-RESEARCH-DAILY","name":"Research diario","action":"CONTINUE_RESEARCH","mode":"DAILY","intervalMinutes":null,"dailyTime":"09:30","status":"PAUSED"},
+    {"id":"AUTO-QA-DAILY","name":"QA diario","action":"RUN_QA","mode":"DAILY","intervalMinutes":null,"dailyTime":"17:45","status":"PAUSED"}
+  ]
+}

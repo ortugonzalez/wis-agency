@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "deployment_mode": "disabled",
+  "enabled": false,
+  "dry_run": true,
+  "provider": "gmail",
+  "sender": {
+    "name": "Ortu - WIS",
+    "email": "ortu@wis-agency.com",
+    "reply_to": "ortu@wis-agency.com",
+    "alias_verification": "PENDING"
+  },
+  "signature": {
+    "approval_status": "PENDING",
+    "html_path": "./signature.example.html",
+    "sha256": null,
+    "forbid_gravatar": true
+  },
+  "credential_reference": {
+    "n8n_type": "gmailOAuth2",
+    "id_env": "N8N_WIS_GMAIL_CREDENTIAL_ID",
+    "name_env": "N8N_WIS_GMAIL_CREDENTIAL_NAME"
+  },
+  "limits": {
+    "daily_cap": 25,
+    "interval_minutes": 15,
+    "timezone": "America/Buenos_Aires",
+    "window_start": "09:30",
+    "window_end": "17:30",
+    "max_followups": 2,
+    "followup_days": [3, 7]
+  },
+  "required_snapshots": ["Outreach_Queue", "provider_reconciliation"]
+}

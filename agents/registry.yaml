@@ -49,7 +49,7 @@
       "id": "email-sender",
       "mission": "Encolar, enviar y monitorear emails individuales aprobados mediante Gmail/Brevo con firma WIS e idempotencia.",
       "read_paths": ["agents/**", "docs/**", "agents/artifacts/copy/**"],
-      "write_paths": ["agents/artifacts/email/**", "ops/reports/email/**", "automation/email/**"],
+      "write_paths": ["agents/artifacts/email/**", "ops/reports/email/**", "integrations/email/**"],
       "external_scopes": ["Gmail/Brevo", "Outreach_Queue", "Outreach_Events"],
       "allowed_tools": ["google_sheets", "gmail", "brevo", "n8n_read_only"],
       "forbidden_actions": ["send_without_batch_approval", "send_cc_or_bcc", "exceed_daily_cap", "blind_retry", "rewrite_approved_copy"],
@@ -57,13 +57,13 @@
     },
     {
       "id": "whatsapp-sender",
-      "mission": "Encolar, enviar y monitorear WhatsApp aprobados sólo con opt-in verificable y sobre workflows WIS aislados.",
+      "mission": "Encolar, enviar y monitorear WhatsApp aprobados sólo con opt-in verificable mediante la sesión no oficial WIS 5679 aislada.",
       "read_paths": ["agents/**", "docs/**", "agents/artifacts/copy/**"],
-      "write_paths": ["agents/artifacts/whatsapp/**", "ops/reports/whatsapp/**", "automation/whatsapp/**"],
-      "external_scopes": ["workflows WIS Kapso-MundoVera", "Outreach_Queue", "Outreach_Events"],
-      "allowed_tools": ["google_sheets", "n8n_read_only", "kapso_read_only"],
+      "write_paths": ["agents/artifacts/whatsapp/**", "ops/reports/whatsapp/**", "integrations/whatsapp/**"],
+      "external_scopes": ["sesión WIS 5679", "Outreach_Queue", "Outreach_Events"],
+      "allowed_tools": ["google_sheets", "n8n_read_only", "baileys_session_read_only"],
       "forbidden_actions": ["send_without_batch_approval", "send_without_verified_opt_in", "cold_whatsapp", "touch_dugas_or_qh", "activate_workflow_without_approval", "blind_retry"],
-      "tests": ["opt-in verificable", "ventana 24 horas o plantilla aprobada", "10/día", "intervalo 15 minutos", "máximo un follow-up"]
+      "tests": ["binding línea 5679", "opt-in verificable", "bloqueo fuera de ventana de 24 horas", "10/día", "intervalo 15 minutos", "máximo un follow-up"]
     },
     {
       "id": "qa-ops",

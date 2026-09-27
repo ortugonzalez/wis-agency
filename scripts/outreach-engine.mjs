@@ -116,12 +116,7 @@ export function evaluateCandidate(candidate, approval, context = {}) {
     const optInAgeMs = now - new Date(optIn.recorded_at);
     const within24h = optInAgeMs >= 0 && optInAgeMs <= 24 * 60 * 60 * 1000;
     if (!within24h) {
-      if (!optIn.approved_template || !optIn.template_id) {
-        return { eligible: false, reason: "APPROVED_TEMPLATE_REQUIRED" };
-      }
-      if (!context.templateSnapshotLoaded || !context.approvedTemplateIds?.includes(optIn.template_id)) {
-        return { eligible: false, reason: "TEMPLATE_APPROVAL_RECONCILIATION_REQUIRED" };
-      }
+      return { eligible: false, reason: "SERVICE_WINDOW_EXPIRED" };
     }
   }
   return { eligible: true, reason: "ELIGIBLE" };

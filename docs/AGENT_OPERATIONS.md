@@ -47,10 +47,10 @@ Canario inicial:
 ## WhatsApp
 
 - Email primero; WhatsApp sólo después de que el prospecto lo inicia o entrega consentimiento verificable.
-- Fuera de la ventana de 24 horas se exige una plantilla aprobada.
+- La conexión WIS 5679 es no oficial y no soporta plantillas oficiales. Fuera de la ventana de 24 horas se bloquea el envío con `SERVICE_WINDOW_EXPIRED`.
 - 10 conversaciones por día, una cada 15 minutos, máximo un follow-up aprobado.
-- Usar únicamente el carril WIS Kapso-MundoVera. DUGAS y QH están fuera de alcance.
-- Los workflows permanecen inactivos hasta auditoría, dry-run y canario aprobado.
+- Usar únicamente la sesión WIS 5679 y su adaptador aislado. DUGAS y QH están fuera de alcance.
+- La sesión, el worker y el transporte permanecen inactivos hasta auditoría, dry-run y canario aprobado.
 
 ## Recuperación e incidentes
 

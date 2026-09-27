@@ -53,10 +53,9 @@ test("WhatsApp requires email-first and verified opt-in", () => {
   const optedIn = { ...wa, opt_in: { verified: true, source: "prospect initiated", recorded_at: "2026-09-27T00:00:00Z", within_24h: false, approved_template: false, template_id: null } };
   assert.equal(evaluateCandidate(optedIn, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true }).eligible, true);
   const expiredOptIn = { ...optedIn, opt_in: { ...optedIn.opt_in, recorded_at: "2026-09-25T00:00:00Z" } };
-  assert.equal(evaluateCandidate(expiredOptIn, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true }).reason, "APPROVED_TEMPLATE_REQUIRED");
-  const templated = { ...expiredOptIn, opt_in: { ...expiredOptIn.opt_in, approved_template: true, template_id: "wis_followup_v1" } };
-  assert.equal(evaluateCandidate(templated, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true }).reason, "TEMPLATE_APPROVAL_RECONCILIATION_REQUIRED");
-  assert.equal(evaluateCandidate(templated, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true, templateSnapshotLoaded: true, approvedTemplateIds: ["wis_followup_v1"] }).eligible, true);
+  assert.equal(evaluateCandidate(expiredOptIn, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true }).reason, "SERVICE_WINDOW_EXPIRED");
+  const legacyTemplateFields = { ...expiredOptIn, opt_in: { ...expiredOptIn.opt_in, approved_template: true, template_id: "legacy_only" } };
+  assert.equal(evaluateCandidate(legacyTemplateFields, approval, { now: "2026-09-27T14:00:00Z", emailInitialSent: true }).reason, "SERVICE_WINDOW_EXPIRED");
 });
 
 test("simultaneous channels and uncertain retries are blocked", () => {

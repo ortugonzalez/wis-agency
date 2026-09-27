@@ -32,6 +32,7 @@ __pycache__/
 *.log
 *.har
 *.ndjson
+ops/runtime/*.local.json
 *.sqlite*
 *.db
 playwright-report/
