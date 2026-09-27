@@ -1,0 +1,10 @@
+{
+  "name": "wis-command-center",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check out/app.js"
+  }
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="WIS Command Center: prospectos, mensajes y actividad comercial en una sola interfaz." />
+  <meta name="color-scheme" content="light" />
+  <title>WIS · Command Center</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Saltar a prospectos</a>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#prospects" aria-label="WIS Command Center"><span class="brand-mark">W</span><span><strong>WIS</strong><small>Command Center</small></span></a>
+      <nav aria-label="Navegación principal">
+        <button class="nav-item is-active" data-view="prospects"><span>⌘</span>Prospectos <b id="nav-prospect-count">—</b></button>
+        <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
+        <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <section class="sync-card" aria-label="Sincronización con Google Sheets">
+        <div><span class="pulse" id="sync-dot"></span><strong id="sync-label">Conectando…</strong></div>
+        <p id="sync-detail">Leyendo la fuente comercial.</p>
+        <button class="link-button" id="sync-button">Sincronizar ahora</button>
+      </section>
+      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer">Abrir fuente en Sheets <span>↗</span></a>
+      <div class="sidebar-foot">Refresco del panel cada 30 segundos<br><strong id="last-sync">—</strong></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">WIS / Operaciones comerciales</p><h1 id="page-title">Prospectos</h1></div>
+        <div class="top-actions">
+          <label class="global-search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar empresa, rubro, ubicación…" autocomplete="off" /><kbd>Ctrl K</kbd></label>
+          <button class="icon-button" id="refresh-button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
+        </div>
+      </header>
+
+      <section class="view is-active" id="prospects">
+        <div class="hero-row">
+          <div><p class="eyebrow">Base comercial unificada</p><h2>Todo el trabajo, sin volver a la planilla</h2><p>Filtrá, revisá el análisis, copiá contactos y gestioná cada canal desde una única pantalla.</p></div>
+          <div class="hero-actions"><button class="button button-secondary" id="continue-research">Continuar research</button><button class="button button-primary" id="hero-sync">Actualizar desde Sheets</button></div>
+        </div>
+        <div class="metrics" id="metrics"></div>
+        <section class="workspace" id="workspace">
+          <div class="workspace-head">
+            <div><h3>Directorio comercial</h3><p id="result-count">Cargando…</p></div>
+            <div class="filters">
+              <label>Rubro<select id="filter-rubro"><option value="">Todos</option></select></label>
+              <label>Contacto<select id="filter-contact"><option value="">Todos</option><option value="email">Con email</option><option value="whatsapp">Con WhatsApp</option><option value="both">Ambos canales</option><option value="missing">Contacto incompleto</option></select></label>
+              <label>Estado<select id="filter-status"><option value="">Todos</option><option value="ready">Listo para revisar</option><option value="sent">Contactado</option><option value="needs-work">Requiere trabajo</option></select></label>
+              <button class="clear-filters" id="clear-filters">Limpiar</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro / ubicación</th><th>Contacto</th><th>Señal detectada</th><th>Estado</th><th></th></tr></thead><tbody id="prospect-body"></tbody></table></div>
+          <div class="pagination"><span id="page-label">—</span><div><button id="page-prev" aria-label="Página anterior">←</button><button id="page-next" aria-label="Página siguiente">→</button></div></div>
+        </section>
+      </section>
+
+      <section class="view" id="activity">
+        <div class="section-intro"><div><p class="eyebrow">Historial vivo</p><h2>Actividad comercial</h2><p>Cada intento, entrega, respuesta, rebote y baja queda trazado.</p></div></div>
+        <div class="metrics" id="activity-metrics"></div>
+        <section class="workspace activity-surface queue-surface">
+          <div class="workspace-head"><div><h3>Cola de outreach</h3><p id="queue-count">Cargando…</p></div><span class="meta-tag">Outreach_Queue</span></div>
+          <div id="queue-list" class="activity-list queue-list"></div>
+        </section>
+        <section class="workspace activity-surface">
+          <div class="workspace-head"><div><h3>Últimos eventos</h3><p>Más recientes primero</p></div><select id="event-filter"><option value="">Todos los eventos</option><option value="EMAIL">Email</option><option value="WHATSAPP">WhatsApp</option><option value="SYSTEM">Sistema</option></select></div>
+          <div id="activity-list" class="activity-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="channels">
+        <div class="section-intro"><div><p class="eyebrow">Infraestructura</p><h2>Canales conectados</h2><p>El dashboard sólo habilita un envío cuando identidad, autorización e idempotencia están verificadas.</p></div></div>
+        <div id="channel-grid" class="channel-grid"></div>
+        <section class="workspace guide-card">
+          <div><span class="guide-number">01</span><strong>Elegí un prospecto</strong><p>Abrí la ficha desde cualquier fila.</p></div>
+          <div><span class="guide-number">02</span><strong>Revisá el mensaje</strong><p>El texto del Sheet aparece listo para controlar.</p></div>
+          <div><span class="guide-number">03</span><strong>Confirmá el canal</strong><p>Un segundo clic registra la aprobación y evita duplicados.</p></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head"><div><span class="drawer-kicker" id="drawer-rubro">—</span><h2 id="drawer-company">—</h2><p id="drawer-location">—</p></div><button class="close-button" data-close="drawer" aria-label="Cerrar ficha">×</button></div>
+    <div class="drawer-scroll">
+      <section class="contact-panel"><h3>Contacto</h3><div id="drawer-contacts"></div></section>
+      <section class="detail-section"><div class="section-title"><h3>Análisis del negocio</h3><span id="drawer-rating" class="rating"></span></div><p id="drawer-analysis"></p></section>
+      <section class="detail-section"><div class="section-title"><h3>Reseñas críticas</h3><span id="drawer-reviews" class="meta-tag"></span></div><p id="drawer-problems"></p></section>
+      <section class="message-tabs">
+        <div class="tab-list"><button class="is-active" data-message-tab="EMAIL">Email</button><button data-message-tab="WHATSAPP">WhatsApp</button></div>
+        <div class="message-card"><div class="message-meta"><span id="message-channel">EMAIL</span><button id="copy-message">Copiar mensaje</button></div><pre id="message-preview"></pre></div>
+      </section>
+    </div>
+    <div class="drawer-actions"><p id="drawer-send-status" class="drawer-send-status">Verificando requisitos…</p><button class="button button-secondary" id="drawer-web">Abrir web ↗</button><button class="button button-primary" id="open-send">Revisar y enviar</button></div>
+  </aside>
+  <div class="scrim" id="scrim" data-close="drawer"></div>
+
+  <dialog id="send-dialog">
+    <form method="dialog" class="send-modal" id="send-form">
+      <div class="modal-head"><div><p class="eyebrow">Confirmación humana</p><h2 id="send-title">Enviar mensaje</h2></div><button type="button" class="close-button" data-modal-close aria-label="Cerrar">×</button></div>
+      <div class="recipient-box"><span>Destinatario</span><strong id="send-recipient">—</strong><button type="button" id="copy-recipient">Copiar</button></div>
+      <label class="message-editor">Mensaje<textarea id="send-message" rows="10"></textarea></label>
+      <div class="wa-optin" id="wa-optin">
+        <span>Consentimiento de WhatsApp</span>
+        <strong id="optin-status">Sin opt-in inbound durable y reconciliado</strong>
+        <p>El consentimiento se importa desde un evento entrante verificable; no puede autodeclararse en el dashboard.</p>
+      </div>
+      <div class="send-guard"><span>✓</span><p>Se enviará una sola vez. Si el proveedor devuelve un resultado incierto, el sistema bloqueará el reintento.</p></div>
+      <div class="modal-error" id="send-error" role="alert"></div>
+      <div class="modal-actions"><button type="button" class="button button-secondary" data-modal-close>Cancelar</button><button type="submit" class="button button-primary" id="confirm-send">Confirmar envío</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button></nav>
+</body>
+</html>
