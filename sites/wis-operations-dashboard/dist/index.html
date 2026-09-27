@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Centro operativo de WIS: tareas, agentes, aprobaciones, evidencias y próximos pasos." />
+    <meta name="color-scheme" content="dark" />
+    <title>WIS · Centro Operativo</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23081018'/%3E%3Cpath d='M13 18l8 29 11-20 11 20 8-29' fill='none' stroke='%236ee7d2' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Saltar al contenido</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegación principal">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">W</div>
+          <div>
+            <strong>WIS</strong>
+            <span>Centro operativo</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item is-active" data-view-target="overview" type="button">
+            <span class="nav-icon" aria-hidden="true">⌁</span><span>Resumen</span>
+          </button>
+          <button class="nav-item" data-view-target="work" type="button">
+            <span class="nav-icon" aria-hidden="true">▤</span><span>Trabajo</span><span class="nav-count" id="work-count">0</span>
+          </button>
+          <button class="nav-item" data-view-target="agents" type="button">
+            <span class="nav-icon" aria-hidden="true">◫</span><span>Agentes</span><span class="nav-count">9</span>
+          </button>
+          <button class="nav-item" data-view-target="sources" type="button">
+            <span class="nav-icon" aria-hidden="true">⌘</span><span>Fuentes</span><span class="nav-count">12</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+
+        <div class="guardrail-card">
+          <div class="guardrail-title"><span class="pulse-dot"></span> Modo seguro</div>
+          <p>Envíos, publicaciones, despliegues y activaciones requieren aprobación humana.</p>
+        </div>
+
+        <div class="sidebar-footer">
+          <span>Snapshot</span>
+          <time datetime="2026-09-27">27 sep 2026</time>
+        </div>
+      </aside>
+
+      <main id="main" class="main-area">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Operaciones multiagente</p>
+            <h1 id="view-title">Visión general</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="system-state" title="No hay bloqueos ni aprobaciones pendientes">
+              <span class="signal-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+              Sistema estable
+            </div>
+            <a class="button button-secondary" href="https://docs.google.com/spreadsheets/d/1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w/edit" target="_blank" rel="noreferrer">
+              Abrir tablero fuente <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </header>
+
+        <section class="view is-active" data-view="overview" aria-labelledby="view-title">
+          <div class="status-strip">
+            <div>
+              <span class="status-kicker">Prioridad actual</span>
+              <strong>Auditar distribuidoras provisionales</strong>
+            </div>
+            <div class="status-meta">
+              <span class="pill pill-ready">READY</span>
+              <span>P0 · growth-research</span>
+              <span>Próximo lote: 25 filas</span>
+            </div>
+          </div>
+
+          <div class="metric-grid" id="metric-grid"></div>
+
+          <div class="overview-grid">
+            <section class="panel panel-large" aria-labelledby="critical-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Secuencia de ingresos</p>
+                  <h2 id="critical-title">Camino crítico</h2>
+                </div>
+                <span class="quiet-label">1 de 4 completada</span>
+              </div>
+              <div class="critical-path" id="critical-path"></div>
+            </section>
+
+            <section class="panel approval-panel" aria-labelledby="approval-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Control humano</p>
+                  <h2 id="approval-title">Aprobaciones</h2>
+                </div>
+                <span class="count-badge">0</span>
+              </div>
+              <div class="empty-state compact">
+                <div class="empty-icon" aria-hidden="true">✓</div>
+                <strong>Sin acciones externas pendientes</strong>
+                <p>El sistema sólo está investigando, validando y preparando borradores.</p>
+              </div>
+              <div class="approval-rules">
+                <span>Enviar</span><span>Publicar</span><span>Desplegar</span><span>Activar</span>
+              </div>
+            </section>
+          </div>
+
+          <div class="overview-grid lower-grid">
+            <section class="panel" aria-labelledby="activity-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Evidencia reciente</p>
+                  <h2 id="activity-title">Última ejecución</h2>
+                </div>
+                <span class="pill pill-review">REVIEW</span>
+              </div>
+              <div class="run-summary">
+                <div class="run-line"><span>RUN-WIS-WEB-001-001</span><time>27 sep · revisión</time></div>
+                <h3>Dashboard operativo preparado</h3>
+                <p>Vista ejecutiva, trabajo, agentes y fuentes integrados en un panel responsive.</p>
+                <div class="test-grid">
+                  <div><strong>0</strong><span>Errores de consola</span></div>
+                  <div><strong>OK</strong><span>Desktop y móvil</span></div>
+                  <div><strong>OK</strong><span>JavaScript</span></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" aria-labelledby="capacity-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="section-kicker">Capacidad configurada</p>
+                  <h2 id="capacity-title">Equipo de agentes</h2>
+                </div>
+                <button class="text-button" type="button" data-jump="agents">Ver los 9</button>
+              </div>
+              <div class="capacity-chart" aria-label="Un orquestador y hasta tres especialistas simultáneos">
+                <div class="capacity-center"><strong>3</strong><span>especialistas<br />simultáneos</span></div>
+                <div class="capacity-ring" aria-hidden="true"></div>
+              </div>
+              <div class="capacity-key">
+                <span><i class="key-orchestrator"></i>1 orquestador</span>
+                <span><i class="key-specialist"></i>8 especialistas disponibles</span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" data-view="work" aria-labelledby="work-title">
+          <div class="view-intro">
+            <div>
+              <p class="section-kicker">Backlog y control</p>
+              <h2 id="work-title">Trabajo operativo</h2>
+              <p>Prioridades, dependencias, responsables y evidencia en una sola vista.</p>
+            </div>
+            <div class="filters" aria-label="Filtros de tareas">
+              <label class="search-field">
+                <span aria-hidden="true">⌕</span>
+                <span class="sr-only">Buscar tareas</span>
+                <input id="task-search" type="search" placeholder="Buscar tarea o responsable" />
+              </label>
+              <label class="select-field">
+                <span class="sr-only">Filtrar por estado</span>
+                <select id="status-filter">
+                  <option value="ALL">Todos los estados</option>
+                  <option value="READY">Ready</option>
+                  <option value="BACKLOG">Backlog</option>
+                  <option value="DONE">Done</option>
+                  <option value="REVIEW">Review</option>
+                  <option value="WAITING_APPROVAL">Waiting approval</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="panel table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Tarea</th><th>Prioridad</th><th>Responsable</th><th>Estado</th><th>Dependencia</th><th>Próxima acción</th></tr>
+                </thead>
+                <tbody id="task-table-body"></tbody>
+              </table>
+            </div>
+            <div class="table-footer"><span id="task-result-count"></span><span>Fuente: WIS · Operaciones de Agentes</span></div>
+          </div>
+
+          <div class="work-secondary-grid">
+            <section class="panel" aria-labelledby="runs-title">
+              <div class="panel-heading"><div><p class="section-kicker">Trazabilidad</p><h2 id="runs-title">Ejecuciones</h2></div><span class="count-badge">1</span></div>
+              <div id="runs-list"></div>
+            </section>
+            <section class="panel" aria-labelledby="handoffs-title">
+              <div class="panel-heading"><div><p class="section-kicker">Transferencias e incidentes</p><h2 id="handoffs-title">Handoffs</h2></div><span class="count-badge">1</span></div>
+              <div id="handoffs-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" data-view="agents" aria-labelledby="agents-title">
+          <div class="view-intro">
+            <div>
+              <p class="section-kicker">Roles permanentes</p>
+              <h2 id="agents-title">Mapa de responsabilidades</h2>
+              <p>Cada agente tiene una misión, un alcance de escritura y límites explícitos.</p>
+            </div>
+            <div class="legend"><span><i class="legend-dot cyan"></i>Orquestación</span><span><i class="legend-dot violet"></i>Especialista</span><span><i class="legend-dot amber"></i>QA independiente</span></div>
+          </div>
+          <div class="agent-grid" id="agent-grid"></div>
+        </section>
+
+        <section class="view" data-view="sources" aria-labelledby="sources-title">
+          <div class="view-intro">
+            <div>
+              <p class="section-kicker">Contexto reutilizable</p>
+              <h2 id="sources-title">Conversaciones fuente</h2>
+              <p>Las conversaciones permanecen abiertas como referencia; no ejecutan trabajo paralelo por sí solas.</p>
+            </div>
+            <label class="search-field source-search">
+              <span aria-hidden="true">⌕</span>
+              <span class="sr-only">Buscar conversaciones</span>
+              <input id="source-search" type="search" placeholder="Buscar conversación o agente" />
+            </label>
+          </div>
+          <div class="source-grid" id="source-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="task-dialog" class="detail-dialog" aria-labelledby="dialog-title">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="Cerrar detalle" value="close">×</button>
+      </form>
+      <div id="dialog-content"></div>
+    </dialog>
+
+    <div class="mobile-nav" aria-label="Navegación móvil">
+      <button class="is-active" data-view-target="overview" type="button">Resumen</button>
+      <button data-view-target="work" type="button">Trabajo</button>
+      <button data-view-target="agents" type="button">Agentes</button>
+      <button data-view-target="sources" type="button">Fuentes</button>
+    </div>
+  </body>
+</html>

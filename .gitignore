@@ -20,6 +20,8 @@
 node_modules/
 .next/
 dist/
+!sites/wis-operations-dashboard/dist/
+!sites/wis-operations-dashboard/dist/**
 build/
 coverage/
 reports/
