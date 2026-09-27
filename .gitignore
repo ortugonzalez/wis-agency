@@ -34,6 +34,7 @@ __pycache__/
 *.ndjson
 ops/runtime/*.local.json
 ops/runtime/dashboard-sheet-snapshot.json
+ops/runtime/command-center-access.txt
 *.sqlite*
 *.db
 playwright-report/
