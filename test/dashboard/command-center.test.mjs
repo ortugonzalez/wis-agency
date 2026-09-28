@@ -114,12 +114,12 @@ test("conserva los criterios estructurados del constructor de research",()=>{
 });
 
 test("no confunde país ni rango de empleados con el rubro",()=>{
-  const request=normalizeResearchRequest({prompt:"busca 30 logisticas de chile entre 11-50 empleados"});
+  const request=normalizeResearchRequest({prompt:"busca 30 logisticas de chile entre 51-200 empleados"});
   assert.equal(request.quantity,30);
   assert.equal(request.businessType,"logisticas");
   assert.equal(request.industry,"Logística y Transporte");
   assert.equal(request.location,"Chile");
-  assert.equal(request.employeeSize,"11-50");
+  assert.equal(request.employeeSize,"51-200");
 });
 
 test("la consola desplegada exige credenciales con contraseña hasheada",()=>{
