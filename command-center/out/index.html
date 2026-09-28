@@ -20,6 +20,7 @@
         <button class="nav-item" data-view="whatsapp"><span>◌</span>WhatsApp <b id="nav-wa-count">—</b></button>
         <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
         <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
+        <button class="nav-item" data-view="costs"><span>$</span>Costos <b id="nav-cost-alert">—</b></button>
         <button class="nav-item" data-view="apollo"><span>◎</span>Apollo</button>
       </nav>
       <div class="sidebar-spacer"></div>
@@ -175,6 +176,55 @@
           <div><span class="guide-number">02</span><strong>Revisá el mensaje</strong><p>El texto del Sheet aparece listo para controlar.</p></div>
           <div><span class="guide-number">03</span><strong>Confirmá el canal</strong><p>Un segundo clic registra la aprobación y evita duplicados.</p></div>
         </section>
+      </section>
+
+      <section class="view" id="costs">
+        <div class="section-intro cost-heading"><div><p class="eyebrow">Control económico en vivo</p><h2>Costos y rentabilidad</h2><p>Qué estamos gastando, cuánto costaría escalar y dónde conviene optimizar.</p></div><span class="cost-source-badge" id="cost-source-badge">Esperando consumos</span></div>
+        <div class="cost-alert" id="cost-alert"><span>✓</span><div><strong>Presupuesto bajo control</strong><p>La proyección mensual está dentro del límite configurado.</p></div></div>
+        <div class="metrics cost-metrics" id="cost-metrics"></div>
+
+        <div class="cost-layout">
+          <section class="workspace budget-card">
+            <div class="workspace-head"><div><p class="eyebrow">Presupuesto mensual</p><h3>Tu límite y la proyección</h3></div><span class="meta-tag">USD</span></div>
+            <div class="budget-visual"><div class="budget-ring" id="budget-ring"><strong id="budget-percent">0%</strong><small>usado</small></div><div class="budget-copy"><span>Gastado este mes</span><strong id="budget-spend">US$ 0,00</strong><p id="budget-projection">Proyección: US$ 0,00</p></div></div>
+            <div class="budget-bar"><i id="budget-progress"></i></div>
+            <form id="cost-settings-form" class="cost-settings-form">
+              <label><span>Presupuesto mensual</span><div class="money-input"><i>US$</i><input id="cost-budget" type="number" min="0" step="1" value="150" /></div></label>
+              <label><span>Costos fijos mensuales</span><div class="money-input"><i>US$</i><input id="cost-fixed" type="number" min="0" step="0.01" value="0" /></div></label>
+              <button class="button button-secondary" type="submit">Guardar límites</button>
+            </form>
+          </section>
+
+          <section class="workspace unit-card">
+            <div class="workspace-head"><div><p class="eyebrow">Economía comercial</p><h3>Cuánto cuesta cada resultado</h3></div><span class="meta-tag">Mes actual</span></div>
+            <div class="unit-grid" id="unit-economics"></div>
+            <p class="cost-footnote">Los valores aparecen sólo cuando existe actividad medida. “—” significa que todavía no hay suficiente evidencia.</p>
+          </section>
+        </div>
+
+        <section class="workspace cost-breakdown-card">
+          <div class="workspace-head"><div><p class="eyebrow">Composición del gasto</p><h3>Proveedores y tareas</h3></div><span class="meta-tag" id="pricing-version">Tarifas versionadas</span></div>
+          <div class="cost-breakdown-grid"><div><h4>Por proveedor</h4><div id="cost-provider-list" class="cost-bars"></div></div><div><h4>Por etapa</h4><div id="cost-stage-list" class="cost-bars"></div></div></div>
+        </section>
+
+        <section class="workspace simulator-card">
+          <div class="workspace-head"><div><p class="eyebrow">Simulador de escala</p><h3>Probá cuánto costaría el próximo lote</h3><p>Cambiá los campos. No ejecuta nada ni genera cargos.</p></div><span class="meta-tag">Estimación</span></div>
+          <form id="cost-simulator" class="simulator-form">
+            <label><span>Prospectos</span><select id="sim-prospects"><option value="300">300</option><option value="1000">1.000</option><option value="10000">10.000</option></select></label>
+            <label><span>Modelo</span><select id="sim-model"><option value="gpt-6-luna">Luna · económico</option><option value="gpt-6-sol">Sol · equilibrado</option><option value="gpt-6-astra">Astra · máximo análisis</option></select></label>
+            <label><span>Procesamiento</span><select id="sim-tier"><option value="batch">Batch · menor costo</option><option value="standard">Inmediato</option></select></label>
+            <label><span>Búsquedas web por prospecto</span><input id="sim-web" type="number" min="0" max="20" step="1" value="0" /></label>
+            <label><span>Consultas Maps por prospecto</span><input id="sim-maps" type="number" min="0" max="20" step="1" value="0" /></label>
+            <label><span>Emails por prospecto</span><input id="sim-email" type="number" min="0" max="3" step="1" value="1" /></label>
+          </form>
+          <div class="simulator-result"><div><span>Costo total estimado</span><strong id="sim-total">US$ 0,00</strong></div><div><span>Por prospecto</span><strong id="sim-per-prospect">US$ 0,00</strong></div><div id="sim-breakdown" class="sim-breakdown"></div></div>
+          <p class="cost-footnote">La estimación usa 15.000 tokens de entrada, 2.500 de salida y 50% de caché por prospecto. Las cuotas gratuitas de Google Places se descuentan antes de calcular.</p>
+        </section>
+
+        <div class="cost-layout">
+          <section class="workspace recommendations-card"><div class="workspace-head"><div><p class="eyebrow">Optimización automática</p><h3>Qué haría ahora</h3></div></div><div id="cost-recommendations" class="recommendation-list"></div></section>
+          <section class="workspace ledger-card"><div class="workspace-head"><div><p class="eyebrow">Auditoría</p><h3>Últimos consumos</h3></div><span class="meta-tag">Cost_Ledger</span></div><div id="cost-ledger" class="cost-ledger"></div></section>
+        </div>
       </section>
 
       <section class="view" id="apollo">

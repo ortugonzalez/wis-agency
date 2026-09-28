@@ -7,6 +7,10 @@ const DEFAULT_COMMERCIAL_ID="1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8";
 const DEFAULT_OPERATIONS_ID="1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w";
 const DRAFTS_SHEET="Message_Drafts";
 const DRAFT_HEADERS=["draft_key","source_sheet","source_row","channel","message","updated_at","updated_by"];
+const COST_LEDGER_SHEET="Cost_Ledger";
+const COST_LEDGER_HEADERS=["usage_id","timestamp","operation_id","idempotency_key","run_id","prospect_key","source_row","empresa","stage","provider","service","model","pricing_tier","input_tokens","cached_input_tokens","cache_write_tokens","output_tokens","reasoning_tokens","tool_calls","units","unit_name","provider_cost_usd","calculated_cost_usd","cost_source","metadata","recorded_by"];
+const COST_SETTINGS_SHEET="Cost_Settings";
+const COST_SETTINGS_HEADERS=["key","value","updated_at","updated_by","note"];
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -92,6 +96,10 @@ async function updateValues(spreadsheetId,range,values) {
 }
 
 async function ensureDraftsSheet() {
+  await ensureOperationalSheet(DRAFTS_SHEET,DRAFT_HEADERS);
+}
+
+async function ensureOperationalSheet(sheetName,headers) {
   const spreadsheetId=operationsId();
   const token=await accessToken();
   const metadataUrl=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`);
@@ -99,18 +107,25 @@ async function ensureDraftsSheet() {
   const metadataResponse=await fetch(metadataUrl,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
   const metadata=await metadataResponse.json();
   if(!metadataResponse.ok) throw new Error(`GOOGLE_SHEETS_METADATA_FAILED_${metadataResponse.status}`);
-  const exists=(metadata.sheets||[]).some(sheet=>sheet?.properties?.title===DRAFTS_SHEET);
+  const exists=(metadata.sheets||[]).some(sheet=>sheet?.properties?.title===sheetName);
   if(!exists) {
     const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
       method:"POST",
       headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
-      body:JSON.stringify({requests:[{addSheet:{properties:{title:DRAFTS_SHEET}}}]}),
+      body:JSON.stringify({requests:[{addSheet:{properties:{title:sheetName}}}]}),
       signal:AbortSignal.timeout(30_000)
     });
     if(!response.ok&&response.status!==400) throw new Error(`GOOGLE_SHEETS_ADD_SHEET_FAILED_${response.status}`);
   }
-  const current=await batchGet(spreadsheetId,[`${DRAFTS_SHEET}!A1:G1`],token);
-  if(!(current[0]?.values?.[0]||[]).length) await updateValues(spreadsheetId,`${DRAFTS_SHEET}!A1:G1`,DRAFT_HEADERS);
+  const lastColumn=columnName(headers.length);
+  const current=await batchGet(spreadsheetId,[`${sheetName}!A1:${lastColumn}1`],token);
+  if(!(current[0]?.values?.[0]||[]).length) await updateValues(spreadsheetId,`${sheetName}!A1:${lastColumn}1`,headers);
+}
+
+function columnName(number) {
+  let result="";
+  for(let value=number;value>0;value=Math.floor((value-1)/26)) result=String.fromCharCode(65+(value-1)%26)+result;
+  return result;
 }
 
 async function upsertMessageDraft(rowNumber,channel,message) {
@@ -186,6 +201,29 @@ export async function updateProspectMessage(rowNumber,channel,message) {
   return {rowNumber,column,channel:normalizedChannel,draftKey,commercialSheetUpdated};
 }
 
+export async function appendCostUsage(row) {
+  await ensureOperationalSheet(COST_LEDGER_SHEET,COST_LEDGER_HEADERS);
+  return appendValues(operationsId(),`${COST_LEDGER_SHEET}!A:Z`,[
+    row.usageId,row.timestamp,row.operationId,row.idempotencyKey,row.runId,row.prospectKey,row.sourceRow||"",row.empresa,row.stage,
+    row.provider,row.service,row.model,row.pricingTier,row.inputTokens,row.cachedInputTokens,row.cacheWriteTokens,row.outputTokens,
+    row.reasoningTokens,row.toolCalls,row.units,row.unitName,row.providerCostUsd,row.calculatedCostUsd,row.costSource,row.metadata,row.recordedBy
+  ]);
+}
+
+export async function upsertCostSetting(key,value,note="",updatedBy="human-dashboard") {
+  await ensureOperationalSheet(COST_SETTINGS_SHEET,COST_SETTINGS_HEADERS);
+  const spreadsheetId=operationsId();
+  const token=await accessToken();
+  const range=await batchGet(spreadsheetId,[`${COST_SETTINGS_SHEET}!A1:E500`],token);
+  const values=range[0]?.values||[];
+  const normalized=String(key||"").trim();
+  const rowNumber=values.findIndex((row,index)=>index>0&&row[0]===normalized)+1;
+  const record=[normalized,String(value),new Date().toISOString(),updatedBy,String(note||"")];
+  if(rowNumber>0) await updateValues(spreadsheetId,`${COST_SETTINGS_SHEET}!A${rowNumber}:E${rowNumber}`,record);
+  else await appendValues(spreadsheetId,`${COST_SETTINGS_SHEET}!A:E`,record);
+  return {key:normalized,value,rowNumber:rowNumber||null};
+}
+
 async function batchGet(spreadsheetId,ranges,token) {
   const url=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet`);
   ranges.forEach(range=>url.searchParams.append("ranges",range));
@@ -248,6 +286,9 @@ export async function buildLiveSnapshot() {
   ]);
   let draftRanges=[];
   try { draftRanges=await batchGet(operationsId,[`${DRAFTS_SHEET}!A1:G2000`],token); }
+  catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
+  let costRanges=[];
+  try { costRanges=await batchGet(operationsId,[`${COST_LEDGER_SHEET}!A1:Z5000`,`${COST_SETTINGS_SHEET}!A1:E500`],token); }
   catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
   const drafts=objects(draftRanges[0]?.values);
   const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
@@ -339,6 +380,8 @@ export async function buildLiveSnapshot() {
     runs:objects(operations[3]?.values),
     commands:objects(operations[4]?.values),
     channelHealth:objects(operations[5]?.values),
+    costLedger:objects(costRanges[0]?.values),
+    costSettings:objects(costRanges[1]?.values),
     optIns:[],
     providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"
   };

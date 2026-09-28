@@ -5,7 +5,7 @@ const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300
 const PAGE_SIZE = 18;
 
 const store = {
-  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{}, research:{requests:[],summary:{}} },
+  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{}, research:{requests:[],summary:{}}, costs:{summary:{},unitEconomics:{},tokens:{},records:[],recommendations:[]} },
   filtered: [],
   page: 1,
   selected: null,
@@ -146,6 +146,89 @@ function renderTable() {
   $$("[data-open-row]").forEach(row=>row.addEventListener("click",()=>openDrawer(Number(row.dataset.openRow))));
   $$("[data-open]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openDrawer(Number(button.dataset.open));}));
   $$("[data-compose]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openComposer(Number(button.dataset.compose),button.dataset.channel);}));
+}
+
+const usd=value=>Number(value||0).toLocaleString("es-AR",{style:"currency",currency:"USD",minimumFractionDigits:Number(value||0)<1?4:2,maximumFractionDigits:Number(value||0)<1?4:2});
+const compact=value=>Number(value||0).toLocaleString("es-AR",{notation:"compact",maximumFractionDigits:1});
+const unitCost=value=>value===null||value===undefined?"—":usd(value);
+
+function costBarRows(rows=[],empty="Todavía no hay consumos medidos") {
+  const max=Math.max(0,...rows.map(row=>Number(row.costUsd||0)));
+  if(!rows.length) return `<div class="cost-empty">${esc(empty)}</div>`;
+  return rows.map(row=>`<div class="cost-bar-row"><div><strong>${esc(String(row.key||"Otro").replaceAll("_"," "))}</strong><span>${row.records} registro${row.records===1?"":"s"}</span></div><div class="cost-bar-track"><i style="width:${max?Math.max(4,row.costUsd/max*100):0}%"></i></div><b>${esc(usd(row.costUsd))}</b></div>`).join("");
+}
+
+function renderCosts() {
+  const costs=store.data.costs||{};
+  const summary=costs.summary||{};
+  const economics=costs.unitEconomics||{};
+  const settings=costs.settings||{};
+  const tokens=costs.tokens||{};
+  const measured=costs.sources?.measured===true;
+  $("#cost-source-badge").textContent=measured?`${costs.sources.ledgerRows} consumos medidos`:"Listo para medir";
+  $("#cost-source-badge").classList.toggle("is-live",measured);
+  $("#cost-metrics").innerHTML=[
+    metric("Gasto del mes",usd(summary.spendMtd),`Variable ${usd(summary.variableMtd)} + fijo devengado`),
+    metric("Proyección mensual",usd(summary.projectedMonth),`${summary.projectedBudgetPct||0}% del presupuesto`,summary.alertLevel==="OK"?"blue":"amber"),
+    metric("Tokens de entrada",compact(tokens.input),`${tokens.cacheRate||0}% recuperado desde caché`),
+    metric("Búsquedas web",compact(tokens.webSearches),"Llamadas registradas","red")
+  ].join("");
+  const pct=Math.max(0,Number(summary.budgetUsedPct||0));
+  $("#budget-percent").textContent=`${Math.round(pct)}%`;
+  $("#budget-spend").textContent=usd(summary.spendMtd);
+  $("#budget-projection").textContent=`Proyección: ${usd(summary.projectedMonth)} de ${usd(settings.monthlyBudgetUsd)}`;
+  $("#budget-progress").style.width=`${Math.min(100,pct)}%`;
+  $("#budget-ring").style.setProperty("--budget-angle",`${Math.min(100,pct)*3.6}deg`);
+  $("#cost-budget").value=settings.monthlyBudgetUsd??150;
+  $("#cost-fixed").value=settings.fixedMonthlyUsd??0;
+  const alert=$("#cost-alert");
+  const levels={OK:["✓","Presupuesto bajo control","La proyección mensual está dentro del límite configurado."],LOW:["i","Atención temprana","La proyección ya supera el 50% del presupuesto."],MEDIUM:["!","Revisá el ritmo de gasto","La proyección supera el 75% del presupuesto mensual."],HIGH:["!","Presupuesto casi agotado","La proyección supera el 90%. Conviene pausar o cambiar de modelo."],CRITICAL:["×","Proyección por encima del límite","Antes de escalar, reducí llamadas o aumentá el presupuesto aprobado."]};
+  const copy=levels[summary.alertLevel]||levels.OK;
+  alert.className=`cost-alert is-${String(summary.alertLevel||"OK").toLowerCase()}`;
+  alert.innerHTML=`<span>${copy[0]}</span><div><strong>${copy[1]}</strong><p>${copy[2]}</p></div>`;
+  $("#nav-cost-alert").textContent=summary.alertLevel==="OK"?"OK":`${Math.round(summary.projectedBudgetPct||0)}%`;
+  $("#unit-economics").innerHTML=[
+    ["Por prospecto",economics.costPerProspect,`${economics.measuredProspects||0} medidos`],
+    ["Por prospecto listo",economics.costPerQualified,`${economics.qualified||0} listos`],
+    ["Por respuesta",economics.costPerReply,`${economics.replies||0} respuestas`],
+    ["Por reunión",economics.costPerMeeting,`${economics.meetings||0} reuniones`]
+  ].map(([label,value,note])=>`<article><span>${esc(label)}</span><strong>${esc(unitCost(value))}</strong><small>${esc(note)}</small></article>`).join("");
+  $("#cost-provider-list").innerHTML=costBarRows(costs.byProvider);
+  $("#cost-stage-list").innerHTML=costBarRows(costs.byStage);
+  $("#pricing-version").textContent=`Tarifas ${costs.pricingVersion||"—"}`;
+  $("#cost-recommendations").innerHTML=(costs.recommendations||[]).map(item=>`<article class="recommendation is-${String(item.level||"info").toLowerCase()}"><span>${item.level==="HIGH"?"!":item.level==="MEDIUM"?"↗":"i"}</span><div><strong>${esc(item.title)}</strong><p>${esc(item.detail)}</p></div></article>`).join("")||'<div class="cost-empty">No hay recomendaciones pendientes.</div>';
+  $("#cost-ledger").innerHTML=(costs.records||[]).slice(0,12).map(row=>`<article><span class="ledger-provider">${esc(row.provider)}</span><div><strong>${esc(row.empresa||row.stage||row.operationId||"Operación")}</strong><p>${esc([row.service,row.stage,row.model].filter(Boolean).join(" · "))}</p></div><b>${esc(usd(row.calculatedCostUsd))}</b><time>${esc(relativeDate(row.timestamp))}</time></article>`).join("")||'<div class="cost-empty">El próximo research, borrador o envío aparecerá aquí automáticamente.</div>';
+}
+
+let simulatorTimer;
+async function updateCostSimulator() {
+  clearTimeout(simulatorTimer);
+  simulatorTimer=setTimeout(async()=>{
+    try {
+      const response=await fetch("/api/costs/estimate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prospects:Number($("#sim-prospects").value),model:$("#sim-model").value,pricingTier:$("#sim-tier").value,webSearchesPerProspect:Number($("#sim-web").value),placesTextPerProspect:Number($("#sim-maps").value),placeDetailsPerProspect:Number($("#sim-maps").value),emailsPerProspect:Number($("#sim-email").value),fixedMonthlyUsd:Number($("#cost-fixed").value)})});
+      const payload=await response.json();
+      if(!response.ok) throw new Error(payload.error);
+      const result=payload.estimate;
+      $("#sim-total").textContent=usd(result.totalUsd);
+      $("#sim-per-prospect").textContent=usd(result.costPerProspect);
+      const labels={ai:"IA",webSearch:"Búsquedas",places:"Google Maps",email:"Emails",fixed:"Costos fijos"};
+      $("#sim-breakdown").innerHTML=Object.entries(result.breakdown).map(([key,value])=>`<span>${labels[key]||key}: <b>${esc(usd(value))}</b></span>`).join("");
+    } catch(error) { $("#sim-breakdown").textContent=error.message||"No se pudo calcular."; }
+  },180);
+}
+
+async function saveCostSettings(event) {
+  event.preventDefault();
+  const button=event.currentTarget.querySelector("button");
+  button.disabled=true;button.textContent="Guardando…";
+  try {
+    const response=await fetch("/api/costs/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({monthlyBudgetUsd:Number($("#cost-budget").value),fixedMonthlyUsd:Number($("#cost-fixed").value)})});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error);
+    toast("Presupuesto guardado en Google Sheets.");
+    await loadData(true);
+  } catch(error) { toast(error.message||"No se pudo guardar el presupuesto.",true); }
+  finally { button.disabled=false;button.textContent="Guardar límites"; }
 }
 
 function renderEvents() {
@@ -424,6 +507,8 @@ function renderAll() {
   renderChannels();
   renderSync();
   renderResearch();
+  renderCosts();
+  updateCostSimulator();
 }
 
 async function loadData(silent=false) {
@@ -751,7 +836,7 @@ async function prepareApolloPilot() {
 function switchView(id) {
   $$(".view").forEach(view=>view.classList.toggle("is-active",view.id===id));
   $$("[data-view]").forEach(button=>button.classList.toggle("is-active",button.dataset.view===id));
-  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",whatsapp:"WhatsApp",activity:"Actividad",channels:"Canales",apollo:"Apollo"}[id]||"Prospectos";
+  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",whatsapp:"WhatsApp",activity:"Actividad",channels:"Canales",costs:"Costos",apollo:"Apollo"}[id]||"Prospectos";
   history.replaceState(null,"",`#${id}`);
   if(id==="whatsapp"&&!store.whatsapp.loaded) loadWhatsapp();
 }
@@ -771,6 +856,9 @@ $("#research-refresh").addEventListener("click",()=>loadData());
 $("#research-business-type").addEventListener("change",alignResearchDefaults);
 $$('#research-form input, #research-form select').forEach(node=>node.addEventListener(node.matches('input[type="text"], input[type="number"]')?"input":"change",updateResearchPreview));
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
+$("#cost-settings-form").addEventListener("submit",saveCostSettings);
+$$('#cost-simulator input, #cost-simulator select').forEach(node=>node.addEventListener("input",updateCostSimulator));
+$("#cost-fixed").addEventListener("input",updateCostSimulator);
 $("#wa-refresh").addEventListener("click",()=>loadWhatsapp());
 let waSearchTimer;
 $("#wa-search").addEventListener("input",()=>{clearTimeout(waSearchTimer);waSearchTimer=setTimeout(()=>loadWhatsapp(),280);});
@@ -799,7 +887,7 @@ $("#send-message").addEventListener("input",()=>{$("#save-draft").disabled=!$("#
 $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
-const initialView=["prospects","research","whatsapp","activity","channels","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+const initialView=["prospects","research","whatsapp","activity","channels","costs","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
 updateResearchPreview();
 switchView(initialView);
 loadData();

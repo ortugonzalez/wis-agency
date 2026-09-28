@@ -6,13 +6,16 @@ import { fileURLToPath } from "node:url";
 import {
   appendOutreachEvent,
   appendOutreachQueue,
+  appendCostUsage,
   appendTaskCommand,
   buildLiveSnapshot,
   sheetsLiveConfigured,
   sheetsWriteConfigured,
   updateOutreachQueue,
-  updateProspectMessage
+  updateProspectMessage,
+  upsertCostSetting
 } from "./sheets-live.mjs";
+import { buildCostAnalytics, estimateScenario, normalizeCostRecord, normalizeCostSettings, PRICING, PRICING_VERSION } from "./costs.mjs";
 
 const standaloneRoot=process.env.WIS_STANDALONE_ROOT?resolve(process.env.WIS_STANDALONE_ROOT):null;
 const root = standaloneRoot||fileURLToPath(new URL("../../../..", import.meta.url));
@@ -22,6 +25,7 @@ const runtimeDir = standaloneRoot?join(root,"runtime"):join(root, "ops", "runtim
 const commandsPath = join(runtimeDir, "dashboard-commands.ndjson");
 const sheetSnapshotPath = join(runtimeDir, "dashboard-sheet-snapshot.json");
 const outreachEventsPath = join(runtimeDir, "dashboard-outreach-events.ndjson");
+const costUsagePath = join(runtimeDir, "dashboard-cost-usage.ndjson");
 const statePath = join(configDir, "dashboard-state.json");
 const channelVerificationPath = join(configDir, "channel-verification.json");
 const port = Number(process.env.PORT || process.env.WIS_DASHBOARD_PORT || 4174);
@@ -476,12 +480,13 @@ async function whatsappProviderGet(resource,params={}) {
 
 async function dashboardPayload() {
   try { await refreshLiveSheets(false); } catch { /* keep the last valid snapshot and surface degraded sync below */ }
-  const [snapshot,state,localEvents,localCommands,verification]=await Promise.all([
+  const [snapshot,state,localEvents,localCommands,verification,localCosts]=await Promise.all([
     readJson(sheetSnapshotPath,{fetchedAt:null,source:"NONE",prospects:[],events:[]}),
     readJson(statePath,{}),
     readNdjson(outreachEventsPath,500),
     readNdjson(commandsPath,200),
-    readJson(channelVerificationPath,{})
+    readJson(channelVerificationPath,{}),
+    readNdjson(costUsagePath,2000)
   ]);
   const prospects=(snapshot.prospects||[]).map(normalizeProspect);
   const queue=Array.isArray(snapshot.outreachQueue)?snapshot.outreachQueue:[];
@@ -505,12 +510,25 @@ async function dashboardPayload() {
     prospect.whatsappOptIn=whatsappOptInGate(snapshot,prospect);
   }
   const research=researchState(snapshot.commands||[],localCommands);
+  const costRows=[...(snapshot.costLedger||[]),...localCosts];
+  const uniqueCosts=[];
+  const seenCosts=new Set();
+  for(const row of costRows) {
+    const identity=row.usageId||row.usage_id||row.idempotencyKey||row.idempotency_key;
+    if(identity&&seenCosts.has(identity)) continue;
+    if(identity) seenCosts.add(identity);
+    uniqueCosts.push(row);
+  }
+  const meetings=events.filter(row=>/MEETING|REUNION/i.test(row.eventType||row.status||"")).length;
+  const costSettings=normalizeCostSettings(snapshot.costSettings||[],process.env);
+  const costs=buildCostAnalytics(uniqueCosts,costSettings,{qualified:prospects.filter(candidateReady).length,replies,meetings});
   return {
     generatedAt:new Date().toISOString(),
     prospects,
     queue,
     events:events.slice(0,500),
     research,
+    costs,
     stats:{
       prospects:prospects.length,
       bothChannels:prospects.filter(row=>row.email&&row.whatsapp).length,
@@ -545,6 +563,16 @@ async function appendEvent(event) {
   try { await appendFile(outreachEventsPath,`${JSON.stringify(complete)}\n`,"utf8"); }
   catch(error) { if(!sheetsWriteConfigured()) throw error; }
   return complete;
+}
+
+async function recordCostUsage(input={}) {
+  const record=normalizeCostRecord({...input,usageId:input.usageId||`COST-${Date.now()}-${randomUUID().slice(0,8)}`});
+  const local=await readNdjson(costUsagePath,2000);
+  if(record.idempotencyKey&&local.some(row=>row.idempotencyKey===record.idempotencyKey)) return {...local.find(row=>row.idempotencyKey===record.idempotencyKey),deduplicated:true};
+  if(sheetsWriteConfigured()) await appendCostUsage(record);
+  try { await appendFile(costUsagePath,`${JSON.stringify(record)}\n`,"utf8"); }
+  catch(error) { if(!sheetsWriteConfigured()) throw error; }
+  return record;
 }
 
 async function postJson(url,payload,headers={}) {
@@ -670,6 +698,9 @@ async function processSend(input) {
     queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
     await updateOutreachQueue(queueRowNumber,queueRecord);
     const event=await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
+    try {
+      await recordCostUsage({operationId:messageId,idempotencyKey:`COST:${idempotencyKey}`,prospectKey:gate.prospectKey,sourceRow:prospect.rowNumber,empresa:prospect.empresa,stage:"SEND",provider:channel==="EMAIL"?"brevo":"whatsapp",service:channel==="EMAIL"?"transactional-email":"baileys",units:1,unitName:channel==="EMAIL"?"email":"mensaje",metadata:{channel,messageId},recordedBy:"wis-command-center"});
+    } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
     return {status:200,body:{ok:true,eventId:event.eventId,idempotencyKey}};
   } catch(error) {
     if(queueRowNumber&&queueRecord) {
@@ -712,6 +743,30 @@ const server=createServer(async(req,res)=>{
       return res.end(JSON.stringify({error:"AUTH_REQUIRED"}));
     }
     if(url.pathname==="/api/dashboard"&&req.method==="GET") return json(res,200,await dashboardPayload());
+    if(url.pathname==="/api/costs/pricing"&&req.method==="GET") return json(res,200,{version:PRICING_VERSION,pricing:PRICING});
+    if(url.pathname==="/api/costs/estimate"&&req.method==="POST") {
+      assertMutationRequest(req);
+      return json(res,200,{ok:true,estimate:estimateScenario(await requestBody(req))});
+    }
+    if(url.pathname==="/api/costs/usage"&&req.method==="POST") {
+      assertMutationRequest(req);
+      const configuredToken=process.env.WIS_COST_INGEST_TOKEN;
+      if(configuredToken&&req.headers["x-wis-cost-token"]!==configuredToken) return json(res,401,{ok:false,error:"COST_INGEST_TOKEN_INVALID"});
+      const record=await recordCostUsage(await requestBody(req));
+      return json(res,record.deduplicated?200:201,{ok:true,record,deduplicated:record.deduplicated===true});
+    }
+    if(url.pathname==="/api/costs/settings"&&req.method==="POST") {
+      assertMutationRequest(req);
+      if(!sheetsWriteConfigured()) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
+      const input=await requestBody(req);
+      const monthlyBudgetUsd=Math.max(0,Math.min(1_000_000,Number(input.monthlyBudgetUsd)));
+      const fixedMonthlyUsd=Math.max(0,Math.min(1_000_000,Number(input.fixedMonthlyUsd)));
+      if(!Number.isFinite(monthlyBudgetUsd)||!Number.isFinite(fixedMonthlyUsd)) return json(res,400,{ok:false,error:"COST_SETTINGS_INVALID"});
+      await upsertCostSetting("monthly_budget_usd",monthlyBudgetUsd,"Presupuesto mensual aprobado desde Command Center");
+      await upsertCostSetting("fixed_monthly_usd",fixedMonthlyUsd,"Costos fijos mensuales informados por el usuario");
+      await refreshLiveSheets(true);
+      return json(res,200,{ok:true,monthlyBudgetUsd,fixedMonthlyUsd});
+    }
     if(url.pathname==="/api/whatsapp/status"&&req.method==="GET") {
       const config=await whatsappProviderConfig();
       if(!config) return json(res,200,{configured:false,connected:false,identityVerified:false,outboundEnabled:false,account:"•••• 5679"});
@@ -788,6 +843,7 @@ const server=createServer(async(req,res)=>{
       let eventLogged=true;
       try { await appendEvent({messageId:`DRAFT-${rowNumber}-${channel}`,rowNumber,empresa:prospect.empresa,channel,recipient,eventType:"DRAFT_SAVED",fromStatus:"BORRADOR",toStatus:"BORRADOR",detail:"Borrador actualizado desde el dashboard",actor:"human-dashboard",source:"DASHBOARD",evidence:`message_sha256=${hash(message)}`}); }
       catch { eventLogged=false; }
+      try { await recordCostUsage({operationId:`DRAFT-${rowNumber}-${channel}`,idempotencyKey:`COST:DRAFT:${rowNumber}:${channel}:${hash(message)}`,prospectKey:`distribuidoras-300-row-${rowNumber}`,sourceRow:rowNumber,empresa:prospect.empresa,stage:"COPY",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{channel,event:"DRAFT_SAVED"},recordedBy:"human-dashboard"}); } catch { /* no bloquear el guardado por telemetría */ }
       return json(res,200,{ok:true,rowNumber,channel,savedAt,messageHash:hash(message),eventLogged,draftStorage});
     }
     if(url.pathname==="/api/research/request"&&req.method==="POST") {
@@ -816,6 +872,7 @@ const server=createServer(async(req,res)=>{
       else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
       try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
       catch(error) { if(!sheetsWriteConfigured()) throw error; }
+      try { await recordCostUsage({operationId:command.commandId,idempotencyKey:`COST:${command.idempotencyKey}`,runId:command.commandId,stage:"RESEARCH_REQUEST",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{quantity:request.quantity,businessType:request.businessType,industry:request.industry},recordedBy:"human-dashboard"}); } catch { /* el pedido queda válido aunque falle la telemetría */ }
       return json(res,202,{ok:true,command,request,deduplicated:false});
     }
     if(url.pathname==="/api/actions"&&req.method==="POST") {
