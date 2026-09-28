@@ -260,7 +260,8 @@ function normalizeResearchRequest(input={}) {
   location=region&&country?`${region}, ${country}`:region||country||location||"Argentina";
   const reviews=input.reviews==="none"?"none":"1-3";
   const contact=["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
-  const employeeSize=["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:"11-50";
+  const inferredEmployeeSize=prompt.match(/\b(1-10|11-20|11-50|20-50|51-200|201-500)\s+empleados?\b/i)?.[1];
+  const employeeSize=["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:(inferredEmployeeSize||"11-50");
   const minimumReviews=[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
   const destination=["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
   const priority=["NORMAL","HIGH","URGENT"].includes(input.priority)?input.priority:"NORMAL";
@@ -292,7 +293,13 @@ function normalizeResearchRequest(input={}) {
 function researchCommand(row={}) {
   let evidence={};
   try { evidence=typeof row.evidence==="string"?JSON.parse(row.evidence):row.evidence||{}; } catch { evidence={}; }
-  const request=evidence&&typeof evidence==="object"&&Number.isFinite(Number(evidence.quantity))?evidence:null;
+  const storedRequest=evidence&&typeof evidence==="object"&&Number.isFinite(Number(evidence.quantity))?evidence:null;
+  let request=storedRequest;
+  if(storedRequest?.prompt&&(!storedRequest.employeeSize||!storedRequest.country||/\bempleados?\b/i.test(storedRequest.industry||""))) {
+    try {
+      request={...storedRequest,...normalizeResearchRequest({prompt:storedRequest.prompt,quantity:storedRequest.quantity})};
+    } catch { request=storedRequest; }
+  }
   const status=cleanText(row.status||"NEW",40).toUpperCase()||"NEW";
   const quantity=Math.max(0,Number(request?.quantity||0));
   const completed=Math.max(0,Math.min(quantity,Number(evidence?.progress?.completed||row.completed||(status==="DONE"?quantity:0))));
