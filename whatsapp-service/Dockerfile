@@ -8,11 +8,11 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
-COPY local ./local
-COPY public ./public
-COPY docs/api.openapi.json ./docs/api.openapi.json
+COPY --chown=node:node local ./local
+COPY --chown=node:node public ./public
+COPY --chown=node:node docs/api.openapi.json ./docs/api.openapi.json
 
-RUN mkdir -p /app/.local && chown -R node:node /app
+RUN install -d -o node -g node /app/.local
 USER node
 
 EXPOSE 3010
