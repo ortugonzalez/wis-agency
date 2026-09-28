@@ -38,6 +38,15 @@ Variables:
 
 La clave privada nunca se guarda en Git ni se entrega al navegador. Sin escritura habilitada, el panel continúa en modo lectura y los envíos siguen bloqueados.
 
+## Centro de costos
+
+- `Cost_Ledger` conserva cada consumo con operación, prospecto, etapa, proveedor, modelo, tokens, unidades y costo.
+- `Cost_Settings` conserva presupuesto y costos fijos mensuales.
+- `POST /api/costs/usage` recibe telemetría del ejecutor de research/copy y deduplica por `idempotencyKey`.
+- Si el proveedor informa el costo real, ese valor tiene prioridad. Si no, se aplica la tabla versionada de `costs.mjs`.
+- Research, borradores y envíos registran su operación automáticamente; las simulaciones nunca se guardan como gasto.
+- `WIS_COST_INGEST_TOKEN` puede exigir un token adicional a los workers, además de la autenticación del panel.
+
 ## Envío de email
 
 Variables del proceso local:
