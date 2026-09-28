@@ -10,7 +10,8 @@ const store = {
   page: 1,
   selected: null,
   messageChannel: "EMAIL",
-  loading: false
+  loading: false,
+  whatsapp: {loaded:false,loading:false,status:null,conversations:[],selected:null,messages:[],filter:"all"}
 };
 
 function toast(message, error=false) {
@@ -178,6 +179,152 @@ function renderChannels() {
     const label=ready?"Listo":channel.connected?"Conectado · pausado":"Requiere conexión";
     return `<article class="channel-card"><div class="channel-top"><span class="channel-icon ${key==="whatsapp"?"wa":""}">${key==="email"?"@":"WA"}</span><span class="status ${ready?"status-ready":"status-review"}">${label}</span></div><h3>${title}</h3><p>${esc(channel.account||"Sin cuenta verificada")}</p><div class="channel-details"><div><span>Proveedor</span><strong>${esc(channel.provider||"Pendiente")}</strong></div><div><span>Modo</span><strong>${ready?"Envío con confirmación":"Bloqueado seguro"}</strong></div></div>${ready?"":`<div class="blocker">${esc(channel.detail||"Falta configurar el adaptador del canal.")}</div>`}</article>`;
   }).join("");
+}
+
+function waName(conversation) {
+  return conversation.display_name||conversation.title||conversation.contact_name||conversation.phone_e164||"Contacto de WhatsApp";
+}
+
+function waInitial(conversation) {
+  return waName(conversation).replace(/[^\p{L}\p{N}]/gu,"").slice(0,1).toUpperCase()||"W";
+}
+
+function waMoment(value,withDate=false) {
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime())) return "";
+  const sameDay=date.toDateString()===new Date().toDateString();
+  return sameDay&&!withDate?date.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):date.toLocaleDateString("es-AR",{day:"2-digit",month:"short"});
+}
+
+function waConversationMatchesFilter(conversation) {
+  const group=String(conversation.wa_chat_id||"").endsWith("@g.us");
+  return store.whatsapp.filter==="all"||(store.whatsapp.filter==="group"&&group)||(store.whatsapp.filter==="direct"&&!group);
+}
+
+function renderWhatsappStatus() {
+  const status=store.whatsapp.status||{};
+  const card=$("#wa-connection-card");
+  card.classList.toggle("is-online",status.connected===true&&status.identityVerified===true);
+  card.classList.toggle("is-offline",status.configured===false||status.error);
+  $("#wa-connection-label").textContent=status.connected&&status.identityVerified?`Línea ${status.account||"•••• 5679"} conectada`:status.configured?"Conexión temporalmente no disponible":"Falta conectar Baileys";
+  $("#wa-connection-detail").textContent=status.connected?(status.outboundEnabled?"Recepción y salida habilitadas":"Recepción en vivo · salida protegida"):status.error?"No se pudo consultar el servicio":"Esperando credencial del servicio";
+}
+
+function renderWhatsappConversations() {
+  const rows=store.whatsapp.conversations.filter(waConversationMatchesFilter);
+  $("#wa-total").textContent=`${store.whatsapp.conversations.length} conversaciones`;
+  $("#nav-wa-count").textContent=store.whatsapp.conversations.length||"—";
+  $("#wa-conversation-list").innerHTML=rows.length?rows.map(conversation=>`
+    <button class="wa-conversation ${store.whatsapp.selected?.id===conversation.id?"is-active":""}" data-wa-conversation="${esc(conversation.id)}">
+      <span class="wa-avatar">${esc(waInitial(conversation))}</span>
+      <span class="wa-conversation-copy"><strong>${esc(waName(conversation))}</strong><span>${esc(conversation.last_message_preview||"Sin mensajes de texto")}</span></span>
+      <time>${esc(waMoment(conversation.last_message_at))}</time>
+    </button>`).join(""):'<div class="wa-list-empty">No hay conversaciones que coincidan con este filtro.</div>';
+  $$('[data-wa-conversation]').forEach(button=>button.addEventListener("click",()=>openWhatsappConversation(button.dataset.waConversation)));
+}
+
+function renderWhatsappMessages() {
+  const conversation=store.whatsapp.selected;
+  if(!conversation) return;
+  const messages=store.whatsapp.messages;
+  let lastDay="";
+  $("#wa-message-stage").innerHTML=messages.length?messages.map(message=>{
+    const date=new Date(message.created_at);
+    const day=Number.isFinite(date.getTime())?date.toLocaleDateString("es-AR",{weekday:"short",day:"numeric",month:"short"}):"";
+    const separator=day&&day!==lastDay?`<span class="wa-day">${esc(day)}</span>`:"";
+    lastDay=day||lastDay;
+    const outbound=message.direction==="out";
+    return `${separator}<div class="wa-bubble-row ${outbound?"is-out":""}"><article class="wa-bubble"><p>${esc(message.body||`[${message.type||"Mensaje"}]`)}</p><footer><span>${esc(waMoment(message.created_at))}</span>${outbound?`<span class="wa-ticks">${/read|delivered/i.test(message.delivery_status||"")?"✓✓":"✓"}</span>`:""}</footer></article></div>`;
+  }).join(""):'<div class="wa-list-empty">Todavía no hay mensajes guardados en esta conversación.</div>';
+  $("#wa-message-stage").scrollTop=$("#wa-message-stage").scrollHeight;
+}
+
+function whatsappMatchedProspect(conversation) {
+  const digits=String(conversation?.phone_e164||conversation?.wa_chat_id||"").replace(/\D/g,"");
+  if(!digits) return null;
+  return store.data.prospects.find(prospect=>String(prospect.whatsappE164||prospect.whatsapp||"").replace(/\D/g,"")===digits)||null;
+}
+
+function configureWhatsappComposer() {
+  const prospect=whatsappMatchedProspect(store.whatsapp.selected);
+  const button=$("#wa-send");
+  const reply=$("#wa-reply");
+  const hint=$("#wa-send-hint");
+  if(!prospect) {
+    button.disabled=true;
+    reply.value="";
+    reply.disabled=true;
+    hint.textContent="Este chat todavía no está vinculado con un prospecto del pipeline.";
+    return;
+  }
+  const blocker=sendBlocker(prospect,"WHATSAPP");
+  reply.value=prospect.whatsappMessage||"";
+  reply.disabled=Boolean(blocker);
+  button.disabled=Boolean(blocker)||!reply.value;
+  hint.textContent=blocker?(sendErrors[blocker]||blocker):"Mensaje aprobado. Al continuar verás la confirmación final antes del envío.";
+}
+
+async function openWhatsappConversation(id) {
+  const conversation=store.whatsapp.conversations.find(row=>row.id===id);
+  if(!conversation) return;
+  store.whatsapp.selected=conversation;
+  renderWhatsappConversations();
+  $("#wa-chat-empty").hidden=true;
+  $("#wa-chat").hidden=false;
+  $(".wa-shell").classList.add("is-chat-open");
+  $("#wa-chat-avatar").textContent=waInitial(conversation);
+  $("#wa-chat-name").textContent=waName(conversation);
+  $("#wa-chat-phone").textContent=conversation.phone_e164||"Identificador de WhatsApp";
+  $("#wa-chat-state").textContent="Cargando historial…";
+  $("#wa-message-stage").innerHTML='<div class="wa-loading">Cargando mensajes…</div>';
+  configureWhatsappComposer();
+  try {
+    const response=await fetch(`/api/whatsapp/messages?conversationId=${encodeURIComponent(id)}&limit=100`,{cache:"no-store"});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error||"No se pudo cargar el historial");
+    store.whatsapp.messages=Array.isArray(payload.data)?payload.data:[];
+    $("#wa-chat-state").textContent=`${store.whatsapp.messages.length} mensajes visibles`;
+    renderWhatsappMessages();
+  } catch(error) {
+    $("#wa-chat-state").textContent="Historial no disponible";
+    $("#wa-message-stage").innerHTML=`<div class="wa-error">${esc(error.message||"No se pudo cargar el historial")}</div>`;
+  }
+}
+
+async function loadWhatsapp(silent=false) {
+  if(store.whatsapp.loading) return;
+  store.whatsapp.loading=true;
+  if(!silent) $("#wa-conversation-list").innerHTML='<div class="wa-loading">Cargando conversaciones…</div>';
+  try {
+    const query=$("#wa-search").value.trim();
+    const [statusResponse,conversationResponse]=await Promise.all([
+      fetch("/api/whatsapp/status",{cache:"no-store"}),
+      fetch(`/api/whatsapp/conversations?limit=100${query?`&q=${encodeURIComponent(query)}`:""}`,{cache:"no-store"})
+    ]);
+    const status=await statusResponse.json();
+    const conversations=await conversationResponse.json();
+    store.whatsapp.status=status;
+    if(!conversationResponse.ok) throw new Error(conversations.error||"No se pudieron cargar las conversaciones");
+    store.whatsapp.conversations=Array.isArray(conversations.data)?conversations.data:[];
+    store.whatsapp.loaded=true;
+    renderWhatsappStatus();
+    renderWhatsappConversations();
+  } catch(error) {
+    store.whatsapp.status={configured:false,connected:false,error:error.message};
+    renderWhatsappStatus();
+    $("#wa-conversation-list").innerHTML=`<div class="wa-error">${esc(error.message||"WhatsApp no está disponible")}</div>`;
+  } finally {
+    store.whatsapp.loading=false;
+  }
+}
+
+function openWhatsappSendConfirmation() {
+  const prospect=whatsappMatchedProspect(store.whatsapp.selected);
+  if(!prospect) return toast("Este chat todavía no está vinculado con un prospecto.",true);
+  store.selected=prospect;
+  store.messageChannel="WHATSAPP";
+  openSendDialog();
+  $("#send-message").value=$("#wa-reply").value;
 }
 
 function renderSync() {
@@ -440,8 +587,9 @@ async function prepareApolloPilot() {
 function switchView(id) {
   $$(".view").forEach(view=>view.classList.toggle("is-active",view.id===id));
   $$("[data-view]").forEach(button=>button.classList.toggle("is-active",button.dataset.view===id));
-  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",activity:"Actividad",channels:"Canales",apollo:"Apollo"}[id]||"Prospectos";
+  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",whatsapp:"WhatsApp",activity:"Actividad",channels:"Canales",apollo:"Apollo"}[id]||"Prospectos";
   history.replaceState(null,"",`#${id}`);
+  if(id==="whatsapp"&&!store.whatsapp.loaded) loadWhatsapp();
 }
 
 $$("[data-view]").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
@@ -457,6 +605,21 @@ $("#continue-research").addEventListener("click",enqueueResearch);
 $("#research-chat-form").addEventListener("submit",submitResearchChat);
 $("#research-form").addEventListener("submit",submitResearchForm);
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
+$("#wa-refresh").addEventListener("click",()=>loadWhatsapp());
+let waSearchTimer;
+$("#wa-search").addEventListener("input",()=>{clearTimeout(waSearchTimer);waSearchTimer=setTimeout(()=>loadWhatsapp(),280);});
+$$('[data-wa-filter]').forEach(button=>button.addEventListener("click",()=>{
+  store.whatsapp.filter=button.dataset.waFilter;
+  $$('[data-wa-filter]').forEach(item=>item.classList.toggle("is-active",item===button));
+  renderWhatsappConversations();
+}));
+$("#wa-chat-phone").addEventListener("click",()=>copy(store.whatsapp.selected?.phone_e164,"Número de WhatsApp"));
+$("#wa-mobile-back").addEventListener("click",()=>$(".wa-shell").classList.remove("is-chat-open"));
+$("#wa-send").addEventListener("click",openWhatsappSendConfirmation);
+$("#wa-reply").addEventListener("input",()=>{
+  const prospect=whatsappMatchedProspect(store.whatsapp.selected);
+  $("#wa-send").disabled=!prospect||Boolean(sendBlocker(prospect,"WHATSAPP"))||!$("#wa-reply").value.trim();
+});
 $$("[data-close]").forEach(node=>node.addEventListener("click",closeDrawer));
 $$("[data-modal-close]").forEach(node=>node.addEventListener("click",()=>$("#send-dialog").close()));
 $$("[data-message-tab]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.messageTab;renderMessagePreview();}));
@@ -467,7 +630,7 @@ $("#open-send").addEventListener("click",openSendDialog);
 $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
-const initialView=["prospects","research","activity","channels","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+const initialView=["prospects","research","whatsapp","activity","channels","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
 switchView(initialView);
 loadData();
 setInterval(()=>loadData(true),30_000);

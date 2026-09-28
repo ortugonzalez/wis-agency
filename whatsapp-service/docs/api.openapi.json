@@ -1,0 +1,4703 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WIS WhatsApp API",
+    "version": "1.1.0",
+    "description": "Local SQLite API for one WIS connection wis-5679. Bearer tokens have explicit scopes. Admin cookies and same-origin Origin are required for administration. Sends and webhook delivery are disabled by default. Live dashboard pagination preserves data arrays and adds top-level meta. Snapshots are observed data, never a claim of complete WhatsApp history. Sync queues read-only work and does not activate outbound. Successful read audits are sampled once per actor/resource/minute and contain no query, content, credentials or QR."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3010/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "cookieAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "wis_session"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Connection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "disconnected",
+              "qr_pending",
+              "connected"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expected_phone_e164": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phone_e164": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "consent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "consent_source": {
+            "type": "string"
+          },
+          "consent_scope": {
+            "type": "string"
+          },
+          "opted_out_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ContactInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phone_e164": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "consent_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "consent_source": {
+            "type": "string"
+          },
+          "consent_scope": {
+            "type": "string"
+          },
+          "opted_out_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MessageInput": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^\\+[1-9][0-9]{6,14}$"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "image",
+              "audio",
+              "document"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "purpose": {
+            "const": "transactional"
+          },
+          "media_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "type"
+        ]
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "sending",
+              "sent",
+              "failed",
+              "outcome_unknown"
+            ]
+          },
+          "to_e164": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "wa_message_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TokenInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "read",
+                "send",
+                "contacts:write",
+                "webhooks:write"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "scopes"
+        ]
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CampaignInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "contact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          },
+          "daily_limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "window_start": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "window_end": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "body",
+          "contact_ids",
+          "daily_limit",
+          "window_start",
+          "window_end"
+        ]
+      },
+      "CampaignAction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "enum": [
+              "preview",
+              "approve",
+              "pause"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/connections": {
+      "get": {
+        "summary": "List connections",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Connection"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ]
+      }
+    },
+    "/coverage": {
+      "get": {
+        "summary": "Get observed local data coverage",
+        "description": "Returns aggregate entity counts, persisted top-level and nested snapshot paths, the count of records containing each path, and the latest snapshot write time for a record containing the path. It also groups read commands by kind and status with counts and latest update time, without exposing command IDs, targets, or error fields. Snapshots may merge older fields, so this is not the field value's refresh time. Array indexes are normalized as [] without rewriting quoted literal keys. Paths longer than 100 characters or beyond the first 100 names per snapshot kind are omitted and counted. Field inventory rows stream from SQLite; retained paths are capped at 10,000 per record and snapshot kind, with field_inventory_truncated indicating a cap. Query time still scales with total snapshot data scanned. It never returns message or contact values and never claims complete history.",
+        "responses": {
+          "200": {
+            "description": "Coverage counts, observed top-level and nested field paths with per-path record counts and latest snapshot write times, omitted field counts, cap indicator, message type counts, and command counts grouped by kind/status, plus allowlisted failed-read codes, without targets, command IDs or raw error text"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        }
+      }
+    },
+    "/contact-checks": {
+      "get": {
+        "summary": "Read cached WhatsApp registration checks for known contacts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Local contact ID; omit to list cached results."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registered, explicitly not registered, or unknown; absence is never converted to false"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "404": {
+            "description": "Unknown contact"
+          }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "summary": "List contacts",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "404": {
+            "description": "Requested resource has not been observed"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Local contact UUID: returns contact, profile, presence, conversations and normalized snapshots instead of list",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": " Detail includes safe avatar metadata, or null when no eligible target exists. Contact detail conversations include exact stored FK or exact wa_jid/phone-derived JID matches with relation_origins: stored_contact_id, exact_wa_jid, exact_phone_jid. This read never uses ambiguous LID/PN mappings, modifies foreign keys, or changes consent. The panel can manually queue contact_profile for a known contact; it reads status and, for an exact PN JID, available Business-profile fields. Replies include presence and correlation evidence; absent fields are not inferred, and LIDs are not converted to phone JIDs."
+      },
+      "post": {
+        "summary": "Create contact and record consent provenance",
+        "responses": {
+          "201": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactInput"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update contact; id required; removing opt-out forbidden",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Contact"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations": {
+      "get": {
+        "summary": "List operations",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Operation"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ]
+      }
+    },
+    "/tokens": {
+      "get": {
+        "summary": "List tokens",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Token"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Admin cookie only: issue token shown once",
+        "responses": {
+          "201": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "token": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenInput"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke token or delete webhook",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "deleted": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "summary": "List webhooks",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "description": "Requires webhooks:write (without hidden read scope), or administrator cookie. Rows exclude secret and include delivery_counts total/pending/sending/delivered/failed, last_delivery_at, dispatcher_enabled, activation_requires_approval. New webhook configuration always disabled."
+      },
+      "delete": {
+        "summary": "Disable webhook without deleting its configuration or delivery history",
+        "responses": {
+          "200": {
+            "description": "data: disabled=true, history_preserved=true"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create disabled webhook; secret shown once",
+        "responses": {
+          "201": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "enabled": {
+                          "const": false
+                        },
+                        "secret": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "description": "Returns generated secret only once. enabled=true and PATCH/PUT activation return409 webhook_activation_requires_approval. No endpoint activates dispatch or sends a test."
+      }
+    },
+    "/conversations": {
+      "get": {
+        "summary": "List conversations",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "404": {
+            "description": "Conversation not found; never falls back to list"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "all",
+                "direct",
+                "group"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Exact local conversation ID; returns detail instead of list, absent ID yields 404."
+          }
+        ],
+        "description": " With id returns {data:{conversation,contact,contact_relation,snapshots,history,message_counts:{total,in,out,by_status},history_complete:false}}. Contact is only the stored foreign-key association, otherwise null. Snapshots contain allowlisted chat/group/presence fields only. Counts reflect local persisted messages, not complete provider history. Read has no remote effects."
+      }
+    },
+    "/messages": {
+      "get": {
+        "summary": "List messages",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Local message UUID returns message, conversation, contact, sanitized snapshot/details, quote, mentions, reaction snapshots/events, receipts and history metadata instead of list",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Exact received message type filter; read only, does not enable outbound formats.",
+            "schema": {
+              "enum": [
+                "text",
+                "image",
+                "video",
+                "audio",
+                "document",
+                "sticker",
+                "location",
+                "contact",
+                "poll",
+                "reaction",
+                "button_reply",
+                "list_reply",
+                "poll_update",
+                "unsupported",
+                "unknown",
+                "product",
+                "order",
+                "event",
+                "event_response"
+              ]
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "description": "Alternative to limit; local maximum is 200 rows.",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 200 }
+          },
+          {
+            "name": "from_me",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "time_from",
+            "in": "query",
+            "description": "Unix timestamp in seconds or milliseconds; filters persisted created_at values.",
+            "schema": { "type": "integer", "minimum": 1 }
+          },
+          {
+            "name": "time_to",
+            "in": "query",
+            "description": "Unix timestamp in seconds or milliseconds; filters persisted created_at values.",
+            "schema": { "type": "integer", "minimum": 1 }
+          },
+          {
+            "name": "normal_types",
+            "in": "query",
+            "description": "When true, excludes rows with an observed messageStubType. Rows without a stored snapshot remain included.",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "description": "Local exact match against direct-chat identifiers or observed group participants. It does not resolve unknown identities.",
+            "schema": { "type": "string", "pattern": "^\\+?[1-9][0-9]{6,14}(@lid|@s\\.whatsapp\\.net)?$" }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" }
+          }
+        ],
+        "description": "Without id, q searches body across all conversations unless conversation_id narrows it. Filters operate only on persisted local rows; no filter triggers a remote fetch. Timestamp values accept Unix seconds or milliseconds. normal_types=true excludes only messages with a recorded messageStubType. Author matching uses observed direct-chat IDs and participant snapshots and is therefore partial. Pagination is bounded to 200 rows. Message detail never implies complete reaction or history coverage. Received product/order/event rows retain observed metadata in detail; no order lookup, payment action, event creation or product sending is enabled. POST supported send types remain unchanged."
+      },
+      "post": {
+        "summary": "Queue a message; accepted is not delivered",
+        "responses": {
+          "202": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns": {
+      "get": {
+        "summary": "List campaigns",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create draft without sending",
+        "responses": {
+          "201": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "const": "draft"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignInput"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Preview, approve draft, pause; execution remains disabled",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignAction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media": {
+      "post": {
+        "summary": "Upload private media (10 MiB maximum)",
+        "responses": {
+          "201": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "media_bucket_path": {
+                          "type": "string"
+                        },
+                        "mime_type": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mime_type",
+                  "base64"
+                ],
+                "properties": {
+                  "mime_type": {
+                    "type": "string"
+                  },
+                  "base64": {
+                    "type": "string",
+                    "contentEncoding": "base64"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Authenticated local media; filename only, symlinks cannot leave media storage",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Optional registered filename: returns binary; omission lists registered media metadata",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary local media"
+          },
+          "400": {
+            "description": "Invalid filename"
+          },
+          "404": {
+            "description": "Media absent"
+          }
+        },
+        "description": "Without path: data rows path, media_url, mime_type, size, available, created_at, message_count, type and top-level pagination meta. Only message-referenced files and uploaded files with audit registration appear; storage is never enumerated. Missing files are unavailable. Binary reads also require registration. No session files are accessible."
+      }
+    },
+    "/capabilities": {
+      "get": {
+        "summary": "Read coverage and limitations",
+        "responses": {
+          "200": {
+            "description": "Scoped data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Scope, origin, consent or opt-out blocked"
+          },
+          "409": {
+            "description": "Idempotency conflict, disabled campaign or invalid state"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        }
+      }
+    },
+    "/overview": {
+      "get": {
+        "summary": "Real aggregate counts across all persisted rows",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "summary": "Administrator account snapshots; unknown sections are null",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        },
+        "description": " Detail includes safe avatar metadata, or null when no eligible target exists."
+      }
+    },
+    "/groups": {
+      "get": {
+        "summary": "Persisted group metadata snapshots",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "404": {
+            "description": "Requested resource has not been observed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Known group JID: returns persisted metadata including observed participants instead of list",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "description": " Detail includes safe avatar metadata, or null when no eligible target exists."
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "Recent sanitized local events, retention 1000",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "summary": "Administrator display preferences and local scheduled read-only sync",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "scheduled_reads": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "interval_minutes": {
+                              "type": "integer",
+                              "enum": [
+                                15,
+                                30,
+                                60,
+                                120
+                              ]
+                            },
+                            "next_run_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "last_kind": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                            "all",
+                            "blocklist",
+                            "communities",
+                            "catalog",
+                            "collections",
+                            "newsletters",
+                            "account_limits",
+                            null
+                              ]
+                            },
+                            "last_enqueued_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "last_status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "pending",
+                                "running",
+                                "done",
+                                "failed",
+                                null
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Persist display preferences or configure local read-only sync",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "poll_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 60
+                  },
+                  "default_page_size": {
+                    "enum": [
+                      25,
+                      50,
+                      100,
+                      200
+                    ]
+                  },
+                  "theme": {
+                    "enum": [
+                      "light",
+                      "dark",
+                      "system"
+                    ]
+                  },
+                  "scheduled_reads_enabled": {
+                    "type": "boolean",
+                    "description": "Pause or enable the local rotation of read-only WhatsApp metadata reads."
+                  },
+                  "scheduled_reads_interval_minutes": {
+                    "type": "integer",
+                    "enum": [
+                      15,
+                      30,
+                      60,
+                      120
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "scheduled_reads": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "interval_minutes": {
+                              "type": "integer",
+                              "enum": [
+                                15,
+                                30,
+                                60,
+                                120
+                              ]
+                            },
+                            "next_run_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "last_kind": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                            "all",
+                            "blocklist",
+                            "communities",
+                            "catalog",
+                            "collections",
+                            "newsletters",
+                            "account_limits",
+                            null
+                              ]
+                            },
+                            "last_enqueued_at": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "last_status": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "pending",
+                                "running",
+                                "done",
+                                "failed",
+                                null
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid local request"
+          },
+          "403": {
+            "description": "Administrator session and same-origin request required"
+          }
+        }
+      }
+    },
+    "/sync": {
+      "get": {
+        "summary": "Administrator read synchronization command queue or one command by ID",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; with id, returns one command status. No WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "description": "One read command when the id query parameter is supplied"
+                        }
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "400": {
+            "description": "Invalid command ID"
+          },
+          "404": {
+            "description": "Read command not found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Return one persisted command by exact ID instead of a paginated list"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Queue read-only account, group or known-contact refresh; no sends or remote mutations",
+        "description": "contact_profile accepts only the exact WhatsApp JID of a contact already stored locally. It reads status and, for PN JIDs, the available Business profile. Field availability and response correlation are preserved; absent values are never inferred.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "account",
+                      "groups",
+                      "group",
+                      "contact_profile",
+                      "all",
+                      "catalog",
+                      "collections",
+                      "blocklist",
+                      "communities",
+                      "community",
+                      "newsletter",
+                      "newsletters",
+                      "history",
+                      "avatar",
+                      "group_requests",
+                      "community_subgroups",
+                      "account_limits",
+                      "newsletter_messages",
+                      "bot_list",
+                      "contact_catalog",
+                      "group_invite",
+                      "order_details",
+                      "contact_check"
+                    ]
+                  },
+                  "target": {
+                    "type": "string",
+                    "description": "Existing group/contact JID required for targeted reads"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid local request"
+          },
+          "403": {
+            "description": "Administrator session and same-origin request required"
+          }
+        },
+        "description": "Own-account catalog, collections and blocklist take no target. Community/group/newsletter/contact_profile require a known matching JID. Unknown targets, URLs and unexpected targets are rejected before queueing. Commands are reads only. History requires an existing conversation JID and oldest usable persisted message anchor. Exactly 50 messages are requested; count and other extra properties are rejected. A done read-command means request accepted, not history received or complete. Only a correlated receipt marks the request arrived. Avatar reads require known contact/group or verified own-account JID; accept kind/target only, never an arbitrary remote URL. No automatic avatar refresh is scheduled. group_requests and community_subgroups accept only kind/target and require administrator cookie. Subgroups require observed community evidence. No join, accept, reject, invite or membership change is available. account_limits accepts only kind, with no target or extra properties; reads own account limits without changing any sending gate. newsletter_messages accepts only kind/target for an already observed channel; administrator-only fixed 50-message read. No subscribe or receipt operation. bot_list accepts only kind, with no target or extra fields. Administrator manual read of provider catalog only. contact_catalog accepts only kind/target with exact known contact PN JID; administrator manual read only, no LID inference or arbitrary owner URL. group_invite accepts kind/target only for known group, administrator manual get of existing invite credential; never revokes or joins. Code is temporary private data. order_details accepts kind/target only for an existing order message; administrator-only manual read. The token is used from worker memory, never persisted or logged; response image URLs are discarded. contact_check accepts only the local ID of a stored contact with a valid E.164 phone. It is an administrator-initiated single-number read with a 15-minute local cooldown, no batch or raw arbitrary phone input. Only an exact provider match can report existence; an empty result remains unknown, never not registered."
+      }
+    },
+    "/reference-fields": {
+      "get": {
+        "summary": "WHAPI structural field reference: summary or one method",
+        "responses": {
+          "200": {
+            "description": "Local persisted data; no WhatsApp write",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Exact WHAPI method reference ID; omission returns summaries only",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/snapshots": {
+      "get": {
+        "summary": "Read allowlisted persisted metadata snapshots; excludes administrator account privacy",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "contact",
+                "contact_profile",
+                "chat",
+                "group",
+                "presence",
+                "message"
+              ]
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data array of kind/resource_id/data/updated_at; top-level pagination meta"
+          },
+          "400": {
+            "description": "Invalid snapshot kind"
+          }
+        }
+      }
+    },
+    "/labels": {
+      "get": {
+        "summary": "Read persisted labels; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          }
+        }
+      }
+    },
+    "/label-associations": {
+      "get": {
+        "summary": "Read persisted label-associations; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          }
+        }
+      }
+    },
+    "/communities": {
+      "get": {
+        "summary": "Read persisted communities; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Known community JID returns safe detail with linked_groups and subgroups read snapshot"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          }
+        }
+      }
+    },
+    "/channels": {
+      "get": {
+        "summary": "Read persisted channels; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "summary": "Read persisted products; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs. Detail exposes safe persisted fields only, provider product_id/collection_id separately from local id, and owner-scoped summary metadata. No remote lookup; historical availability is not current provider verification.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "description": "Exact persisted resource ID; detail instead of list, 404 if absent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          },
+          "404": {
+            "description": "Exact catalog resource not found"
+          }
+        }
+      }
+    },
+    "/collections": {
+      "get": {
+        "summary": "Read persisted collections; read scope",
+        "description": "Rows are observed snapshots only. meta.collection_status distinguishes not_collected, unavailable, truncated, complete and observed_partial. Passive label/channel data is never presented as a complete remote inventory. No network call or WhatsApp mutation occurs. Detail exposes safe persisted fields only, provider product_id/collection_id separately from local id, and owner-scoped summary metadata. No remote lookup; historical availability is not current provider verification.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "description": "Exact persisted resource ID; detail instead of list, 404 if absent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          },
+          "404": {
+            "description": "Exact catalog resource not found"
+          }
+        }
+      }
+    },
+    "/blocklist": {
+      "get": {
+        "summary": "Read persisted blocklist; administrator cookie only",
+        "description": "Administrator-only persisted blocklist. A failed refresh preserves earlier rows: stale marks retained information, last_success_at dates its last successful read, last_attempt_at dates the latest attempt, and error is a sanitized code. Retained rows do not prove current blocking state. GET performs no provider request or account mutation.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot rows and collection metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "has_more": {
+                          "type": "boolean"
+                        },
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "last_updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "collection_status": {
+                          "enum": [
+                            "not_collected",
+                            "unavailable",
+                            "truncated",
+                            "complete",
+                            "observed_partial"
+                          ]
+                        },
+                        "summaries": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "stale": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "last_attempt_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "last_success_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope or administrator session"
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "summary": "Read persisted history-request progress for one known conversation",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: latest_command (queue status/error), latest_request (command_id,data,updated_at), latest_sync (account-scoped), latest_sync_scope=account, complete=false, request_limit=50"
+          },
+          "404": {
+            "description": "Conversation not observed"
+          }
+        }
+      }
+    },
+    "/webhook-deliveries": {
+      "get": {
+        "summary": "Read delivery metadata, or administrator-only sanitized payload detail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Single delivery detail requires administrator cookie",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "pending",
+                "sending",
+                "delivered",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List data metadata fields id,webhook_id,event_id,event_type,status,attempts,available_at,last_error,created_at plus pagination meta. Detail includes sanitized payload; credentials/secret/authorization/session keys excluded."
+          },
+          "400": {
+            "description": "Invalid status or pagination"
+          },
+          "403": {
+            "description": "webhooks:write required for list; administrator required for payload detail"
+          },
+          "404": {
+            "description": "Delivery absent"
+          }
+        }
+      }
+    },
+    "/webhook-events": {
+      "get": {
+        "summary": "Actual local event inventory, delivery signature/retry contract and distinct WHAPI reference categories",
+        "description": "webhooks:write scope. Only message.created, message.updated, operation.updated are emitted by local triggers. WHAPI reference categories are not wire-compatible event names. No action is activated by reading this endpoint. Retry contract: max_attempts=5 includes the initial attempt; at most four retries are scheduled after 2, 4, 8 and 16 seconds. A failed fifth attempt is terminal; its available_at value does not schedule another retry.",
+        "responses": {
+          "200": {
+            "description": "data: supported, delivery, reference"
+          },
+          "403": {
+            "description": "Scope required"
+          }
+        }
+      }
+    },
+    "/avatars": {
+      "get": {
+        "summary": "Read cached avatar metadata or authenticated private image for a known JID",
+        "description": "Metadata allowlists safe fields only: target,observed,available,cached,stale,status,mime,size,updated_at,last_attempt_at,error,content_url. No provider URL or filename is exposed. cached requires an existing file within private avatars storage. Own account requires administrator and verified identity. Content requires a registered UUID filename, realpath containment, JPEG/PNG/WebP MIME and magic validation, maximum2MiB, no-store headers.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "content",
+            "in": "query",
+            "schema": {
+              "const": "1"
+            },
+            "description": "Omit for metadata; 1 returns image bytes"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata envelope or image bytes"
+          },
+          "400": {
+            "description": "Invalid target or content option"
+          },
+          "403": {
+            "description": "Read scope or own-account administrator required"
+          },
+          "404": {
+            "description": "Unknown target, absent cache or missing image"
+          },
+          "409": {
+            "description": "Own identity unverified"
+          },
+          "415": {
+            "description": "Image MIME/magic mismatch"
+          }
+        }
+      }
+    },
+    "/calls": {
+      "get": {
+        "summary": "Read locally observed call snapshots and bounded event timeline",
+        "description": "Read scope required. No network fetch or call initiation. Only persisted kind=call snapshots are listed; legacy generic events are not backfilled or merged. Empty results do not prove absence of calls. Detail/list use explicit field allowlists, status is null if unknown, timeline limited50. history_complete always false; source observed_events.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "description": "Observed call ID returns one detail"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Search call id/from/chatId"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "offer",
+                "ringing",
+                "preaccept",
+                "transport",
+                "relaylatency",
+                "timeout",
+                "reject",
+                "accept",
+                "terminate"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data array with pagination meta, or detail object for id. Safe fields id,from,chatId,callerPn,groupJid,isVideo,isGroup,offline,latencyMs,date,status,observed_at,last_event_at,updated_at,history(status,date,observed_at),history_complete,source"
+          },
+          "400": {
+            "description": "Invalid filter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Call not observed"
+          }
+        }
+      }
+    },
+    "/identities": {
+      "get": {
+        "summary": "Read persisted explicit LID/PN mappings and unknown identifiers",
+        "description": "Read scope only, no network or auth-state reads. Explicit identity snapshots require canonical LID and PN plus recognized source lid-mapping.update, messaging-history.set or contacts. Contact identifiers without explicit mapping have status unknown; a LID never generates a phone number. Conflicts preserve original observed PN and flag conflicting_pn. GET never merges contacts or modifies consent. candidate_pns contains at most20 validated distinct PN JIDs, including preserved and contradictory candidates. Exact PN and free-text filters include these candidates. Shared candidates propagate conflict visibility across affected rows without writing the database.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical row JID returns one detail"
+          },
+          {
+            "name": "lid",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact numeric@lid"
+          },
+          {
+            "name": "pn",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact PN JID or +E164"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data row(s): id,lid,pn,phone_e164,status observed|conflict|unknown,conflict,conflicting_pn,source,observed_at,updated_at,contact_ids. List meta total,limit,offset,has_more,history_complete=false,source=persisted_identity_observations, candidate_pns validated PN JID array (maximum20)"
+          },
+          "400": {
+            "description": "Invalid filter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Identity not observed"
+          }
+        }
+      }
+    },
+    "/stories": {
+      "get": {
+        "summary": "Read observed WhatsApp statuses that remain unexpired and unrevoked",
+        "description": "Read scope. SQL expiry/revocation filters run before list pagination, counts and detail selection, independently of worker cleanup. Generic snapshots does not allow story kind. Empty results do not prove no WhatsApp statuses. No media downloads, provider URLs, keys, read receipts or publishing. Content can expire after response; clients should hide it at expires_at and discard expired cached views.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Composite persisted story ID returns detail"
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data rows/detail: id,author,fromMe,type,body,date,expires_at,source,updated_at,contact(id,display_name)|null,media_available=false,history_complete=false; list meta total,limit,offset,has_more,active_only=true,source=observed_events"
+          },
+          "400": {
+            "description": "Invalid author/filter"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Story absent, expired or revoked"
+          }
+        }
+      }
+    },
+    "/group-requests": {
+      "get": {
+        "summary": "Read cached group-requests without remote mutations",
+        "description": "Read scope. Known target required; community-subgroups additionally requires community snapshot or observed isCommunity=true. Explicit allowlist strips invite codes/links/secrets. No remote query on GET. Bounded at2000 entries. Empty not_collected differs from verified complete empty; stale unavailable snapshots remain labeled. observed_events are separate passive group.join-request evidence, bounded200 rows with history20 each; they never establish the current pending-request list. observed_events_meta includes total,limit,truncated,complete=false,current_pending_inferred=false. IQ requests and availability remain separate even on provider500.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data target,observed,available,response_verified,stale,truncated,collection_status,updated_at,error plus requests[jid,request_method,request_time] or groups[id,subject,creation,owner,size]; status_code validated100..599 or null; observed_events[id,group_id,participant,author?,participantPn?,authorPn?,action,method,observed_at,updated_at,source,history] and observed_events_meta"
+          },
+          "400": {
+            "description": "Invalid group JID"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Unknown group/community"
+          }
+        }
+      }
+    },
+    "/community-subgroups": {
+      "get": {
+        "summary": "Read cached community-subgroups without remote mutations",
+        "description": "Read scope. Known target required; community-subgroups additionally requires community snapshot or observed isCommunity=true. Explicit allowlist strips invite codes/links/secrets. No remote query on GET. Bounded at2000 entries. Empty not_collected differs from verified complete empty; stale unavailable snapshots remain labeled.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data target,observed,available,response_verified,stale,truncated,collection_status,updated_at,error plus requests[jid,request_method,request_time] or groups[id,subject,creation,owner,size]; status_code validated100..599 or null"
+          },
+          "400": {
+            "description": "Invalid group JID"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Unknown group/community"
+          }
+        }
+      }
+    },
+    "/account-limits": {
+      "get": {
+        "summary": "Administrator-only observed provider quota and reachout timelock",
+        "description": "Local snapshot only; unknown fields are null, never invented zero. No safe sending quota, ban-risk score or permission to send is inferred. Does not change operational gates. Refresh requires administrator POST /sync with only kind account_limits.",
+        "responses": {
+          "200": {
+            "description": "Sanitized latest observation; independent subquery availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "observed": {
+                          "type": "boolean"
+                        },
+                        "updated_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "observed_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "partial": {
+                          "type": "boolean"
+                        },
+                        "quota": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "available": {
+                              "type": "boolean"
+                            },
+                            "response_verified": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status_code": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 100,
+                              "maximum": 599
+                            },
+                            "total_quota": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "used_quota": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 0
+                            },
+                            "cycle_start_timestamp": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9]{1,16}$",
+                              "description": "Raw provider timestamp; unit is not inferred."
+                            },
+                            "cycle_end_timestamp": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9]{1,16}$",
+                              "description": "Raw provider timestamp; unit is not inferred."
+                            },
+                            "server_sent_timestamp": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9]{1,16}$",
+                              "description": "Raw provider timestamp; unit is not inferred."
+                            },
+                            "ote_status": {
+                              "enum": [
+                                null,
+                                "NOT_ELIGIBLE",
+                                "ELIGIBLE",
+                                "ACTIVE_IN_CURRENT_CYCLE",
+                                "EXHAUSTED"
+                              ]
+                            },
+                            "mv_status": {
+                              "enum": [
+                                null,
+                                "NOT_ELIGIBLE",
+                                "NOT_ACTIVE",
+                                "ACTIVE",
+                                "ACTIVE_UPGRADE_AVAILABLE"
+                              ]
+                            },
+                            "capping_status": {
+                              "enum": [
+                                null,
+                                "NONE",
+                                "FIRST_WARNING",
+                                "SECOND_WARNING",
+                                "CAPPED"
+                              ]
+                            }
+                          }
+                        },
+                        "timelock": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "available": {
+                              "type": "boolean"
+                            },
+                            "response_verified": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "status_code": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ],
+                              "minimum": 100,
+                              "maximum": 599
+                            },
+                            "is_active": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ]
+                            },
+                            "time_enforcement_ends": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "pattern": "^[0-9]{1,16}$",
+                              "description": "Raw provider timestamp; unit is not inferred."
+                            },
+                            "enforcement_type": {
+                              "enum": [
+                                null,
+                                "BIZ_COMMERCE_VIOLATION_ALCOHOL",
+                                "BIZ_COMMERCE_VIOLATION_ADULT",
+                                "BIZ_COMMERCE_VIOLATION_ANIMALS",
+                                "BIZ_COMMERCE_VIOLATION_BODY_PARTS_FLUIDS",
+                                "BIZ_COMMERCE_VIOLATION_DATING",
+                                "BIZ_COMMERCE_VIOLATION_DIGITAL_SERVICES_PRODUCTS",
+                                "BIZ_COMMERCE_VIOLATION_DRUGS",
+                                "BIZ_COMMERCE_VIOLATION_DRUGS_ONLY_OTC",
+                                "BIZ_COMMERCE_VIOLATION_GAMBLING",
+                                "BIZ_COMMERCE_VIOLATION_HEALTHCARE",
+                                "BIZ_COMMERCE_VIOLATION_REAL_FAKE_CURRENCY",
+                                "BIZ_COMMERCE_VIOLATION_SUPPLEMENTS",
+                                "BIZ_COMMERCE_VIOLATION_TOBACCO",
+                                "BIZ_COMMERCE_VIOLATION_VIOLENT_CONTENT",
+                                "BIZ_COMMERCE_VIOLATION_WEAPONS",
+                                "BIZ_QUALITY",
+                                "DEFAULT",
+                                "WEB_COMPANION_ONLY"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator cookie required"
+          }
+        }
+      }
+    },
+    "/channel-messages": {
+      "get": {
+        "summary": "Local observed messages from a known newsletter",
+        "description": "Read scope. Returns data array of id, server_id, date, type, body and media_available:false. No URLs, keys, downloads, sends, subscription or read receipts. Metadata reports observed/available/response_verified/stale/error and last attempt/success; history_complete is always false. At most 50 provider messages retained for this observation; local q/limit/offset paginate only this snapshot.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+@newsletter$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Local partial snapshot, unknown distinct from empty"
+          },
+          "400": {
+            "description": "Invalid target"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Unknown channel"
+          }
+        }
+      }
+    },
+    "/collection-products": {
+      "get": {
+        "summary": "Observed nested products of an exact stored collection",
+        "description": "No inferred product joins. Returns safe nested data array and pagination metadata, products_collected/products_truncated. Missing collection members are not a verified empty list. Owner-scoped summary preserves unavailable state. Never loads media.",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Local partial collection membership"
+          },
+          "400": {
+            "description": "Missing or invalid ID"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Collection not found"
+          }
+        }
+      }
+    },
+    "/bots": {
+      "get": {
+        "summary": "Observed provider bot catalog, not WIS automations or contacts",
+        "description": "Read scope. Local snapshot only. Returns jid/persona_id only, partial:true and history_complete:false. Metadata preserves failed refresh with stale entries and sanitized errors/timestamps. Does not create chats, contact records or subscriptions.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partial local provider bot catalog"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          }
+        }
+      }
+    },
+    "/contact-products": {
+      "get": {
+        "summary": "Persisted catalog for an exact known PN contact",
+        "description": "Read scope. Requires exact contacts.wa_jid or phone_e164; never resolves LID mappings. Products are isolated by owner_jid and safely projected. Owner summary carries stale/error/timestamps; unknown is not verified empty. No remote query from GET, no sends or purchases.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{6,14}@s\\.whatsapp\\.net$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Partial local owner-scoped catalog"
+          },
+          "400": {
+            "description": "Invalid PN target"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          },
+          "404": {
+            "description": "Contact not known"
+          }
+        }
+      }
+    },
+    "/group-invite-info": {
+      "post": {
+        "summary": "Administrator-only temporary group metadata lookup by invite code",
+        "description": "The invite code is sent in a local POST body and passed to the Baileys worker over in-memory IPC. It is not written to SQLite, audit events, or logs. Read-only. The normalized fields are a partial mapping; this endpoint does not join a group, create or revoke a link, or send messages. One lookup per administrator every five seconds.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "invite_code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "invite_code": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mapped Baileys group metadata; field equivalence remains partial until validated against an authorized live response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name_at": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "participants": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "rank"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "rank": {
+                                "type": "string",
+                                "enum": [
+                                  "admin",
+                                  "member",
+                                  "creator"
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "participantsCount": {
+                          "type": "integer"
+                        },
+                        "created_at": {
+                          "type": "integer"
+                        },
+                        "created_by": {
+                          "type": "string"
+                        },
+                        "ephemeral": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "source",
+                        "response_verified",
+                        "observed_at",
+                        "available_fields",
+                        "participants_truncated"
+                      ],
+                      "properties": {
+                        "source": {
+                          "type": "string"
+                        },
+                        "response_verified": {
+                          "type": "boolean"
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "available_fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean"
+                          }
+                        },
+                        "participants_truncated": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid invite code"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator browser session required"
+          },
+          "409": {
+            "description": "Another read is unresolved"
+          },
+          "429": {
+            "description": "Lookup rate limit"
+          },
+          "501": {
+            "description": "Baileys method unavailable"
+          },
+          "502": {
+            "description": "Provider returned an invalid or failed response"
+          },
+          "503": {
+            "description": "WhatsApp connection unavailable"
+          },
+          "504": {
+            "description": "Provider read timed out"
+          }
+        }
+      }
+    },
+    "/newsletter-invite-info": {
+      "post": {
+        "summary": "Administrator-only transient newsletter metadata lookup by invite code",
+        "description": "The code is sent in a local POST body and passed to the Baileys worker over in-memory IPC. It is not written to SQLite, audit events, or logs. Read-only and partial: only fields exposed by newsletterMetadata(invite) are returned; the lookup does not follow or join the newsletter. One lookup per administrator every five seconds.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "invite_code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "invite_code": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Partial mapped newsletter metadata with explicit field availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "type"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "const": "newsletter"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "subscribers_count": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "created_at": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "verification": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "source",
+                        "response_verified",
+                        "partial",
+                        "history_complete",
+                        "observed_at",
+                        "available_fields"
+                      ],
+                      "properties": {
+                        "source": {
+                          "type": "string"
+                        },
+                        "response_verified": {
+                          "type": "boolean"
+                        },
+                        "partial": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "history_complete": {
+                          "type": "boolean",
+                          "const": false
+                        },
+                        "observed_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "available_fields": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "boolean"
+                          }
+                        },
+                        "has_picture": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid invite code"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator browser session required"
+          },
+          "404": {
+            "description": "Newsletter invite was not found"
+          },
+          "409": {
+            "description": "Another read is unresolved"
+          },
+          "429": {
+            "description": "Lookup rate limit"
+          },
+          "501": {
+            "description": "Baileys method unavailable"
+          },
+          "502": {
+            "description": "Provider returned an invalid or failed response"
+          },
+          "503": {
+            "description": "WhatsApp connection unavailable"
+          },
+          "504": {
+            "description": "Provider read timed out"
+          }
+        }
+      }
+    },
+    "/group-invite": {
+      "get": {
+        "summary": "Administrator-only temporary invitation code for a known group",
+        "description": "Credential response is no-store. API returns code only when verified available, last_success_at is not future and expiry is future within five minutes of success. Missing, invalid, expired or failed credentials return null, regardless of worker cleanup. No API token access, no generic snapshots or events exposure. No link creation, join, revoke or publication.",
+        "parameters": [
+          {
+            "name": "target",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Code or null with sanitized availability/expiry metadata"
+          },
+          "400": {
+            "description": "Invalid group JID"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator browser session required"
+          },
+          "404": {
+            "description": "Unknown group"
+          }
+        }
+      }
+    },
+    "/limits": {
+      "get": {
+        "summary": "Administrator local implementation limits and read-only gates",
+        "description": "Local configuration, not WHAPI plan quotas or a safe daily volume. Fields are byte counts except *_chars (JavaScript UTF-16 length), page counts and history_request_messages. Upload limit applies decoded bytes with a separate base64 character and JSON-body cap. No mutation endpoint. Flags report configuration, not permission to send.",
+        "responses": {
+          "200": {
+            "description": "data: source local_config, limits object, flags outbound_enabled/webhooks_enabled, safe_daily_volume:null, provider_plan:false, editable:false"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator browser session required"
+          }
+        }
+      }
+    },
+    "/order-details": {
+      "get": {
+        "summary": "Read stored details of a known WhatsApp order",
+        "description": "Returns locally stored, sanitized item details. Does not trigger WhatsApp reads.",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Known order details or availability status"
+          },
+          "400": {
+            "description": "Invalid message ID"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient scope"
+          },
+          "404": {
+            "description": "Not a known order"
+          }
+        }
+      }
+    },
+    "/capability-fields": {
+      "get": {
+        "summary": "Paginated public WHAPI field catalog and search",
+        "description": "Enumerates documented parameter, request and response field metadata in bounded pages, or searches by field, operation, endpoint or tag. Returns no example values or account data.",
+        "security": [
+          {
+            "BearerAuth": [
+              "read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100
+            },
+            "description": "Optional field name, operation, endpoint, location or tag; requires at least two characters when supplied."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0
+            },
+            "description": "Zero-based row offset for browsing or search results."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching public schema fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "query",
+                        "total",
+                        "offset",
+                        "limit",
+                        "results",
+                        "captured_at"
+                      ],
+                      "properties": {
+                        "query": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "captured_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "results": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "capability_id": {
+                                "type": "string"
+                              },
+                              "operation_id": {
+                                "type": "string"
+                              },
+                              "endpoint_method": {
+                                "type": "string"
+                              },
+                              "endpoint_path": {
+                                "type": "string"
+                              },
+                              "direction": {
+                                "type": "string",
+                                "enum": [
+                                  "parameter",
+                                  "request",
+                                  "response"
+                                ]
+                              },
+                              "response_status": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "HTTP status when direction is response."
+                              },
+                              "field_path": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "location": {
+                                "type": "string",
+                                "description": "Query, path, header or body location; parameter examples are never returned."
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "enum_values": {
+                                "type": "array",
+                                "maxItems": 100,
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Documented allowed values, when present."
+                              },
+                              "enum_truncated": {
+                                "type": "boolean",
+                                "description": "True when more than 100 documented values exist or unsupported enum values were omitted."
+                              }
+                            }
+                          }
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Read scope required"
+          }
+        }
+      }
+    }
+  }
+}

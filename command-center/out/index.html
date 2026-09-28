@@ -17,6 +17,7 @@
       <nav aria-label="Navegación principal">
         <button class="nav-item is-active" data-view="prospects"><span>⌘</span>Prospectos <b id="nav-prospect-count">—</b></button>
         <button class="nav-item" data-view="research"><span>✦</span>Nuevo research</button>
+        <button class="nav-item" data-view="whatsapp"><span>◌</span>WhatsApp <b id="nav-wa-count">—</b></button>
         <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
         <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
         <button class="nav-item" data-view="apollo"><span>◎</span>Apollo</button>
@@ -26,6 +27,40 @@
         <div><span class="pulse" id="sync-dot"></span><strong id="sync-label">Conectando…</strong></div>
         <p id="sync-detail">Leyendo la fuente comercial.</p>
         <button class="link-button" id="sync-button">Sincronizar ahora</button>
+      </section>
+
+      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer">Abrir fuente en Sheets <span>↗</span></a>
+      <div class="sidebar-foot">Refresco del panel cada 30 segundos<br><strong id="last-sync">—</strong></div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><p class="eyebrow">WIS / Operaciones comerciales</p><h1 id="page-title">Prospectos</h1></div>
+        <div class="top-actions">
+          <label class="global-search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar empresa, rubro, ubicación…" autocomplete="off" /><kbd>Ctrl K</kbd></label>
+          <button class="icon-button" id="refresh-button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
+        </div>
+      </header>
+
+      <section class="view is-active" id="prospects">
+        <div class="hero-row">
+          <div><p class="eyebrow">Base comercial unificada</p><h2>Todo el trabajo, sin volver a la planilla</h2><p>Filtrá, revisá el análisis, copiá contactos y gestioná cada canal desde una única pantalla.</p></div>
+          <div class="hero-actions"><button class="button button-secondary" id="continue-research">Continuar research</button><button class="button button-primary" id="hero-sync">Actualizar desde Sheets</button></div>
+        </div>
+        <div class="metrics" id="metrics"></div>
+        <section class="workspace" id="workspace">
+          <div class="workspace-head">
+            <div><h3>Directorio comercial</h3><p id="result-count">Cargando…</p></div>
+            <div class="filters">
+              <label>Rubro<select id="filter-rubro"><option value="">Todos</option></select></label>
+              <label>Contacto<select id="filter-contact"><option value="">Todos</option><option value="email">Con email</option><option value="whatsapp">Con WhatsApp</option><option value="both">Ambos canales</option><option value="missing">Contacto incompleto</option></select></label>
+              <label>Estado<select id="filter-status"><option value="">Todos</option><option value="ready">Listo para revisar</option><option value="sent">Contactado</option><option value="needs-work">Requiere trabajo</option></select></label>
+              <button class="clear-filters" id="clear-filters">Limpiar</button>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro / ubicación</th><th>Contacto</th><th>Señal detectada</th><th>Estado</th><th></th></tr></thead><tbody id="prospect-body"></tbody></table></div>
+          <div class="pagination"><span id="page-label">—</span><div><button id="page-prev" aria-label="Página anterior">←</button><button id="page-next" aria-label="Página siguiente">→</button></div></div>
+        </section>
       </section>
 
       <section class="view" id="research">
@@ -59,37 +94,27 @@
           </section>
         </div>
       </section>
-      <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer">Abrir fuente en Sheets <span>↗</span></a>
-      <div class="sidebar-foot">Refresco del panel cada 30 segundos<br><strong id="last-sync">—</strong></div>
-    </aside>
 
-    <main>
-      <header class="topbar">
-        <div><p class="eyebrow">WIS / Operaciones comerciales</p><h1 id="page-title">Prospectos</h1></div>
-        <div class="top-actions">
-          <label class="global-search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar empresa, rubro, ubicación…" autocomplete="off" /><kbd>Ctrl K</kbd></label>
-          <button class="icon-button" id="refresh-button" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
+      <section class="view" id="whatsapp">
+        <div class="wa-view-head">
+          <div><p class="eyebrow">Bandeja unificada · línea 5679</p><h2>WhatsApp, sin salir de WIS</h2><p>Conversaciones reales de Baileys, ordenadas para responder sin perder el contexto comercial.</p></div>
+          <div class="wa-connection-card" id="wa-connection-card"><span class="wa-live-dot"></span><div><strong id="wa-connection-label">Conectando…</strong><small id="wa-connection-detail">Verificando la línea</small></div><button id="wa-refresh" aria-label="Actualizar WhatsApp">↻</button></div>
         </div>
-      </header>
-
-      <section class="view is-active" id="prospects">
-        <div class="hero-row">
-          <div><p class="eyebrow">Base comercial unificada</p><h2>Todo el trabajo, sin volver a la planilla</h2><p>Filtrá, revisá el análisis, copiá contactos y gestioná cada canal desde una única pantalla.</p></div>
-          <div class="hero-actions"><button class="button button-secondary" id="continue-research">Continuar research</button><button class="button button-primary" id="hero-sync">Actualizar desde Sheets</button></div>
-        </div>
-        <div class="metrics" id="metrics"></div>
-        <section class="workspace" id="workspace">
-          <div class="workspace-head">
-            <div><h3>Directorio comercial</h3><p id="result-count">Cargando…</p></div>
-            <div class="filters">
-              <label>Rubro<select id="filter-rubro"><option value="">Todos</option></select></label>
-              <label>Contacto<select id="filter-contact"><option value="">Todos</option><option value="email">Con email</option><option value="whatsapp">Con WhatsApp</option><option value="both">Ambos canales</option><option value="missing">Contacto incompleto</option></select></label>
-              <label>Estado<select id="filter-status"><option value="">Todos</option><option value="ready">Listo para revisar</option><option value="sent">Contactado</option><option value="needs-work">Requiere trabajo</option></select></label>
-              <button class="clear-filters" id="clear-filters">Limpiar</button>
+        <section class="wa-shell" aria-label="Bandeja de WhatsApp">
+          <aside class="wa-list-pane">
+            <div class="wa-list-head"><div><strong>Mensajes</strong><span id="wa-total">— conversaciones</span></div><button class="wa-new" title="Los nuevos envíos se crean desde un prospecto aprobado">＋</button></div>
+            <label class="wa-search"><span>⌕</span><input id="wa-search" type="search" placeholder="Buscar nombre o número" autocomplete="off" /></label>
+            <div class="wa-list-filters"><button class="is-active" data-wa-filter="all">Todos</button><button data-wa-filter="direct">Personas</button><button data-wa-filter="group">Grupos</button></div>
+            <div class="wa-conversation-list" id="wa-conversation-list"><div class="wa-loading">Cargando conversaciones…</div></div>
+          </aside>
+          <section class="wa-chat-pane">
+            <div class="wa-chat-empty" id="wa-chat-empty"><span class="wa-empty-mark">W</span><h3>Tu bandeja comercial, más simple</h3><p>Elegí una conversación para ver el historial. Los mensajes sólo salen cuando el contacto, el opt-in y la aprobación están verificados.</p><div><span>✓ Historial vivo</span><span>✓ Línea 5679</span><span>✓ Sin duplicados</span></div></div>
+            <div class="wa-chat" id="wa-chat" hidden>
+              <header class="wa-chat-head"><button class="wa-mobile-back" id="wa-mobile-back" aria-label="Volver a conversaciones">←</button><span class="wa-avatar" id="wa-chat-avatar">W</span><div><strong id="wa-chat-name">—</strong><button id="wa-chat-phone" title="Copiar número">—</button></div><span class="wa-chat-state" id="wa-chat-state">Historial local</span></header>
+              <div class="wa-message-stage" id="wa-message-stage"></div>
+              <footer class="wa-composer"><button class="wa-attach" title="Adjuntos disponibles después de QA" disabled>＋</button><textarea id="wa-reply" rows="1" placeholder="Escribí una respuesta…" aria-label="Respuesta de WhatsApp"></textarea><button class="wa-send" id="wa-send" disabled aria-label="Enviar mensaje">➤</button><p id="wa-send-hint">La respuesta se habilita al vincular un prospecto con QA y aprobación vigentes.</p></footer>
             </div>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro / ubicación</th><th>Contacto</th><th>Señal detectada</th><th>Estado</th><th></th></tr></thead><tbody id="prospect-body"></tbody></table></div>
-          <div class="pagination"><span id="page-label">—</span><div><button id="page-prev" aria-label="Página anterior">←</button><button id="page-next" aria-label="Página siguiente">→</button></div></div>
+          </section>
         </section>
       </section>
 
@@ -163,6 +188,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="research">Research</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button><button data-view="apollo">Apollo</button></nav>
+  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="research">Research</button><button data-view="whatsapp">WhatsApp</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button><button data-view="apollo">Apollo</button></nav>
 </body>
 </html>

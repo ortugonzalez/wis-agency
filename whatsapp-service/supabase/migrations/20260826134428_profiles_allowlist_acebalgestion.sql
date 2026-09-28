@@ -1,0 +1,1 @@
+-- WIS: inherited organization seed removed.

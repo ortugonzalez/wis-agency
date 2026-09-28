@@ -1,0 +1,49 @@
+{
+  "name": "wis-whatsapp-local",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node local/start.mjs",
+    "build": "node --check local/server.mjs && node --check local/worker.mjs && node --check local/webhooks.mjs && node --check local/avatars.mjs && node --check local/public/app.js && node --check local/public/live.js && node --check local/public/explorer.js && node --check local/public/messages.js && node --check local/public/integrations.js && node --check local/public/avatars.js && node --check local/public/calls.js && node --check local/public/identities.js && node --check local/public/stories.js && node --check local/public/communities.js && node --check local/public/capability-audit.js && node --check local/public/account-limits.js && node --check local/public/data-coverage.js && node --check local/public/contact-checks.js && node --check local/public/scheduled-reads.js && node --check local/public/chat-details.js && node --check local/public/bots.js && node --check local/public/contact-catalog.js && node --check local/public/group-invite.js && node --check local/public/group-invite-info.js && node --check local/public/newsletter-invite-info.js && node --check local/public/limits.js && node --check local/group-invite-info.mjs && node --check local/newsletter-invite-info.mjs && node --check local/limits.mjs && node --check local/supervisor.mjs && node --check local/start.mjs && node --check local/control.mjs",
+    "start": "node local/start.mjs",
+    "lint": "eslint",
+    "local:setup": "node local/setup.mjs",
+    "worker": "node local/worker.mjs",
+    "test:api": "node --test examples/webhook-dispatcher.test.mjs examples/n8n-contract.test.mjs",
+    "test:worker": "npm --prefix workers/whatsapp-baileys test",
+    "legacy:build": "next build",
+    "local:backup": "node local/backup.mjs",
+    "local:backup:check": "node local/backup-check.mjs",
+    "test:local": "node --test --test-concurrency=1 local/*.test.mjs",
+    "local:stop": "node local/control.mjs stop",
+    "local:status": "node local/status.mjs",
+    "local:reload-api": "node local/control.mjs reload-api"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
+    "next": "16.3.6",
+    "qrcode": "^1.5.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "baileys": "7.0.0-rc14",
+    "pino": "9.6.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "supabase": "2.118.0",
+    "tailwindcss": "^4",
+    "tsx": "4.20.6",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=24.13.0"
+  }
+}
