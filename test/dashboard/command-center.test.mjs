@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeResearchRequest, prospectStopGate, whatsappOptInGate, whatsappQuery } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
+import { buildCostAnalytics, calculateUsageCost, estimateScenario, normalizeCostRecord } from "../../ops/reports/web/wis-operations-dashboard/costs.mjs";
 
 const prospect={rowNumber:42};
 const approvedBodyHash="52ad4a85f158f776d1385ac66f4536ff32c4020a5153847566c29bb89d51d7fa";
@@ -176,4 +177,35 @@ test("acota los filtros enviados a la bandeja de WhatsApp",()=>{
   assert.equal(query.get("conversation_id"),"chat-42");
   assert.equal(query.get("sort"),"asc");
   assert.equal(query.get("normal_types"),"true");
+});
+
+test("calcula tokens estándar, caché y Batch con precios versionados",()=>{
+  const standard=calculateUsageCost({provider:"openai",service:"gpt-6-luna",pricingTier:"standard",inputTokens:1000000,cachedInputTokens:500000,outputTokens:100000});
+  const batch=calculateUsageCost({provider:"openai",service:"gpt-6-luna",pricingTier:"batch",inputTokens:1000000,cachedInputTokens:500000,outputTokens:100000});
+  assert.equal(standard,.105);
+  assert.equal(batch,.0525);
+});
+
+test("normaliza consumo e impide proveedor o servicio vacío",()=>{
+  const row=normalizeCostRecord({provider:"OpenAI",service:"gpt-6-sol",inputTokens:1000,outputTokens:100,prospectKey:"p-1",timestamp:"2026-09-28T12:00:00.000Z"});
+  assert.equal(row.provider,"openai");
+  assert.equal(row.calculatedCostUsd,.003);
+  assert.throws(()=>normalizeCostRecord({provider:"openai"}),/COST_PROVIDER_SERVICE_REQUIRED/);
+});
+
+test("separa gasto medido, fijo, proyección y economía unitaria",()=>{
+  const records=[normalizeCostRecord({provider:"brevo",service:"transactional-email",units:10,prospectKey:"p-1",timestamp:"2026-09-10T12:00:00.000Z"})];
+  const analytics=buildCostAnalytics(records,{monthlyBudgetUsd:100,fixedMonthlyUsd:30},{qualified:2,replies:1,meetings:0},new Date("2026-09-15T12:00:00.000Z"));
+  assert.equal(analytics.summary.variableMtd,.018);
+  assert.equal(analytics.summary.fixedAccrued,15);
+  assert.equal(analytics.unitEconomics.measuredProspects,1);
+  assert.equal(analytics.unitEconomics.costPerMeeting,null);
+});
+
+test("simulador descuenta cuotas gratuitas de Places y devuelve costo unitario",()=>{
+  const estimate=estimateScenario({prospects:300,model:"gpt-6-luna",pricingTier:"batch",webSearchesPerProspect:0,placesTextPerProspect:1,placeDetailsPerProspect:1,emailsPerProspect:1});
+  assert.equal(estimate.breakdown.places,0);
+  assert.equal(estimate.prospects,300);
+  assert.ok(estimate.totalUsd>0);
+  assert.ok(Math.abs(estimate.costPerProspect-estimate.totalUsd/300)<1e-8);
 });
