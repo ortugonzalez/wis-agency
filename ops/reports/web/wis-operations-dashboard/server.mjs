@@ -226,7 +226,10 @@ function cleanText(value,max=180) {
 }
 
 function titleCase(value) {
-  return cleanText(value).toLocaleLowerCase("es-AR").replace(/(^|[\s/-])(\p{L})/gu,(_,prefix,letter)=>`${prefix}${letter.toLocaleUpperCase("es-AR")}`);
+  return cleanText(value)
+    .toLocaleLowerCase("es-AR")
+    .replace(/(^|[\s/-])(\p{L})/gu,(_,prefix,letter)=>`${prefix}${letter.toLocaleUpperCase("es-AR")}`)
+    .replace(/\b(Y|E|De|Del|La|Las|El|Los|En)\b/g,(word,_,offset)=>offset===0?word:word.toLocaleLowerCase("es-AR"));
 }
 
 function normalizeResearchRequest(input={}) {
@@ -237,19 +240,31 @@ function normalizeResearchRequest(input={}) {
   let businessType=cleanText(input.businessType,40).toLowerCase();
   if(!businessType) businessType=promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
   if(!["distribuidoras","logisticas","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
+  const knownCountries=["Argentina","Chile","Uruguay","Paraguay","Bolivia","Perú","Colombia","México","Brasil","Ecuador"];
+  const promptCountry=knownCountries.find(country=>promptKey.includes(key(country)))||"";
   let industry=cleanText(input.industry,90);
   if(!industry&&prompt) {
     const match=prompt.match(/(?:distribuidoras?|log[ií]sticas?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
     industry=cleanText(match?.[1],90);
   }
+  if(industry&&(promptCountry&&key(industry).includes(key(promptCountry))||/\bempleados?\b/i.test(industry))) {
+    industry=businessType==="logisticas"?"Logística y transporte":businessType==="distribuidoras"?"Distribución general":"Servicios B2B";
+  }
+  const country=cleanText(input.country,60)||promptCountry;
+  const region=cleanText(input.region,80);
   let location=cleanText(input.location,90);
   if(!location&&prompt) {
     const match=prompt.match(/\ben\s+([^,.]+?)(?=\s+(?:con|incluyendo|junto|y\s+analiz)\b|$)/iu);
     location=cleanText(match?.[1],90);
   }
-  location=location||"Argentina";
+  location=region&&country?`${region}, ${country}`:region||country||location||"Argentina";
   const reviews=input.reviews==="none"?"none":"1-3";
   const contact=["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
+  const employeeSize=["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:"11-50";
+  const minimumReviews=[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
+  const destination=["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
+  const priority=["NORMAL","HIGH","URGENT"].includes(input.priority)?input.priority:"NORMAL";
+  const batchName=cleanText(input.batchName,80)||`${businessType}-${industry||"general"}-${country||location}`;
   const objective=cleanText(input.objective,400)||"Detectar problemas recurrentes y oportunidades concretas para WIS";
   if(!industry) throw Object.assign(new Error("RESEARCH_INDUSTRY_REQUIRED"),{status:400});
   return {
@@ -257,12 +272,65 @@ function normalizeResearchRequest(input={}) {
     businessType,
     industry:titleCase(industry),
     location:titleCase(location),
+    country:titleCase(country||location),
+    region:titleCase(region),
+    employeeSize,
+    minimumReviews:reviews==="none"?0:minimumReviews,
+    excludeLargeCorporations:input.excludeLargeCorporations!==false,
+    destination,
+    priority,
+    batchName,
     reviews,
     contact,
     objective,
     prompt,
     reviewRule:reviews==="1-3"?"Analizar sólo reseñas de 1, 2 y 3 estrellas e informar analizadas/total accesible":"Sin análisis de reseñas",
     outreachRule:"Preparar borradores; no enviar sin QA y aprobación"
+  };
+}
+
+function researchCommand(row={}) {
+  let evidence={};
+  try { evidence=typeof row.evidence==="string"?JSON.parse(row.evidence):row.evidence||{}; } catch { evidence={}; }
+  const request=evidence&&typeof evidence==="object"&&Number.isFinite(Number(evidence.quantity))?evidence:null;
+  const status=cleanText(row.status||"NEW",40).toUpperCase()||"NEW";
+  const quantity=Math.max(0,Number(request?.quantity||0));
+  const completed=Math.max(0,Math.min(quantity,Number(evidence?.progress?.completed||row.completed||(status==="DONE"?quantity:0))));
+  return {
+    commandId:cleanText(row.commandId||row.command_id,100),
+    createdAt:cleanText(row.createdAt||row.created_at,60),
+    action:cleanText(row.action,50),
+    scope:cleanText(row.scope,180),
+    status,
+    source:cleanText(row.source,50),
+    idempotencyKey:cleanText(row.idempotencyKey||row.idempotency_key,200),
+    request,
+    progress:{completed,total:quantity,percent:quantity?Math.round(completed/quantity*100):0},
+    updatedAt:cleanText(row.updatedAt||row.updated_at||row.createdAt||row.created_at,60),
+    error:cleanText(row.error||row.last_error,240)
+  };
+}
+
+function researchState(sheetCommands=[],localCommands=[]) {
+  const rows=[...sheetCommands,...localCommands].map(researchCommand).filter(row=>["REQUEST_RESEARCH","CONTINUE_RESEARCH"].includes(row.action));
+  const unique=[];
+  for(const row of rows) {
+    const identity=row.idempotencyKey||row.commandId;
+    if(!identity||unique.some(existing=>(existing.idempotencyKey||existing.commandId)===identity)) continue;
+    unique.push(row);
+  }
+  unique.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  const pending=new Set(["NEW","READY","PENDING"]);
+  return {
+    requests:unique.slice(0,50),
+    summary:{
+      total:unique.length,
+      pending:unique.filter(row=>pending.has(row.status)).length,
+      running:unique.filter(row=>row.status==="IN_PROGRESS").length,
+      completed:unique.filter(row=>row.status==="DONE").length,
+      blocked:unique.filter(row=>["BLOCKED","CANCELLED","FAILED"].includes(row.status)).length
+    },
+    executor:{connected:false,label:"Ejecutor de research pendiente de conexión"}
   };
 }
 
@@ -399,10 +467,11 @@ async function whatsappProviderGet(resource,params={}) {
 
 async function dashboardPayload() {
   try { await refreshLiveSheets(false); } catch { /* keep the last valid snapshot and surface degraded sync below */ }
-  const [snapshot,state,localEvents,verification]=await Promise.all([
+  const [snapshot,state,localEvents,localCommands,verification]=await Promise.all([
     readJson(sheetSnapshotPath,{fetchedAt:null,source:"NONE",prospects:[],events:[]}),
     readJson(statePath,{}),
     readNdjson(outreachEventsPath,500),
+    readNdjson(commandsPath,200),
     readJson(channelVerificationPath,{})
   ]);
   const prospects=(snapshot.prospects||[]).map(normalizeProspect);
@@ -426,11 +495,13 @@ async function dashboardPayload() {
     };
     prospect.whatsappOptIn=whatsappOptInGate(snapshot,prospect);
   }
+  const research=researchState(snapshot.commands||[],localCommands);
   return {
     generatedAt:new Date().toISOString(),
     prospects,
     queue,
     events:events.slice(0,500),
+    research,
     stats:{
       prospects:prospects.length,
       bothChannels:prospects.filter(row=>row.email&&row.whatsapp).length,
@@ -691,7 +762,7 @@ const server=createServer(async(req,res)=>{
       const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
       const existing=existingSheet||existingLocal;
       if(existing) return json(res,200,{ok:true,command:existing,request,deduplicated:true});
-      const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location}`.slice(0,120);
+      const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location} · ${request.employeeSize} empleados`.slice(0,120);
       const command={
         commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,
         createdAt:new Date().toISOString(),
@@ -701,7 +772,7 @@ const server=createServer(async(req,res)=>{
         requestedBy:"human-dashboard",
         status:"NEW",
         idempotencyKey,
-        evidence:JSON.stringify({schemaVersion:1,...request})
+        evidence:JSON.stringify({schemaVersion:2,...request,progress:{completed:0,total:request.quantity}})
       };
       if(sheetsWriteConfigured()) await appendTaskCommand(command);
       else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});

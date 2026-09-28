@@ -86,6 +86,42 @@ test("convierte pedidos de research en parámetros seguros y acotados",()=>{
   assert.throws(()=>normalizeResearchRequest({prompt:"buscame empresas"}),/RESEARCH_INDUSTRY_REQUIRED/);
 });
 
+test("conserva los criterios estructurados del constructor de research",()=>{
+  const request=normalizeResearchRequest({
+    batchName:"Logísticas Chile · Octubre",
+    quantity:30,
+    priority:"HIGH",
+    businessType:"logisticas",
+    industry:"Logística y transporte",
+    employeeSize:"11-50",
+    country:"Chile",
+    region:"Principales ciudades",
+    reviews:"1-3",
+    minimumReviews:20,
+    contact:"both",
+    destination:"Logisticas_LATAM",
+    excludeLargeCorporations:true
+  });
+  assert.equal(request.quantity,30);
+  assert.equal(request.industry,"Logística y Transporte");
+  assert.equal(request.location,"Principales Ciudades, Chile");
+  assert.equal(request.employeeSize,"11-50");
+  assert.equal(request.minimumReviews,20);
+  assert.equal(request.destination,"Logisticas_LATAM");
+  assert.equal(request.priority,"HIGH");
+  assert.equal(request.batchName,"Logísticas Chile · Octubre");
+  assert.equal(request.excludeLargeCorporations,true);
+});
+
+test("no confunde país ni rango de empleados con el rubro",()=>{
+  const request=normalizeResearchRequest({prompt:"busca 30 logisticas de chile entre 11-50 empleados"});
+  assert.equal(request.quantity,30);
+  assert.equal(request.businessType,"logisticas");
+  assert.equal(request.industry,"Logística y Transporte");
+  assert.equal(request.location,"Chile");
+  assert.equal(request.employeeSize,"11-50");
+});
+
 test("la consola desplegada exige credenciales con contraseña hasheada",()=>{
   const names=["WIS_REQUIRE_AUTH","WIS_DASHBOARD_USERNAME","WIS_DASHBOARD_PASSWORD_SHA256"];
   const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));

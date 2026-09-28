@@ -64,35 +64,64 @@
       </section>
 
       <section class="view" id="research">
-        <div class="section-intro"><div><p class="eyebrow">Asistente de prospección</p><h2>Pedí un nuevo lote en segundos</h2><p>Escribí el pedido como lo dirías normalmente o definí los parámetros. El panel lo transforma en una tarea trazable para research, reseñas y redacción.</p></div></div>
-        <div class="research-layout">
-          <section class="workspace research-chat-card">
-            <div class="workspace-head"><div><h3>Pedido rápido</h3><p>Lenguaje natural</p></div><span class="meta-tag">Asistente WIS</span></div>
-            <div class="research-chat-body">
-              <div class="assistant-bubble"><span>W</span><p>Decime cuántos prospectos querés, el rubro y la zona. Por ejemplo: <strong>“Buscame 25 distribuidoras de bebidas en Córdoba con análisis de reseñas.”</strong></p></div>
-              <form id="research-chat-form" class="research-prompt">
-                <label for="research-prompt">Tu pedido</label>
-                <div><textarea id="research-prompt" rows="4" placeholder="Buscame 30 empresas logísticas de Chile y analizá sus reseñas de 1 a 3 estrellas"></textarea><button class="button button-primary" type="submit" id="research-chat-submit">Crear tarea</button></div>
-              </form>
-              <div class="research-result" id="research-result" aria-live="polite"></div>
-            </div>
-          </section>
-
+        <div class="section-intro research-intro"><div><p class="eyebrow">Research configurado</p><h2>Elegí cada criterio. WIS se ocupa del lote.</h2><p>Sin prompts ambiguos: cantidad, empresa, rubro, país, tamaño y calidad quedan separados antes de registrar la tarea.</p></div><span class="research-live-pill"><i></i> Sheets en vivo</span></div>
+        <div class="research-builder-grid">
           <section class="workspace research-form-card">
-            <div class="workspace-head"><div><h3>Pedido parametrizado</h3><p>Más control, mismos criterios WIS</p></div><span class="meta-tag">Lote configurable</span></div>
-            <form id="research-form" class="parameter-form">
-              <label>Cantidad<input id="research-quantity" type="number" min="1" max="300" value="25" required /></label>
-              <label>Tipo de empresa<select id="research-business-type"><option value="distribuidoras">Distribuidoras</option><option value="logisticas">Logísticas</option><option value="proveedores">Proveedores B2B</option><option value="otro">Otro</option></select></label>
-              <label>Rubro<input id="research-industry" type="text" placeholder="Ej. bebidas, limpieza, frigoríficos" required /></label>
-              <label>País o zona<input id="research-location" type="text" value="Argentina" required /></label>
-              <label>Reseñas<select id="research-reviews"><option value="1-3" selected>Sólo 1, 2 y 3 estrellas</option><option value="none">Sin análisis de reseñas</option></select></label>
-              <label>Contacto prioritario<select id="research-contact"><option value="both">Email + WhatsApp publicado</option><option value="email">Email corporativo</option><option value="whatsapp">WhatsApp empresarial</option></select></label>
-              <label class="parameter-wide">Objetivo comercial<textarea id="research-objective" rows="3" placeholder="Detectar problemas repetidos y oportunidades concretas para WIS"></textarea></label>
-              <div class="research-guard parameter-wide"><span>✓</span><p>Se guardará como tarea pendiente. Research no inventará contactos; WhatsApp sólo se usará con opt-in verificable y los envíos seguirán requiriendo QA y aprobación.</p></div>
-              <button class="button button-primary parameter-wide" type="submit" id="research-form-submit">Agregar a la cola de research</button>
+            <div class="workspace-head"><div><h3>Crear nuevo research</h3><p>Completá los selectores de arriba hacia abajo</p></div><span class="meta-tag">Paso a paso</span></div>
+            <form id="research-form" class="parameter-form research-parameter-form">
+              <fieldset class="research-fieldset parameter-wide"><legend><span>01</span> Alcance del lote</legend>
+                <div class="research-fields three">
+                  <label>Nombre del lote<input id="research-batch-name" type="text" maxlength="80" placeholder="Ej. Logísticas Chile · Octubre" /></label>
+                  <label>Cantidad<input id="research-quantity" type="number" min="1" max="300" value="25" required /></label>
+                  <label>Prioridad<select id="research-priority"><option value="NORMAL">Normal</option><option value="HIGH">Alta</option><option value="URGENT">Urgente</option></select></label>
+                </div>
+              </fieldset>
+              <fieldset class="research-fieldset parameter-wide"><legend><span>02</span> Cliente ideal</legend>
+                <div class="research-fields three">
+                  <label>Tipo de empresa<select id="research-business-type"><option value="distribuidoras">Distribuidoras</option><option value="logisticas">Logísticas</option><option value="proveedores">Proveedores B2B</option><option value="empresas">Empresas de servicios</option><option value="otro">Otro</option></select></label>
+                  <label>Rubro<select id="research-industry"><option value="Alimentos y bebidas">Alimentos y bebidas</option><option value="Logística y transporte">Logística y transporte</option><option value="Limpieza e higiene">Limpieza e higiene</option><option value="Farmacéutica e insumos médicos">Farmacéutica e insumos médicos</option><option value="Ferretería y construcción">Ferretería y construcción</option><option value="Automotor y neumáticos">Automotor y neumáticos</option><option value="Agro e insumos">Agro e insumos</option><option value="Packaging">Packaging</option><option value="Tecnología">Tecnología</option><option value="Servicios B2B">Servicios B2B</option></select></label>
+                  <label>Tamaño estimado<select id="research-employee-size"><option value="1-10">1–10 empleados</option><option value="11-20">11–20 empleados</option><option value="11-50" selected>11–50 empleados</option><option value="20-50">20–50 empleados</option><option value="51-200">51–200 empleados</option><option value="201-500">201–500 empleados</option><option value="any">Sin restricción</option></select></label>
+                  <label>País<select id="research-country"><option value="Argentina">Argentina</option><option value="Chile">Chile</option><option value="Uruguay">Uruguay</option><option value="Paraguay">Paraguay</option><option value="Bolivia">Bolivia</option><option value="Perú">Perú</option><option value="Colombia">Colombia</option><option value="México">México</option><option value="Brasil">Brasil</option><option value="Ecuador">Ecuador</option></select></label>
+                  <label>Zona<select id="research-region"><option value="">Todo el país</option><option value="Principales ciudades">Principales ciudades</option><option value="Capital y alrededores">Capital y alrededores</option><option value="Norte">Norte</option><option value="Centro">Centro</option><option value="Sur">Sur</option></select></label>
+                  <label class="check-field"><input id="research-exclude-large" type="checkbox" checked /><span><strong>Excluir corporaciones grandes</strong><small>Prioriza empresas medianas y chicas accesibles.</small></span></label>
+                </div>
+              </fieldset>
+              <fieldset class="research-fieldset parameter-wide"><legend><span>03</span> Investigación y salida</legend>
+                <div class="research-fields three">
+                  <label>Reseñas<select id="research-reviews"><option value="1-3" selected>Sólo 1, 2 y 3 estrellas</option><option value="none">Sin análisis de reseñas</option></select></label>
+                  <label>Mínimo de reseñas<select id="research-minimum-reviews"><option value="5">5 accesibles</option><option value="10" selected>10 accesibles</option><option value="20">20 accesibles</option><option value="50">50 accesibles</option><option value="100">100 accesibles</option></select></label>
+                  <label>Contacto prioritario<select id="research-contact"><option value="both">Email + WhatsApp publicado</option><option value="email">Email corporativo</option><option value="whatsapp">WhatsApp empresarial</option></select></label>
+                  <label>Guardar resultados en<select id="research-destination"><option value="Distribuidoras_300">Distribuidoras_300</option><option value="Logisticas_LATAM">Logisticas_LATAM</option><option value="Prospectos_Custom">Nuevo lote separado</option></select></label>
+                  <label class="research-objective-field">Objetivo<select id="research-objective"><option value="Detectar problemas recurrentes y oportunidades concretas para WIS">Problemas y oportunidades para WIS</option><option value="Detectar fricción en atención al cliente y seguimiento comercial">Atención y seguimiento comercial</option><option value="Detectar ineficiencias operativas, logísticas y administrativas">Operación y logística</option><option value="Identificar tareas repetitivas con potencial de automatización">Automatización de tareas repetitivas</option></select></label>
+                </div>
+              </fieldset>
+              <div class="research-guard parameter-wide"><span>✓</span><p>Research no inventará contactos. Analizará exclusivamente reseñas de 1–3 estrellas y registrará la cobertura como <strong>analizadas/total accesible</strong>. Los mensajes quedarán como borrador.</p></div>
+              <div class="research-result parameter-wide" id="research-result" aria-live="polite"></div>
+              <button class="button button-primary parameter-wide research-submit" type="submit" id="research-form-submit"><span>Crear research</span><small>Quedará visible abajo como pendiente</small></button>
             </form>
           </section>
+
+          <aside class="research-preview-card">
+            <div class="preview-kicker"><span>Vista previa</span><i id="research-preview-priority">NORMAL</i></div>
+            <h3 id="research-preview-title">25 distribuidoras</h3>
+            <p id="research-preview-subtitle">Alimentos y bebidas · Argentina</p>
+            <dl class="research-preview-list">
+              <div><dt>Tamaño</dt><dd id="research-preview-size">11–50 empleados</dd></div>
+              <div><dt>Reseñas</dt><dd id="research-preview-reviews">1–3 estrellas · mínimo 10</dd></div>
+              <div><dt>Contacto</dt><dd id="research-preview-contact">Email + WhatsApp publicado</dd></div>
+              <div><dt>Destino</dt><dd id="research-preview-destination">Distribuidoras_300</dd></div>
+            </dl>
+            <div class="preview-sequence"><span class="is-active">1</span><i></i><span>2</span><i></i><span>3</span><i></i><span>4</span></div>
+            <div class="preview-sequence-labels"><span>Research</span><span>QA</span><span>Copy</span><span>Aprobación</span></div>
+            <p class="preview-note">Antes de comenzar vas a ver el pedido registrado, sus parámetros y el progreso del lote.</p>
+          </aside>
         </div>
+
+        <section class="workspace research-monitor">
+          <div class="workspace-head"><div><h3>Research solicitados</h3><p id="research-monitor-caption">Leyendo Task_Commands…</p></div><div class="research-monitor-actions"><span class="executor-state" id="research-executor-state"><i></i> Ejecutor pendiente</span><button class="icon-button" id="research-refresh" aria-label="Actualizar pedidos">↻</button></div></div>
+          <div class="research-summary" id="research-summary"></div>
+          <div class="research-run-list" id="research-run-list"><div class="research-empty"><span class="research-spinner"></span><p>Cargando pedidos…</p></div></div>
+        </section>
       </section>
 
       <section class="view" id="whatsapp">
