@@ -265,7 +265,8 @@ function normalizeResearchRequest(input={}) {
   const minimumReviews=[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
   const destination=["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
   const priority=["NORMAL","HIGH","URGENT"].includes(input.priority)?input.priority:"NORMAL";
-  const batchName=cleanText(input.batchName,80)||`${businessType}-${industry||"general"}-${country||location}`;
+  const businessLabel={distribuidoras:"distribuidoras",logisticas:"logísticas",proveedores:"proveedores B2B",empresas:"empresas de servicios",otro:"empresas"}[businessType];
+  const batchName=cleanText(input.batchName,80)||`${quantity} ${businessLabel} · ${industry||"General"} · ${country||location}`;
   const objective=cleanText(input.objective,400)||"Detectar problemas recurrentes y oportunidades concretas para WIS";
   if(!industry) throw Object.assign(new Error("RESEARCH_INDUSTRY_REQUIRED"),{status:400});
   return {
