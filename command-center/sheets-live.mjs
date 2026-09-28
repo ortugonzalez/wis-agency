@@ -5,6 +5,8 @@ const SHEETS_WRITE_SCOPE="https://www.googleapis.com/auth/spreadsheets";
 const TOKEN_URL="https://oauth2.googleapis.com/token";
 const DEFAULT_COMMERCIAL_ID="1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8";
 const DEFAULT_OPERATIONS_ID="1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w";
+const DRAFTS_SHEET="Message_Drafts";
+const DRAFT_HEADERS=["draft_key","source_sheet","source_row","channel","message","updated_at","updated_by"];
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -89,6 +91,42 @@ async function updateValues(spreadsheetId,range,values) {
   if(!response.ok) throw new Error(`GOOGLE_SHEETS_UPDATE_FAILED_${response.status}`);
 }
 
+async function ensureDraftsSheet() {
+  const spreadsheetId=operationsId();
+  const token=await accessToken();
+  const metadataUrl=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`);
+  metadataUrl.searchParams.set("fields","sheets.properties.title");
+  const metadataResponse=await fetch(metadataUrl,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
+  const metadata=await metadataResponse.json();
+  if(!metadataResponse.ok) throw new Error(`GOOGLE_SHEETS_METADATA_FAILED_${metadataResponse.status}`);
+  const exists=(metadata.sheets||[]).some(sheet=>sheet?.properties?.title===DRAFTS_SHEET);
+  if(!exists) {
+    const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
+      method:"POST",
+      headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
+      body:JSON.stringify({requests:[{addSheet:{properties:{title:DRAFTS_SHEET}}}]}),
+      signal:AbortSignal.timeout(30_000)
+    });
+    if(!response.ok&&response.status!==400) throw new Error(`GOOGLE_SHEETS_ADD_SHEET_FAILED_${response.status}`);
+  }
+  const current=await batchGet(spreadsheetId,[`${DRAFTS_SHEET}!A1:G1`],token);
+  if(!(current[0]?.values?.[0]||[]).length) await updateValues(spreadsheetId,`${DRAFTS_SHEET}!A1:G1`,DRAFT_HEADERS);
+}
+
+async function upsertMessageDraft(rowNumber,channel,message) {
+  await ensureDraftsSheet();
+  const spreadsheetId=operationsId();
+  const token=await accessToken();
+  const range=await batchGet(spreadsheetId,[`${DRAFTS_SHEET}!A1:G2000`],token);
+  const values=range[0]?.values||[];
+  const draftKey=`Distribuidoras_300:${rowNumber}:${channel}`;
+  const sheetRow=values.findIndex((row,index)=>index>0&&row[0]===draftKey)+1;
+  const record=[draftKey,"Distribuidoras_300",rowNumber,channel,message,new Date().toISOString(),"human-dashboard"];
+  if(sheetRow>0) await updateValues(spreadsheetId,`${DRAFTS_SHEET}!A${sheetRow}:G${sheetRow}`,record);
+  else await appendValues(spreadsheetId,`${DRAFTS_SHEET}!A:G`,record);
+  return draftKey;
+}
+
 function operationsId() {
   return process.env.WIS_OPERATIONS_SHEET_ID||DEFAULT_OPERATIONS_ID;
 }
@@ -136,10 +174,16 @@ export async function updateProspectMessage(rowNumber,channel,message) {
   const normalizedChannel=String(channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(normalizedChannel)) throw new Error("CHANNEL_INVALID");
   const column=normalizedChannel==="EMAIL"?"L":"K";
-  await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`Distribuidoras_300!${column}${rowNumber}`,[
-    String(message||"").trim()
-  ]);
-  return {rowNumber,column,channel:normalizedChannel};
+  const normalizedMessage=String(message||"").trim();
+  const draftKey=await upsertMessageDraft(rowNumber,normalizedChannel,normalizedMessage);
+  let commercialSheetUpdated=true;
+  try {
+    await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`Distribuidoras_300!${column}${rowNumber}`,[normalizedMessage]);
+  } catch(error) {
+    if(!String(error?.message||"").endsWith("_403")) throw error;
+    commercialSheetUpdated=false;
+  }
+  return {rowNumber,column,channel:normalizedChannel,draftKey,commercialSheetUpdated};
 }
 
 async function batchGet(spreadsheetId,ranges,token) {
@@ -202,8 +246,17 @@ export async function buildLiveSnapshot() {
       "Channel_Health!A1:J100"
     ],token)
   ]);
-  const prospects=objects(commercial[0]?.values).map((row,index)=>({
-    rowNumber:index+2,
+  let draftRanges=[];
+  try { draftRanges=await batchGet(operationsId,[`${DRAFTS_SHEET}!A1:G2000`],token); }
+  catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
+  const drafts=objects(draftRanges[0]?.values);
+  const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
+  const prospects=objects(commercial[0]?.values).map((row,index)=>{
+    const rowNumber=index+2;
+    const emailDraft=draftsByKey.get(`Distribuidoras_300:${rowNumber}:EMAIL`);
+    const whatsappDraft=draftsByKey.get(`Distribuidoras_300:${rowNumber}:WHATSAPP`);
+    return ({
+    rowNumber,
     rubro:row.Rubro,
     empresa:row.Empresa,
     ubicacion:row["Ubicación"],
@@ -214,9 +267,10 @@ export async function buildLiveSnapshot() {
     reviewsAnalyzed:row["Reseñas analizadas"],
     problems:row.Problemas,
     analysis:row["ANALISIS NEGOCIO"],
-    whatsappMessage:row["Mensaje WhatsApp"],
-    emailMessage:row["Mensaje Email"]
-  }));
+    whatsappMessage:whatsappDraft?.message||row["Mensaje WhatsApp"],
+    emailMessage:emailDraft?.message||row["Mensaje Email"]
+  });
+  });
   const queue=objects(operations[0]?.values).map(row=>({
     messageId:row.message_id,
     idempotencyKey:row.idempotency_key,
