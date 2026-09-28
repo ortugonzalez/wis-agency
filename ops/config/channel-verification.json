@@ -1,11 +1,13 @@
 {
-  "checkedAt": "2026-09-27T12:24:00-03:00",
+  "checkedAt": "2026-09-28T09:50:00-03:00",
   "email": {
     "aliasVerified": true,
     "signatureApproved": false,
     "defaultSender": true,
     "sender": "Ortu - WIS <ortu@wis-agency.com>",
-    "transport": "smtp-relay.brevo.com:587 TLS"
+    "transport": "Brevo transactional",
+    "brevoSenderVerified": true,
+    "brevoDomainAuthenticated": true
   },
   "whatsapp": {
     "identityVerified": true,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, prospectStopGate, whatsappOptInGate } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
+import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeResearchRequest, prospectStopGate, whatsappOptInGate } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
 
 const prospect={rowNumber:42};
 const approvedBodyHash="52ad4a85f158f776d1385ac66f4536ff32c4020a5153847566c29bb89d51d7fa";
@@ -73,6 +73,17 @@ test("la salud del canal exige identidad, firma y pausa levantada",()=>{
   } finally {
     for(const name of names) previous[name]===undefined?delete process.env[name]:process.env[name]=previous[name];
   }
+});
+
+test("convierte pedidos de research en parámetros seguros y acotados",()=>{
+  const request=normalizeResearchRequest({prompt:"Buscame 30 distribuidoras de bebidas en Córdoba con análisis de reseñas"});
+  assert.equal(request.quantity,30);
+  assert.equal(request.businessType,"distribuidoras");
+  assert.equal(request.industry,"Bebidas");
+  assert.equal(request.location,"Córdoba");
+  assert.equal(request.reviews,"1-3");
+  assert.match(request.reviewRule,/1, 2 y 3/);
+  assert.throws(()=>normalizeResearchRequest({prompt:"buscame empresas"}),/RESEARCH_INDUSTRY_REQUIRED/);
 });
 
 test("la consola desplegada exige credenciales con contraseña hasheada",()=>{

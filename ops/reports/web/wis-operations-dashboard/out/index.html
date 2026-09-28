@@ -16,14 +16,48 @@
       <a class="brand" href="#prospects" aria-label="WIS Command Center"><span class="brand-mark">W</span><span><strong>WIS</strong><small>Command Center</small></span></a>
       <nav aria-label="Navegación principal">
         <button class="nav-item is-active" data-view="prospects"><span>⌘</span>Prospectos <b id="nav-prospect-count">—</b></button>
+        <button class="nav-item" data-view="research"><span>✦</span>Nuevo research</button>
         <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
         <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
+        <button class="nav-item" data-view="apollo"><span>◎</span>Apollo</button>
       </nav>
       <div class="sidebar-spacer"></div>
       <section class="sync-card" aria-label="Sincronización con Google Sheets">
         <div><span class="pulse" id="sync-dot"></span><strong id="sync-label">Conectando…</strong></div>
         <p id="sync-detail">Leyendo la fuente comercial.</p>
         <button class="link-button" id="sync-button">Sincronizar ahora</button>
+      </section>
+
+      <section class="view" id="research">
+        <div class="section-intro"><div><p class="eyebrow">Asistente de prospección</p><h2>Pedí un nuevo lote en segundos</h2><p>Escribí el pedido como lo dirías normalmente o definí los parámetros. El panel lo transforma en una tarea trazable para research, reseñas y redacción.</p></div></div>
+        <div class="research-layout">
+          <section class="workspace research-chat-card">
+            <div class="workspace-head"><div><h3>Pedido rápido</h3><p>Lenguaje natural</p></div><span class="meta-tag">Asistente WIS</span></div>
+            <div class="research-chat-body">
+              <div class="assistant-bubble"><span>W</span><p>Decime cuántos prospectos querés, el rubro y la zona. Por ejemplo: <strong>“Buscame 25 distribuidoras de bebidas en Córdoba con análisis de reseñas.”</strong></p></div>
+              <form id="research-chat-form" class="research-prompt">
+                <label for="research-prompt">Tu pedido</label>
+                <div><textarea id="research-prompt" rows="4" placeholder="Buscame 30 empresas logísticas de Chile y analizá sus reseñas de 1 a 3 estrellas"></textarea><button class="button button-primary" type="submit" id="research-chat-submit">Crear tarea</button></div>
+              </form>
+              <div class="research-result" id="research-result" aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section class="workspace research-form-card">
+            <div class="workspace-head"><div><h3>Pedido parametrizado</h3><p>Más control, mismos criterios WIS</p></div><span class="meta-tag">Lote configurable</span></div>
+            <form id="research-form" class="parameter-form">
+              <label>Cantidad<input id="research-quantity" type="number" min="1" max="300" value="25" required /></label>
+              <label>Tipo de empresa<select id="research-business-type"><option value="distribuidoras">Distribuidoras</option><option value="logisticas">Logísticas</option><option value="proveedores">Proveedores B2B</option><option value="otro">Otro</option></select></label>
+              <label>Rubro<input id="research-industry" type="text" placeholder="Ej. bebidas, limpieza, frigoríficos" required /></label>
+              <label>País o zona<input id="research-location" type="text" value="Argentina" required /></label>
+              <label>Reseñas<select id="research-reviews"><option value="1-3" selected>Sólo 1, 2 y 3 estrellas</option><option value="none">Sin análisis de reseñas</option></select></label>
+              <label>Contacto prioritario<select id="research-contact"><option value="both">Email + WhatsApp publicado</option><option value="email">Email corporativo</option><option value="whatsapp">WhatsApp empresarial</option></select></label>
+              <label class="parameter-wide">Objetivo comercial<textarea id="research-objective" rows="3" placeholder="Detectar problemas repetidos y oportunidades concretas para WIS"></textarea></label>
+              <div class="research-guard parameter-wide"><span>✓</span><p>Se guardará como tarea pendiente. Research no inventará contactos; WhatsApp sólo se usará con opt-in verificable y los envíos seguirán requiriendo QA y aprobación.</p></div>
+              <button class="button button-primary parameter-wide" type="submit" id="research-form-submit">Agregar a la cola de research</button>
+            </form>
+          </section>
+        </div>
       </section>
       <a class="sheet-link" href="https://docs.google.com/spreadsheets/d/1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8/edit?gid=33130565#gid=33130565" target="_blank" rel="noreferrer">Abrir fuente en Sheets <span>↗</span></a>
       <div class="sidebar-foot">Refresco del panel cada 30 segundos<br><strong id="last-sync">—</strong></div>
@@ -81,6 +115,19 @@
           <div><span class="guide-number">03</span><strong>Confirmá el canal</strong><p>Un segundo clic registra la aprobación y evita duplicados.</p></div>
         </section>
       </section>
+
+      <section class="view" id="apollo">
+        <div class="section-intro"><div><p class="eyebrow">Enriquecimiento opcional</p><h2>Apollo como acelerador, no como reemplazo</h2><p>Una evaluación controlada para decidir con datos si mejora la cobertura de decisores y emails en el ICP real de WIS.</p></div><button class="button button-primary" id="apollo-pilot">Preparar piloto con 50 prospectos</button></div>
+        <div class="apollo-grid">
+          <article class="apollo-lead-card"><span class="apollo-logo">A</span><p class="eyebrow">Dónde es fuerte</p><h3>Datos B2B estructurados a escala</h3><p>Apollo puede acelerar la búsqueda de dueños, gerentes y responsables operativos, enriquecer cargos y dominios, y sumar emails laborales verificados.</p><div class="apollo-tags"><span>Decisores</span><span>Emails laborales</span><span>Firmografía</span><span>API</span></div></article>
+          <article class="workspace apollo-card"><h3>Lo que puede aportar a WIS</h3><ul><li>Encontrar el contacto correcto dentro de empresas ya investigadas.</li><li>Reducir tiempo manual de enriquecimiento.</li><li>Filtrar por tamaño, ubicación, industria y cargo.</li><li>Completar LinkedIn, puesto y dominio corporativo.</li></ul></article>
+          <article class="workspace apollo-card"><h3>Lo que sigue resolviendo WIS</h3><ul><li>Análisis de reseñas negativas y señal comercial concreta.</li><li>Personalización del mensaje desde problemas reales.</li><li>QA, aprobación humana, idempotencia y trazabilidad.</li><li>WhatsApp 5679, opt-in y seguimiento multicanal.</li></ul></article>
+        </div>
+        <section class="workspace pilot-scorecard">
+          <div class="workspace-head"><div><h3>Criterios para aprobar el piloto</h3><p>50 empresas existentes · sin envíos automáticos</p></div><span class="status status-review" id="apollo-status">Pendiente</span></div>
+          <div class="pilot-metrics"><div><strong>≥65%</strong><span>Empresas identificadas</span></div><div><strong>≥40%</strong><span>Decisor relevante</span></div><div><strong>≥70%</strong><span>Email laboral verificado</span></div><div><strong>&lt;2%</strong><span>Hard bounce</span></div></div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -116,6 +163,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button></nav>
+  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="research">Research</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button><button data-view="apollo">Apollo</button></nav>
 </body>
 </html>
