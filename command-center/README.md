@@ -7,7 +7,9 @@ Panel privado de operaciones comerciales desplegable como servicio separado dent
 El servicio lee cada 30 segundos:
 
 - `Distribuidoras_300` desde la planilla comercial.
-- `Outreach_Queue`, `Outreach_Events`, `Approvals`, `Runs`, `Task_Commands` y `Channel_Health` desde la planilla operativa.
+- `Outreach_Queue`, `Outreach_Events`, `Approvals`, `Runs`, `Task_Commands`, `Channel_Health`, `Cost_Ledger` y `Cost_Settings` desde la planilla operativa.
+
+El Centro de Costos registra consumos medidos por operación, admite costos informados por proveedor, calcula tarifas versionadas cuando falta una factura y mantiene separados los valores reales de las simulaciones.
 
 La lectura utiliza una cuenta de servicio de Google. La planilla comercial se comparte como lectora y la operativa como editora para registrar comandos, cola y eventos. La clave nunca se guarda en Git.
 
