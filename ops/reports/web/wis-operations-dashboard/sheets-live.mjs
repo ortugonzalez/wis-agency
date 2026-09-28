@@ -211,6 +211,7 @@ export async function appendCostUsage(row) {
 }
 
 export async function upsertCostSetting(key,value,note="",updatedBy="human-dashboard") {
+  await ensureOperationalSheet(COST_LEDGER_SHEET,COST_LEDGER_HEADERS);
   await ensureOperationalSheet(COST_SETTINGS_SHEET,COST_SETTINGS_HEADERS);
   const spreadsheetId=operationsId();
   const token=await accessToken();
