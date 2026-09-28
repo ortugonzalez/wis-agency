@@ -11,6 +11,11 @@ El servicio lee cada 30 segundos:
 
 El Centro de Costos registra consumos medidos por operación, admite costos informados por proveedor, calcula tarifas versionadas cuando falta una factura y mantiene separados los valores reales de las simulaciones.
 
+- `Cost_Ledger` conserva operación, prospecto, etapa, proveedor, modelo, tokens, unidades y costo.
+- `Cost_Settings` conserva presupuesto y costos fijos mensuales.
+- `POST /api/costs/usage` recibe telemetría del ejecutor y deduplica por `idempotencyKey`.
+- `WIS_COST_INGEST_TOKEN` permite exigir una credencial adicional a los workers.
+
 La lectura utiliza una cuenta de servicio de Google. La planilla comercial se comparte como lectora y la operativa como editora para registrar comandos, cola y eventos. La clave nunca se guarda en Git.
 
 ## Variables obligatorias
