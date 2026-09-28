@@ -10,7 +10,8 @@ import {
   buildLiveSnapshot,
   sheetsLiveConfigured,
   sheetsWriteConfigured,
-  updateOutreachQueue
+  updateOutreachQueue,
+  updateProspectMessage
 } from "./sheets-live.mjs";
 
 const standaloneRoot=process.env.WIS_STANDALONE_ROOT?resolve(process.env.WIS_STANDALONE_ROOT):null;
@@ -759,6 +760,35 @@ const server=createServer(async(req,res)=>{
       assertMutationRequest(req);
       const result=await processSend(await requestBody(req));
       return json(res,result.status,result.body);
+    }
+    if(url.pathname==="/api/outreach/draft"&&req.method==="POST") {
+      assertMutationRequest(req);
+      const input=await requestBody(req);
+      const channel=String(input.channel||"").toUpperCase();
+      if(!["EMAIL","WHATSAPP"].includes(channel)) return json(res,400,{ok:false,error:"CHANNEL_INVALID"});
+      const rowNumber=Number(input.rowNumber);
+      const message=String(input.message||"").trim();
+      if(!message) return json(res,400,{ok:false,error:"MESSAGE_REQUIRED"});
+      const payload=await dashboardPayload();
+      const prospect=payload.prospects.find(row=>row.rowNumber===rowNumber);
+      if(!prospect) return json(res,404,{ok:false,error:"PROSPECT_NOT_FOUND"});
+      const recipient=channel==="EMAIL"?prospect.email:prospect.whatsapp;
+      if(!recipient) return json(res,400,{ok:false,error:"RECIPIENT_MISSING"});
+      if(!sheetsWriteConfigured()) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
+      await updateProspectMessage(rowNumber,channel,message);
+      const snapshot=await readJson(sheetSnapshotPath,{});
+      const cached=(snapshot.prospects||[]).find(row=>Number(row.rowNumber)===rowNumber);
+      if(cached) {
+        if(channel==="EMAIL") cached.emailMessage=message;
+        else cached.whatsappMessage=message;
+        snapshot.fetchedAt=new Date().toISOString();
+        await writeJsonAtomic(sheetSnapshotPath,snapshot);
+      }
+      const savedAt=new Date().toISOString();
+      let eventLogged=true;
+      try { await appendEvent({messageId:`DRAFT-${rowNumber}-${channel}`,rowNumber,empresa:prospect.empresa,channel,recipient,eventType:"DRAFT_SAVED",fromStatus:"BORRADOR",toStatus:"BORRADOR",detail:"Borrador actualizado desde el dashboard",actor:"human-dashboard",source:"DASHBOARD",evidence:`message_sha256=${hash(message)}`}); }
+      catch { eventLogged=false; }
+      return json(res,200,{ok:true,rowNumber,channel,savedAt,messageHash:hash(message),eventLogged});
     }
     if(url.pathname==="/api/research/request"&&req.method==="POST") {
       assertMutationRequest(req);

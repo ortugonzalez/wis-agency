@@ -140,11 +140,12 @@ function renderTable() {
       <td><div class="contact-stack">${contactChip("email",row.email,row.rowNumber)}${contactChip("whatsapp",row.whatsapp,row.rowNumber,waCopyValue(row))}${!row.email&&!row.whatsapp?'<span>Sin contacto verificable</span>':""}</div></td>
       <td><div class="problem-cell"><p>${esc(row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
       <td>${statusBadge(row)}</td>
-      <td><button class="row-button" data-open="${row.rowNumber}" aria-label="Abrir ficha de ${esc(row.empresa)}">→</button></td>
+      <td><div class="row-actions"><button class="write-button" data-compose="${row.rowNumber}" data-channel="${row.email?"EMAIL":"WHATSAPP"}" ${!row.email&&!row.whatsapp?"disabled":""}>Escribir</button><button class="row-button" data-open="${row.rowNumber}" aria-label="Ver detalles de ${esc(row.empresa)}">Ver</button></div></td>
     </tr>`).join("") : '<tr><td colspan="6" class="empty-state">No hay prospectos que coincidan con estos filtros.</td></tr>';
   $$("[data-copy]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();copy(button.dataset.copy,button.dataset.copyLabel);}));
   $$("[data-open-row]").forEach(row=>row.addEventListener("click",()=>openDrawer(Number(row.dataset.openRow))));
   $$("[data-open]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openDrawer(Number(button.dataset.open));}));
+  $$("[data-compose]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openComposer(Number(button.dataset.compose),button.dataset.channel);}));
 }
 
 function renderEvents() {
@@ -457,9 +458,10 @@ function openDrawer(rowNumber) {
   $("#drawer-analysis").textContent=prospect.analysis||"Análisis pendiente.";
   $("#drawer-problems").textContent=prospect.problems||"No se registraron problemas.";
   $("#drawer-contacts").innerHTML=[
-    {label:"Email",value:prospect.email,copy:prospect.email},{label:"WhatsApp",value:prospect.whatsapp,copy:waCopyValue(prospect)}
-  ].map(item=>`<article class="contact-card"><div><span>${item.label}</span><strong>${esc(item.value||"No disponible")}</strong></div>${item.value?`<button data-drawer-copy="${esc(item.copy)}" data-label="${item.label}">Copiar</button>`:""}</article>`).join("");
+    {channel:"EMAIL",label:"Email",value:prospect.email,copy:prospect.email},{channel:"WHATSAPP",label:"WhatsApp",value:prospect.whatsapp,copy:waCopyValue(prospect)}
+  ].map(item=>`<article class="contact-card ${item.value?"":"is-missing"}"><div><span>${item.label}</span><strong>${esc(item.value||"No disponible")}</strong></div><div class="contact-card-actions">${item.value?`<button class="contact-write" data-drawer-write="${item.channel}">Escribir</button><button data-drawer-copy="${esc(item.copy)}" data-label="${item.label}">Copiar</button>`:`<small>Sin dato</small>`}</div></article>`).join("");
   $$("[data-drawer-copy]").forEach(button=>button.addEventListener("click",()=>copy(button.dataset.drawerCopy,button.dataset.label)));
+  $$("[data-drawer-write]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.drawerWrite;openSendDialog();}));
   $("#drawer-web").disabled=!prospect.web;
   store.messageChannel=prospect.email?"EMAIL":"WHATSAPP";
   renderMessagePreview();
@@ -483,11 +485,19 @@ function renderMessagePreview() {
   const recipient=store.messageChannel==="EMAIL"?prospect.email:prospect.whatsapp;
   const blocker=sendBlocker(prospect,store.messageChannel);
   $("#open-send").disabled=!recipient;
-  $("#open-send").textContent=!recipient?"Canal no disponible":blocker?"Ver requisitos de envío":`Revisar y enviar ${store.messageChannel==="EMAIL"?"email":"WhatsApp"}`;
-  $("#open-send").classList.toggle("button-primary",!blocker&&Boolean(recipient));
-  $("#open-send").classList.toggle("button-secondary",Boolean(blocker)||!recipient);
-  $("#drawer-send-status").textContent=blocker?(sendErrors[blocker]||blocker):"Listo para una confirmación final antes del envío.";
+  $("#open-send").textContent=!recipient?"Canal no disponible":`Escribir por ${store.messageChannel==="EMAIL"?"email":"WhatsApp"}`;
+  $("#open-send").classList.toggle("button-primary",Boolean(recipient));
+  $("#open-send").classList.toggle("button-secondary",!recipient);
+  $("#drawer-send-status").textContent=blocker?`Podés preparar el mensaje. Para enviarlo: ${sendErrors[blocker]||blocker}`:"Todo listo para enviar.";
   $("#drawer-send-status").classList.toggle("is-ready",!blocker);
+}
+
+function openComposer(rowNumber,channel) {
+  const prospect=store.data.prospects.find(row=>row.rowNumber===rowNumber);
+  if(!prospect) return toast("No encontramos este contacto. Actualizá los datos.",true);
+  store.selected=prospect;
+  store.messageChannel=channel==="WHATSAPP"?"WHATSAPP":"EMAIL";
+  openSendDialog();
 }
 
 function openSendDialog() {
@@ -497,36 +507,46 @@ function openSendDialog() {
   const recipient=isWa?waCopyValue(prospect):prospect.email;
   const message=isWa?prospect.whatsappMessage:prospect.emailMessage;
   if(!recipient) return toast("Este prospecto no tiene un contacto verificable para el canal.",true);
-  $("#send-title").textContent=`Enviar ${isWa?"WhatsApp":"email"} a ${prospect.empresa}`;
+  $("#composer-kicker").textContent=isWa?"Mensaje por WhatsApp":"Mensaje por email";
+  $("#send-title").textContent=`Escribirle a ${prospect.empresa}`;
   $("#send-recipient").textContent=recipient;
   $("#send-message").value=message||"";
+  $$("[data-composer-channel]").forEach(button=>{
+    const channel=button.dataset.composerChannel;
+    const available=channel==="EMAIL"?Boolean(prospect.email):Boolean(prospect.whatsapp);
+    button.disabled=!available;
+    button.classList.toggle("is-active",channel===store.messageChannel);
+  });
   $("#wa-optin").classList.toggle("is-visible",isWa);
   if(isWa) {
     const optIn=prospect.whatsappOptIn||{};
-    $("#optin-status").textContent=optIn.eligible?`Opt-in inbound verificado · ${relativeDate(optIn.recordedAt)}`:"Sin opt-in inbound durable y reconciliado";
+    $("#optin-status").textContent=optIn.eligible?`Contacto habilitado · ${relativeDate(optIn.recordedAt)}`:"Este contacto todavía no escribió por WhatsApp";
     $("#optin-status").classList.toggle("is-verified",optIn.eligible===true);
   }
   const blocker=sendBlocker(prospect,store.messageChannel);
-  $("#send-error").textContent=blocker?(sendErrors[blocker]||blocker):"";
-  $("#send-error").classList.toggle("is-visible",Boolean(blocker));
+  $("#send-error").textContent=blocker?`Podés escribir y guardar el borrador. Para enviarlo falta: ${sendErrors[blocker]||blocker}`:"El mensaje está listo para enviar.";
+  $("#send-error").classList.toggle("is-visible",true);
+  $("#send-error").classList.toggle("is-ready",!blocker);
   $("#confirm-send").disabled=Boolean(blocker);
-  $("#confirm-send").textContent=blocker?"Envío bloqueado":"Confirmar envío";
-  $("#send-dialog").showModal();
+  $("#confirm-send").textContent=blocker?"Enviar no disponible":"Enviar ahora";
+  $("#save-draft").disabled=!String(message||"").trim();
+  $("#save-draft").textContent="Guardar borrador";
+  if(!$("#send-dialog").open) $("#send-dialog").showModal();
 }
 
 const sendErrors={
-  EMAIL_PROVIDER_NOT_CONFIGURED:"Falta conectar el webhook exclusivo de Gmail/Brevo.",
-  WHATSAPP_PROVIDER_NOT_CONFIGURED:"Falta cargar el token local de la línea WIS terminada en 5679.",
-  WHATSAPP_PHONE_INVALID:"El número publicado no está en formato internacional verificable (+54…). Corregilo en el Sheet antes de enviar.",
-  CHANNEL_BLOCKED:"El canal todavía está bloqueado por su verificación de seguridad.",
-  INDEPENDENT_QA_REQUIRED:"Este mensaje todavía no tiene QA independiente aprobado.",
-  BATCH_APPROVAL_REQUIRED:"Falta una aprobación de lote vigente que incluya este destinatario, canal y versión.",
+  EMAIL_PROVIDER_NOT_CONFIGURED:"el canal de email está conectado, pero todavía está pausado.",
+  WHATSAPP_PROVIDER_NOT_CONFIGURED:"la línea de WhatsApp está conectada, pero todavía está pausada.",
+  WHATSAPP_PHONE_INVALID:"el número necesita el código internacional, por ejemplo +54.",
+  CHANNEL_BLOCKED:"el canal todavía está pausado.",
+  INDEPENDENT_QA_REQUIRED:"primero hay que revisar y aprobar este mensaje.",
+  BATCH_APPROVAL_REQUIRED:"primero hay que aprobar el lote que contiene este contacto.",
   DURABLE_IDEMPOTENCY_SNAPSHOT_REQUIRED:"Falta reconciliar la cola y el proveedor antes de habilitar el envío.",
   APPROVED_MESSAGE_HASH_REQUIRED:"La versión aprobada no tiene una huella verificable del mensaje.",
   APPROVAL_RECIPIENT_LIMIT_REACHED:"La aprobación ya consumió el número exacto de destinatarios autorizado.",
-  DURABLE_OPTIN_REQUIRED:"WhatsApp exige un opt-in inbound durable y reconciliado; no puede cargarse manualmente desde este panel.",
-  SERVICE_WINDOW_EXPIRED:"El opt-in quedó fuera de la ventana de 24 horas y no hay una plantilla aprobada seleccionada.",
-  EMAIL_FIRST_REQUIRED:"Primero debe existir un email inicial enviado a este prospecto.",
+  DURABLE_OPTIN_REQUIRED:"el contacto todavía no inició o autorizó una conversación por WhatsApp.",
+  SERVICE_WINDOW_EXPIRED:"pasaron más de 24 horas desde el último mensaje del contacto.",
+  EMAIL_FIRST_REQUIRED:"primero hay que enviar el email inicial.",
   DAILY_LIMIT_REACHED:"El canal alcanzó su límite diario y quedó pausado.",
   MINIMUM_INTERVAL_NOT_REACHED:"Todavía no transcurrieron 15 minutos desde el último envío del canal.",
   EMAIL_WINDOW_CLOSED:"Los emails sólo se envían de 09:30 a 17:30 de Buenos Aires.",
@@ -538,8 +558,33 @@ const sendErrors={
   EMAIL_SIGNATURE_NOT_APPROVED:"Falta aprobar y cargar la firma HTML WIS sin Gravatar.",
   RECIPIENT_MISSING:"Este prospecto no tiene un destinatario verificable para el canal.",
   PROSPECT_NOT_FOUND:"El prospecto ya no existe en la última sincronización.",
-  MESSAGE_CHANGED:"El borrador cambió desde la última lectura. Actualizá antes de enviar."
+  MESSAGE_CHANGED:"el texto cambió después de la aprobación y debe revisarse nuevamente.",
+  GOOGLE_SHEETS_WRITES_DISABLED:"no se pudo guardar en Google Sheets.",
+  MESSAGE_REQUIRED:"escribí un mensaje antes de guardarlo."
 };
+
+async function saveDraft() {
+  const prospect=store.selected;
+  const message=$("#send-message").value.trim();
+  if(!prospect||!message) return toast("Escribí un mensaje antes de guardarlo.",true);
+  const button=$("#save-draft");
+  button.disabled=true;
+  button.textContent="Guardando…";
+  try {
+    const response=await fetch("/api/outreach/draft",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({rowNumber:prospect.rowNumber,channel:store.messageChannel,message})});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(sendErrors[payload.error]||payload.error||"No se pudo guardar el borrador");
+    if(store.messageChannel==="EMAIL") prospect.emailMessage=message;
+    else prospect.whatsappMessage=message;
+    renderMessagePreview();
+    button.textContent="Borrador guardado ✓";
+    toast("Borrador guardado en Google Sheets.");
+  } catch(error) {
+    button.disabled=false;
+    button.textContent="Guardar borrador";
+    toast(error.message||"No se pudo guardar el borrador.",true);
+  }
+}
 
 async function sendMessage(event) {
   event.preventDefault();
@@ -568,7 +613,7 @@ async function sendMessage(event) {
   } finally {
     const blocker=sendBlocker(prospect,store.messageChannel);
     button.disabled=Boolean(blocker);
-    button.textContent=blocker?"Envío bloqueado":"Confirmar envío";
+    button.textContent=blocker?"Enviar no disponible":"Enviar ahora";
   }
 }
 
@@ -744,10 +789,13 @@ $("#wa-reply").addEventListener("input",()=>{
 $$("[data-close]").forEach(node=>node.addEventListener("click",closeDrawer));
 $$("[data-modal-close]").forEach(node=>node.addEventListener("click",()=>$("#send-dialog").close()));
 $$("[data-message-tab]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.messageTab;renderMessagePreview();}));
+$$("[data-composer-channel]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.composerChannel;openSendDialog();}));
 $("#copy-message").addEventListener("click",()=>copy($("#message-preview").textContent,"Mensaje"));
 $("#copy-recipient").addEventListener("click",()=>copy($("#send-recipient").textContent,"Destinatario"));
 $("#drawer-web").addEventListener("click",()=>store.selected?.web&&window.open(store.selected.web,"_blank","noopener"));
 $("#open-send").addEventListener("click",openSendDialog);
+$("#save-draft").addEventListener("click",saveDraft);
+$("#send-message").addEventListener("input",()=>{$("#save-draft").disabled=!$("#send-message").value.trim();});
 $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
