@@ -368,10 +368,79 @@ async function enqueueResearch() {
   } catch(error) { toast(error.message||"No se pudo registrar la tarea.",true); }
 }
 
+function showResearchResult(message,isError=false) {
+  const node=$("#research-result");
+  node.textContent=message;
+  node.classList.add("is-visible");
+  node.classList.toggle("is-error",isError);
+}
+
+async function createResearchRequest(input,button) {
+  const original=button.textContent;
+  button.disabled=true;
+  button.classList.add("is-loading");
+  button.textContent="Registrando…";
+  try {
+    const response=await fetch("/api/research/request",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input)});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error||"No se pudo crear la tarea");
+    const request=payload.request||{};
+    showResearchResult(`${payload.deduplicated?"Este pedido ya estaba registrado":"Tarea creada"}: ${request.quantity} ${request.businessType} · ${request.industry} · ${request.location}. Quedó pendiente para el ejecutor de research.`);
+    toast(payload.deduplicated?"El pedido ya existía en la cola.":"Pedido agregado a Task_Commands.");
+  } catch(error) {
+    const message=error.message==="RESEARCH_INDUSTRY_REQUIRED"?"Indicá el rubro que querés investigar.":error.message;
+    showResearchResult(message||"No se pudo registrar el pedido.",true);
+    toast(message||"No se pudo registrar el pedido.",true);
+  } finally {
+    button.disabled=false;
+    button.classList.remove("is-loading");
+    button.textContent=original;
+  }
+}
+
+async function submitResearchChat(event) {
+  event.preventDefault();
+  const prompt=$("#research-prompt").value.trim();
+  if(!prompt) return showResearchResult("Escribí qué empresas querés buscar.",true);
+  await createResearchRequest({prompt},$("#research-chat-submit"));
+}
+
+async function submitResearchForm(event) {
+  event.preventDefault();
+  await createResearchRequest({
+    quantity:Number($("#research-quantity").value),
+    businessType:$("#research-business-type").value,
+    industry:$("#research-industry").value,
+    location:$("#research-location").value,
+    reviews:$("#research-reviews").value,
+    contact:$("#research-contact").value,
+    objective:$("#research-objective").value
+  },$("#research-form-submit"));
+}
+
+async function prepareApolloPilot() {
+  const button=$("#apollo-pilot");
+  const original=button.textContent;
+  button.disabled=true;
+  button.textContent="Registrando…";
+  try {
+    const response=await fetch("/api/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+      action:"EVALUATE_APOLLO",
+      scope:"PILOT_50_EXISTING_PROSPECTS",
+      idempotencyKey:`EVALUATE_APOLLO:PILOT_50:${new Date().toISOString().slice(0,10)}`
+    })});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error||"No se pudo preparar el piloto");
+    $("#apollo-status").textContent=payload.deduplicated?"Ya registrado":"En cola";
+    toast(payload.deduplicated?"El piloto Apollo ya estaba registrado.":"Piloto Apollo agregado a la cola, sin realizar envíos.");
+  } catch(error) { toast(error.message||"No se pudo preparar el piloto.",true); }
+  finally { button.disabled=false;button.textContent=original; }
+}
+
 function switchView(id) {
   $$(".view").forEach(view=>view.classList.toggle("is-active",view.id===id));
   $$("[data-view]").forEach(button=>button.classList.toggle("is-active",button.dataset.view===id));
-  $("#page-title").textContent={prospects:"Prospectos",activity:"Actividad",channels:"Canales"}[id]||"Prospectos";
+  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",activity:"Actividad",channels:"Canales",apollo:"Apollo"}[id]||"Prospectos";
   history.replaceState(null,"",`#${id}`);
 }
 
@@ -385,6 +454,9 @@ $("#refresh-button").addEventListener("click",()=>loadData());
 $("#sync-button").addEventListener("click",requestSync);
 $("#hero-sync").addEventListener("click",requestSync);
 $("#continue-research").addEventListener("click",enqueueResearch);
+$("#research-chat-form").addEventListener("submit",submitResearchChat);
+$("#research-form").addEventListener("submit",submitResearchForm);
+$("#apollo-pilot").addEventListener("click",prepareApolloPilot);
 $$("[data-close]").forEach(node=>node.addEventListener("click",closeDrawer));
 $$("[data-modal-close]").forEach(node=>node.addEventListener("click",()=>$("#send-dialog").close()));
 $$("[data-message-tab]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.messageTab;renderMessagePreview();}));
@@ -395,7 +467,7 @@ $("#open-send").addEventListener("click",openSendDialog);
 $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
-const initialView=["prospects","activity","channels"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+const initialView=["prospects","research","activity","channels","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
 switchView(initialView);
 loadData();
 setInterval(()=>loadData(true),30_000);

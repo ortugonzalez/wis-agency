@@ -25,7 +25,7 @@ const statePath = join(configDir, "dashboard-state.json");
 const channelVerificationPath = join(configDir, "channel-verification.json");
 const port = Number(process.env.PORT || process.env.WIS_DASHBOARD_PORT || 4174);
 const bindHost = process.env.WIS_BIND_HOST || "127.0.0.1";
-const allowedActions = new Set(["CONTINUE_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS"]);
+const allowedActions = new Set(["CONTINUE_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS", "EVALUATE_APOLLO"]);
 const mime = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml" };
 const activeSendLocks = new Set();
 let liveSyncPromise=null;
@@ -221,6 +221,51 @@ function approvalGate(snapshot, prospect, channel) {
   };
 }
 
+function cleanText(value,max=180) {
+  return String(value||"").replace(/[\u0000-\u001f\u007f]/g," ").replace(/\s+/g," ").trim().slice(0,max);
+}
+
+function titleCase(value) {
+  return cleanText(value).toLocaleLowerCase("es-AR").replace(/(^|[\s/-])(\p{L})/gu,(_,prefix,letter)=>`${prefix}${letter.toLocaleUpperCase("es-AR")}`);
+}
+
+function normalizeResearchRequest(input={}) {
+  const prompt=cleanText(input.prompt,1000);
+  const inferredQuantity=prompt.match(/\b(\d{1,3})\b/)?.[1];
+  const quantity=Math.max(1,Math.min(300,Number(input.quantity||inferredQuantity||25)));
+  const promptKey=key(prompt);
+  let businessType=cleanText(input.businessType,40).toLowerCase();
+  if(!businessType) businessType=promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
+  if(!["distribuidoras","logisticas","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
+  let industry=cleanText(input.industry,90);
+  if(!industry&&prompt) {
+    const match=prompt.match(/(?:distribuidoras?|log[ií]sticas?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
+    industry=cleanText(match?.[1],90);
+  }
+  let location=cleanText(input.location,90);
+  if(!location&&prompt) {
+    const match=prompt.match(/\ben\s+([^,.]+?)(?=\s+(?:con|incluyendo|junto|y\s+analiz)\b|$)/iu);
+    location=cleanText(match?.[1],90);
+  }
+  location=location||"Argentina";
+  const reviews=input.reviews==="none"?"none":"1-3";
+  const contact=["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
+  const objective=cleanText(input.objective,400)||"Detectar problemas recurrentes y oportunidades concretas para WIS";
+  if(!industry) throw Object.assign(new Error("RESEARCH_INDUSTRY_REQUIRED"),{status:400});
+  return {
+    quantity,
+    businessType,
+    industry:titleCase(industry),
+    location:titleCase(location),
+    reviews,
+    contact,
+    objective,
+    prompt,
+    reviewRule:reviews==="1-3"?"Analizar sólo reseñas de 1, 2 y 3 estrellas e informar analizadas/total accesible":"Sin análisis de reseñas",
+    outreachRule:"Preparar borradores; no enviar sin QA y aprobación"
+  };
+}
+
 function whatsappOptInGate(snapshot, prospect, now=new Date()) {
   const qa=(snapshot.qa||[]).find(row=>Number(row.rowNumber)===prospect.rowNumber);
   const prospectKey=qa?.prospectKey||`distribuidoras-300-row-${prospect.rowNumber}`;
@@ -282,14 +327,17 @@ function prospectStopGate(events,prospect,channel) {
 }
 
 function channelHealth(verification={}) {
-  const emailConfigured=Boolean(process.env.WIS_EMAIL_WEBHOOK_URL&&process.env.WIS_EMAIL_WEBHOOK_TOKEN);
+  const emailConfigured=Boolean(process.env.BREVO_API_KEY||(process.env.WIS_EMAIL_WEBHOOK_URL&&process.env.WIS_EMAIL_WEBHOOK_TOKEN));
   const waConfigured=Boolean(process.env.WIS_WHATSAPP_WEBHOOK_URL&&process.env.WIS_WHATSAPP_WEBHOOK_TOKEN);
-  const emailConnected=verification.email?.aliasVerified===true&&verification.email?.defaultSender===true;
-  const whatsappConnected=verification.whatsapp?.identityVerified===true&&verification.whatsapp?.sessionConnected===true;
-  const signatureApproved=verification.email?.signatureApproved===true&&Boolean(process.env.WIS_EMAIL_SIGNATURE_HTML);
+  const emailConnected=(verification.email?.aliasVerified===true&&verification.email?.defaultSender===true)||
+    (process.env.WIS_EMAIL_ALIAS_VERIFIED==="true"&&process.env.WIS_EMAIL_DEFAULT_SENDER_VERIFIED==="true");
+  const whatsappConnected=(verification.whatsapp?.identityVerified===true&&verification.whatsapp?.sessionConnected===true)||
+    (process.env.WIS_WHATSAPP_IDENTITY_VERIFIED==="true"&&process.env.WIS_WHATSAPP_SESSION_CONNECTED==="true");
+  const signatureApproved=(verification.email?.signatureApproved===true||process.env.WIS_EMAIL_SIGNATURE_APPROVED==="true")&&Boolean(process.env.WIS_EMAIL_SIGNATURE_HTML);
+  const whatsappPaused=verification.whatsapp?.outboundPaused!==undefined?verification.whatsapp.outboundPaused!==false:process.env.WIS_WHATSAPP_OUTBOUND_PAUSED!=="false";
   return {
     email:{
-      provider:"Gmail / Brevo",
+      provider:process.env.BREVO_API_KEY?"Brevo transactional":"Gmail / Brevo",
       account:"Ortu - WIS <ortu@wis-agency.com>",
       canSend:emailConfigured&&emailConnected&&signatureApproved&&process.env.WIS_EMAIL_OUTBOUND_ENABLED==="true",
       configured:emailConfigured,
@@ -299,10 +347,10 @@ function channelHealth(verification={}) {
     whatsapp:{
       provider:"Workflow WIS · 5679",
       account:"línea WIS · •••• 5679",
-      canSend:waConfigured&&whatsappConnected&&verification.whatsapp?.outboundPaused===false&&process.env.WIS_WHATSAPP_OUTBOUND_ENABLED==="true",
+      canSend:waConfigured&&whatsappConnected&&!whatsappPaused&&process.env.WIS_WHATSAPP_OUTBOUND_ENABLED==="true",
       configured:waConfigured,
       connected:whatsappConnected,
-      detail:!whatsappConnected?"Falta verificar la identidad y la sesión exclusiva de la línea 5679.":verification.whatsapp?.outboundPaused!==false?"Identidad y sesión 5679 verificadas; la salida continúa pausada.":!waConfigured?"La línea está verificada; falta conectar el workflow WIS exclusivo.":"El workflow WIS está conectado y permanece bloqueado hasta habilitar el canal."
+      detail:!whatsappConnected?"Falta verificar la identidad y la sesión exclusiva de la línea 5679.":whatsappPaused?"Identidad y sesión 5679 verificadas; la salida continúa pausada.":!waConfigured?"La línea está verificada; falta conectar el workflow WIS exclusivo.":"El workflow WIS está conectado y permanece bloqueado hasta habilitar el canal."
     }
   };
 }
@@ -386,14 +434,15 @@ async function postJson(url,payload,headers={}) {
 }
 
 async function sendEmail({prospect,message,idempotencyKey}) {
-  if(!process.env.WIS_EMAIL_WEBHOOK_URL||!process.env.WIS_EMAIL_WEBHOOK_TOKEN) return {ok:false,error:"EMAIL_PROVIDER_NOT_CONFIGURED",status:409};
+  const directBrevo=Boolean(process.env.BREVO_API_KEY);
+  if(!directBrevo&&(!process.env.WIS_EMAIL_WEBHOOK_URL||!process.env.WIS_EMAIL_WEBHOOK_TOKEN)) return {ok:false,error:"EMAIL_PROVIDER_NOT_CONFIGURED",status:409};
   if(process.env.WIS_EMAIL_OUTBOUND_ENABLED!=="true") return {ok:false,error:"CHANNEL_BLOCKED",status:409};
   const firstLine=message.split(/\r?\n/,1)[0];
   const subject=/^asunto\s*:/i.test(firstLine)?firstLine.replace(/^asunto\s*:\s*/i,"").trim():`Una idea para ${prospect.empresa}`;
   const body=/^asunto\s*:/i.test(firstLine)?message.split(/\r?\n/).slice(1).join("\n").trim():message;
   const signatureHtml=String(process.env.WIS_EMAIL_SIGNATURE_HTML||"");
   if(!signatureHtml||/gravatar(?:\.com)?/i.test(signatureHtml)) return {ok:false,error:"EMAIL_SIGNATURE_NOT_APPROVED",status:409};
-  const result=await postJson(process.env.WIS_EMAIL_WEBHOOK_URL,{
+  const payload={
     to:prospect.email,
     from:"Ortu - WIS <ortu@wis-agency.com>",
     replyTo:"ortu@wis-agency.com",
@@ -402,7 +451,15 @@ async function sendEmail({prospect,message,idempotencyKey}) {
     signatureHtml,
     idempotencyKey,
     prospect:{rowNumber:prospect.rowNumber,empresa:prospect.empresa}
-  },{authorization:`Bearer ${process.env.WIS_EMAIL_WEBHOOK_TOKEN}`});
+  };
+  const result=directBrevo?await postJson("https://api.brevo.com/v3/smtp/email",{
+    sender:{name:"Ortu - WIS",email:"ortu@wis-agency.com"},
+    to:[{email:prospect.email,name:prospect.empresa}],
+    replyTo:{email:"ortu@wis-agency.com",name:"Ortu - WIS"},
+    subject,
+    htmlContent:`<div style="font-family:Arial,sans-serif;white-space:normal">${body.replace(/[&<>\"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"})[char]).replace(/\r?\n/g,"<br>")}</div>${signatureHtml}`,
+    headers:{"X-WIS-Idempotency-Key":idempotencyKey}
+  },{"api-key":process.env.BREVO_API_KEY,accept:"application/json"}):await postJson(process.env.WIS_EMAIL_WEBHOOK_URL,payload,{authorization:`Bearer ${process.env.WIS_EMAIL_WEBHOOK_TOKEN}`});
   if(!result.ok) return {ok:false,error:"PROVIDER_REJECTED",status:502,providerStatus:result.status};
   return {ok:true,providerMessageId:result.body.messageId||result.body.id||"accepted"};
 }
@@ -555,6 +612,34 @@ const server=createServer(async(req,res)=>{
       const result=await processSend(await requestBody(req));
       return json(res,result.status,result.body);
     }
+    if(url.pathname==="/api/research/request"&&req.method==="POST") {
+      assertMutationRequest(req);
+      const request=normalizeResearchRequest(await requestBody(req));
+      const requestHash=hash(JSON.stringify(request)).slice(0,20);
+      const idempotencyKey=`REQUEST_RESEARCH:${new Date().toISOString().slice(0,10)}:${requestHash}`;
+      const liveSnapshot=sheetsLiveConfigured()?await refreshLiveSheets(true):await readJson(sheetSnapshotPath,{});
+      const existingSheet=(liveSnapshot?.commands||[]).find(item=>(item.idempotency_key||item.idempotencyKey)===idempotencyKey);
+      const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
+      const existing=existingSheet||existingLocal;
+      if(existing) return json(res,200,{ok:true,command:existing,request,deduplicated:true});
+      const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location}`.slice(0,120);
+      const command={
+        commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,
+        createdAt:new Date().toISOString(),
+        action:"REQUEST_RESEARCH",
+        scope,
+        source:"WIS_DASHBOARD",
+        requestedBy:"human-dashboard",
+        status:"NEW",
+        idempotencyKey,
+        evidence:JSON.stringify({schemaVersion:1,...request})
+      };
+      if(sheetsWriteConfigured()) await appendTaskCommand(command);
+      else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
+      try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
+      catch(error) { if(!sheetsWriteConfigured()) throw error; }
+      return json(res,202,{ok:true,command,request,deduplicated:false});
+    }
     if(url.pathname==="/api/actions"&&req.method==="POST") {
       assertMutationRequest(req);
       const input=await requestBody(req);
@@ -587,4 +672,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, normalizeResearchRequest, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate };
