@@ -355,6 +355,48 @@ function channelHealth(verification={}) {
   };
 }
 
+async function whatsappProviderConfig() {
+  const apiUrl=String(process.env.WIS_WHATSAPP_API_URL||"").trim().replace(/\/$/,"");
+  const apiToken=String(process.env.WIS_WHATSAPP_API_TOKEN||"").trim();
+  if(apiUrl&&apiToken) return {apiUrl,apiToken,source:"environment"};
+  const local=await readJson(join(runtimeDir,"channel-secrets.local.json"),null);
+  if(!local?.whatsappApiUrl||!local?.whatsappApiToken) return null;
+  return {
+    apiUrl:String(local.whatsappApiUrl).replace(/\/$/,""),
+    apiToken:String(local.whatsappApiToken),
+    source:"local-runtime"
+  };
+}
+
+function whatsappQuery(input={}) {
+  const output=new URLSearchParams();
+  const limit=Math.min(100,Math.max(1,Number(input.limit)||40));
+  const offset=Math.min(100000,Math.max(0,Number(input.offset)||0));
+  output.set("limit",String(limit));
+  output.set("offset",String(offset));
+  const query=cleanText(input.q,100);
+  if(query.length>=2) output.set("q",query);
+  const conversationId=cleanText(input.conversation_id,200);
+  if(conversationId) output.set("conversation_id",conversationId);
+  if(input.sort==="asc"||input.sort==="desc") output.set("sort",input.sort);
+  if(input.normal_types==="true") output.set("normal_types","true");
+  return output;
+}
+
+async function whatsappProviderGet(resource,params={}) {
+  const config=await whatsappProviderConfig();
+  if(!config) throw Object.assign(new Error("WHATSAPP_PROVIDER_NOT_CONFIGURED"),{status:503});
+  if(!["connections","conversations","messages"].includes(resource)) throw Object.assign(new Error("WHATSAPP_RESOURCE_BLOCKED"),{status:400});
+  const url=new URL(`${config.apiUrl}/${resource}`);
+  const query=whatsappQuery(params);
+  for(const [name,value] of query) url.searchParams.set(name,value);
+  const response=await fetch(url,{headers:{authorization:`Bearer ${config.apiToken}`},signal:AbortSignal.timeout(10_000)});
+  let body={};
+  try { body=await response.json(); } catch { /* provider returned no JSON */ }
+  if(!response.ok) throw Object.assign(new Error(body.error||"WHATSAPP_PROVIDER_UNAVAILABLE"),{status:response.status>=400&&response.status<500?response.status:502});
+  return {data:body.data??null,meta:body.meta??null,source:config.source};
+}
+
 async function dashboardPayload() {
   try { await refreshLiveSheets(false); } catch { /* keep the last valid snapshot and surface degraded sync below */ }
   const [snapshot,state,localEvents,verification]=await Promise.all([
@@ -590,6 +632,33 @@ const server=createServer(async(req,res)=>{
       return res.end(JSON.stringify({error:"AUTH_REQUIRED"}));
     }
     if(url.pathname==="/api/dashboard"&&req.method==="GET") return json(res,200,await dashboardPayload());
+    if(url.pathname==="/api/whatsapp/status"&&req.method==="GET") {
+      const config=await whatsappProviderConfig();
+      if(!config) return json(res,200,{configured:false,connected:false,identityVerified:false,outboundEnabled:false,account:"•••• 5679"});
+      try {
+        const provider=await whatsappProviderGet("connections");
+        const connection=Array.isArray(provider.data)?provider.data.find(row=>row.id==="wis-5679")||provider.data[0]:provider.data;
+        return json(res,200,{
+          configured:true,
+          connected:connection?.status==="connected",
+          identityVerified:connection?.identity_verified===true,
+          outboundEnabled:connection?.outbound_enabled===true,
+          account:connection?.phone?`•••• ${String(connection.phone).slice(-4)}`:"•••• 5679",
+          updatedAt:connection?.updated_at||null,
+          source:provider.source
+        });
+      } catch(error) {
+        return json(res,200,{configured:true,connected:false,identityVerified:false,outboundEnabled:false,account:"•••• 5679",error:error.message});
+      }
+    }
+    if(url.pathname==="/api/whatsapp/conversations"&&req.method==="GET") {
+      const result=await whatsappProviderGet("conversations",{q:url.searchParams.get("q"),limit:url.searchParams.get("limit"),offset:url.searchParams.get("offset")});
+      return json(res,200,{ok:true,...result});
+    }
+    if(url.pathname==="/api/whatsapp/messages"&&req.method==="GET") {
+      const result=await whatsappProviderGet("messages",{conversation_id:url.searchParams.get("conversationId"),limit:url.searchParams.get("limit"),offset:url.searchParams.get("offset"),sort:"asc",normal_types:"true"});
+      return json(res,200,{ok:true,...result});
+    }
     if(url.pathname==="/api/sync"&&req.method==="POST") {
       assertMutationRequest(req);
       const result=await syncFromProxy();
@@ -672,4 +741,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, normalizeResearchRequest, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, normalizeResearchRequest, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };

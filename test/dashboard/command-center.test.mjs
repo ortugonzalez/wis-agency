@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeResearchRequest, prospectStopGate, whatsappOptInGate } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
+import { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeResearchRequest, prospectStopGate, whatsappOptInGate, whatsappQuery } from "../../ops/reports/web/wis-operations-dashboard/server.mjs";
 
 const prospect={rowNumber:42};
 const approvedBodyHash="52ad4a85f158f776d1385ac66f4536ff32c4020a5153847566c29bb89d51d7fa";
@@ -130,4 +130,14 @@ test("aplica cupo, cadencia y horario de email en Buenos Aires",()=>{
 test("detiene respuestas, bajas y canales simultáneos",()=>{
   assert.equal(prospectStopGate([{rowNumber:42,source:"DASHBOARD",channel:"EMAIL",eventType:"RESPONDIDO"}],prospect,"EMAIL").reason,"PROSPECT_STOPPED");
   assert.equal(prospectStopGate([{rowNumber:42,source:"DASHBOARD",channel:"EMAIL",eventType:"SEND_ATTEMPT"}],prospect,"WHATSAPP").reason,"SIMULTANEOUS_CHANNEL_BLOCKED");
+});
+
+test("acota los filtros enviados a la bandeja de WhatsApp",()=>{
+  const query=whatsappQuery({q:"  distribuidora norte  ",limit:"999",offset:"-4",conversation_id:"chat-42",sort:"asc",normal_types:"true"});
+  assert.equal(query.get("q"),"distribuidora norte");
+  assert.equal(query.get("limit"),"100");
+  assert.equal(query.get("offset"),"0");
+  assert.equal(query.get("conversation_id"),"chat-42");
+  assert.equal(query.get("sort"),"asc");
+  assert.equal(query.get("normal_types"),"true");
 });
