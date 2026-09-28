@@ -103,11 +103,12 @@ async function ensureOperationalSheet(sheetName,headers) {
   const spreadsheetId=operationsId();
   const token=await accessToken();
   const metadataUrl=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`);
-  metadataUrl.searchParams.set("fields","sheets.properties.title");
+  metadataUrl.searchParams.set("fields","sheets.properties(sheetId,title)");
   const metadataResponse=await fetch(metadataUrl,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
   const metadata=await metadataResponse.json();
   if(!metadataResponse.ok) throw new Error(`GOOGLE_SHEETS_METADATA_FAILED_${metadataResponse.status}`);
-  const exists=(metadata.sheets||[]).some(sheet=>sheet?.properties?.title===sheetName);
+  let sheet=(metadata.sheets||[]).find(item=>item?.properties?.title===sheetName);
+  const exists=Boolean(sheet);
   if(!exists) {
     const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
       method:"POST",
@@ -115,11 +116,28 @@ async function ensureOperationalSheet(sheetName,headers) {
       body:JSON.stringify({requests:[{addSheet:{properties:{title:sheetName}}}]}),
       signal:AbortSignal.timeout(30_000)
     });
+    const created=await response.json();
     if(!response.ok&&response.status!==400) throw new Error(`GOOGLE_SHEETS_ADD_SHEET_FAILED_${response.status}`);
+    sheet=created.replies?.[0]?.addSheet||sheet;
   }
   const lastColumn=columnName(headers.length);
   const current=await batchGet(spreadsheetId,[`${sheetName}!A1:${lastColumn}1`],token);
   if(!(current[0]?.values?.[0]||[]).length) await updateValues(spreadsheetId,`${sheetName}!A1:${lastColumn}1`,headers);
+  if(Number.isInteger(sheet?.properties?.sheetId)) await formatOperationalSheet(spreadsheetId,sheet.properties.sheetId,headers.length,token);
+}
+
+async function formatOperationalSheet(spreadsheetId,sheetId,columnCount,token) {
+  const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
+    method:"POST",
+    headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
+    body:JSON.stringify({requests:[
+      {updateSheetProperties:{properties:{sheetId,gridProperties:{frozenRowCount:1}},fields:"gridProperties.frozenRowCount"}},
+      {repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:columnCount},cell:{userEnteredFormat:{backgroundColor:{red:.055,green:.075,blue:.067},textFormat:{foregroundColor:{red:1,green:1,blue:1},bold:true},verticalAlignment:"MIDDLE",wrapStrategy:"WRAP"}},fields:"userEnteredFormat(backgroundColor,textFormat,verticalAlignment,wrapStrategy)"}},
+      {autoResizeDimensions:{dimensions:{sheetId,dimension:"COLUMNS",startIndex:0,endIndex:columnCount}}}
+    ]}),
+    signal:AbortSignal.timeout(30_000)
+  });
+  if(!response.ok) throw new Error(`GOOGLE_SHEETS_FORMAT_FAILED_${response.status}`);
 }
 
 function columnName(number) {
