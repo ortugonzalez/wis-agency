@@ -5,7 +5,7 @@ const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300
 const PAGE_SIZE = 18;
 
 const store = {
-  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{} },
+  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{}, research:{requests:[],summary:{}} },
   filtered: [],
   page: 1,
   selected: null,
@@ -336,6 +336,84 @@ function renderSync() {
   $("#last-sync").textContent=relativeDate(sync.fetchedAt);
 }
 
+const researchStatusLabels={
+  NEW:"Pendiente",
+  PENDING:"Pendiente",
+  READY:"Listo para iniciar",
+  IN_PROGRESS:"Procesando",
+  REVIEW:"En revisión",
+  WAITING_APPROVAL:"Esperando aprobación",
+  DONE:"Completado",
+  BLOCKED:"Bloqueado",
+  FAILED:"Con error",
+  CANCELLED:"Cancelado"
+};
+
+function researchStatusClass(status) {
+  if(status==="DONE") return "is-done";
+  if(status==="IN_PROGRESS") return "is-running";
+  if(["BLOCKED","FAILED","CANCELLED"].includes(status)) return "is-blocked";
+  if(["REVIEW","WAITING_APPROVAL"].includes(status)) return "is-review";
+  return "is-pending";
+}
+
+function researchRequestTitle(row) {
+  const request=row.request||{};
+  if(request.batchName) return request.batchName;
+  if(row.action==="CONTINUE_RESEARCH") return "Continuar próximo lote pendiente";
+  return `${request.quantity||"—"} ${request.businessType||"empresas"} · ${request.industry||row.scope||"Research"}`;
+}
+
+function renderResearch() {
+  const research=store.data.research||{requests:[],summary:{},executor:{}};
+  const summary=research.summary||{};
+  const requests=research.requests||[];
+  const executor=research.executor||{};
+  const executorNode=$("#research-executor-state");
+  executorNode.className=`executor-state ${executor.connected?"is-connected":"is-pending"}`;
+  executorNode.innerHTML=`<i></i> ${esc(executor.connected?(executor.label||"Ejecutor conectado"):(executor.label||"Ejecutor pendiente"))}`;
+  $("#research-monitor-caption").textContent=requests.length
+    ? `${requests.length} pedido${requests.length===1?"":"s"} registrado${requests.length===1?"":"s"} · actualización automática cada 30 segundos`
+    : "Todavía no hay pedidos de research registrados";
+  $("#research-summary").innerHTML=[
+    ["Pendientes",summary.pending||0,"pending"],
+    ["Procesando",summary.running||0,"running"],
+    ["Completados",summary.completed||0,"done"],
+    ["Bloqueados",summary.blocked||0,"blocked"]
+  ].map(([label,value,tone])=>`<article class="research-summary-item is-${tone}"><span>${esc(label)}</span><strong>${value}</strong></article>`).join("");
+  if(!requests.length) {
+    $("#research-run-list").innerHTML=`<div class="research-empty"><span>＋</span><div><strong>Creá tu primer research</strong><p>Configurá los campos de arriba y el pedido aparecerá acá.</p></div></div>`;
+    return;
+  }
+  $("#research-run-list").innerHTML=requests.map(row=>{
+    const request=row.request||{};
+    const status=String(row.status||"NEW").toUpperCase();
+    const progress=row.progress||{completed:0,total:request.quantity||0,percent:0};
+    const details=row.action==="CONTINUE_RESEARCH"
+      ? "Retoma el siguiente lote incompleto respetando el último avance confirmado."
+      : [request.industry,request.location,request.employeeSize&&request.employeeSize!=="any"?`${request.employeeSize} empleados`:"Sin límite de tamaño"].filter(Boolean).join(" · ");
+    const coverage=row.action==="CONTINUE_RESEARCH"
+      ? "Continuación segura"
+      : `${request.reviews==="none"?"Sin reseñas":`Reseñas 1–3 · mínimo ${request.minimumReviews||0}`} · ${request.contact==="email"?"Email":request.contact==="whatsapp"?"WhatsApp":"Email + WhatsApp"}`;
+    const progressCopy=status==="DONE"
+      ? `${progress.completed||progress.total}/${progress.total||progress.completed} completados`
+      : status==="IN_PROGRESS"
+        ? `${progress.completed||0}/${progress.total||request.quantity||0} procesados`
+        : status==="NEW"||status==="PENDING"||status==="READY"
+          ? "Esperando asignación del ejecutor"
+          : row.error||researchStatusLabels[status]||status;
+    return `<article class="research-run ${researchStatusClass(status)}">
+      <div class="research-run-mark">${status==="IN_PROGRESS"?'<span class="research-spinner"></span>':status==="DONE"?"✓":status==="BLOCKED"||status==="FAILED"?"!":"⌛"}</div>
+      <div class="research-run-main">
+        <div class="research-run-heading"><div><strong>${esc(researchRequestTitle(row))}</strong><p>${esc(details)}</p></div><span class="research-status-chip ${researchStatusClass(status)}">${esc(researchStatusLabels[status]||status)}</span></div>
+        <div class="research-run-meta"><span>${esc(coverage)}</span>${request.destination?`<span>Destino: ${esc(request.destination)}</span>`:""}<span>${esc(relativeDate(row.updatedAt||row.createdAt))}</span></div>
+        <div class="research-progress"><i style="width:${Math.max(0,Math.min(100,Number(progress.percent)||0))}%"></i></div>
+        <small class="research-progress-copy">${esc(progressCopy)}</small>
+      </div>
+    </article>`;
+  }).join("");
+}
+
 function renderAll() {
   renderMetrics();
   populateRubroFilter();
@@ -344,6 +422,7 @@ function renderAll() {
   renderQueue();
   renderChannels();
   renderSync();
+  renderResearch();
 }
 
 async function loadData(silent=false) {
@@ -512,6 +591,9 @@ async function enqueueResearch() {
     const payload=await response.json();
     if(!response.ok) throw new Error(payload.error);
     toast(payload.deduplicated?"La tarea de hoy ya estaba registrada.":"Próximo lote de research registrado.");
+    await loadData(true);
+    switchView("research");
+    $("#research-run-list").scrollIntoView({behavior:"smooth",block:"start"});
   } catch(error) { toast(error.message||"No se pudo registrar la tarea.",true); }
 }
 
@@ -523,7 +605,7 @@ function showResearchResult(message,isError=false) {
 }
 
 async function createResearchRequest(input,button) {
-  const original=button.textContent;
+  const original=button.innerHTML;
   button.disabled=true;
   button.classList.add("is-loading");
   button.textContent="Registrando…";
@@ -534,6 +616,8 @@ async function createResearchRequest(input,button) {
     const request=payload.request||{};
     showResearchResult(`${payload.deduplicated?"Este pedido ya estaba registrado":"Tarea creada"}: ${request.quantity} ${request.businessType} · ${request.industry} · ${request.location}. Quedó pendiente para el ejecutor de research.`);
     toast(payload.deduplicated?"El pedido ya existía en la cola.":"Pedido agregado a Task_Commands.");
+    await loadData(true);
+    $("#research-run-list").scrollIntoView({behavior:"smooth",block:"start"});
   } catch(error) {
     const message=error.message==="RESEARCH_INDUSTRY_REQUIRED"?"Indicá el rubro que querés investigar.":error.message;
     showResearchResult(message||"No se pudo registrar el pedido.",true);
@@ -541,28 +625,63 @@ async function createResearchRequest(input,button) {
   } finally {
     button.disabled=false;
     button.classList.remove("is-loading");
-    button.textContent=original;
+    button.innerHTML=original;
   }
-}
-
-async function submitResearchChat(event) {
-  event.preventDefault();
-  const prompt=$("#research-prompt").value.trim();
-  if(!prompt) return showResearchResult("Escribí qué empresas querés buscar.",true);
-  await createResearchRequest({prompt},$("#research-chat-submit"));
 }
 
 async function submitResearchForm(event) {
   event.preventDefault();
   await createResearchRequest({
+    batchName:$("#research-batch-name").value,
     quantity:Number($("#research-quantity").value),
+    priority:$("#research-priority").value,
     businessType:$("#research-business-type").value,
     industry:$("#research-industry").value,
-    location:$("#research-location").value,
+    employeeSize:$("#research-employee-size").value,
+    country:$("#research-country").value,
+    region:$("#research-region").value,
+    excludeLargeCorporations:$("#research-exclude-large").checked,
     reviews:$("#research-reviews").value,
+    minimumReviews:Number($("#research-minimum-reviews").value),
     contact:$("#research-contact").value,
+    destination:$("#research-destination").value,
     objective:$("#research-objective").value
   },$("#research-form-submit"));
+}
+
+function selectedText(selector) {
+  const node=$(selector);
+  return node?.options?.[node.selectedIndex]?.textContent?.trim()||node?.value||"—";
+}
+
+function updateResearchPreview() {
+  const quantity=Math.max(1,Number($("#research-quantity").value)||1);
+  const type=selectedText("#research-business-type").toLocaleLowerCase("es-AR");
+  const country=selectedText("#research-country");
+  const region=$("#research-region").value;
+  $("#research-preview-priority").textContent=$("#research-priority").value;
+  $("#research-preview-title").textContent=`${quantity} ${type}`;
+  $("#research-preview-subtitle").textContent=`${selectedText("#research-industry")} · ${region?`${region}, `:""}${country}`;
+  $("#research-preview-size").textContent=selectedText("#research-employee-size");
+  const reviewsEnabled=$("#research-reviews").value!=="none";
+  $("#research-minimum-reviews").disabled=!reviewsEnabled;
+  $("#research-preview-reviews").textContent=reviewsEnabled?`1–3 estrellas · mínimo ${$("#research-minimum-reviews").value}`:"Sin análisis";
+  $("#research-preview-contact").textContent=selectedText("#research-contact");
+  $("#research-preview-destination").textContent=selectedText("#research-destination");
+}
+
+function alignResearchDefaults() {
+  const type=$("#research-business-type").value;
+  if(type==="logisticas") {
+    $("#research-industry").value="Logística y transporte";
+    $("#research-destination").value="Logisticas_LATAM";
+  } else if(type==="distribuidoras") {
+    if($("#research-industry").value==="Logística y transporte") $("#research-industry").value="Alimentos y bebidas";
+    $("#research-destination").value="Distribuidoras_300";
+  } else if($("#research-destination").value!=="Prospectos_Custom") {
+    $("#research-destination").value="Prospectos_Custom";
+  }
+  updateResearchPreview();
 }
 
 async function prepareApolloPilot() {
@@ -602,8 +721,10 @@ $("#refresh-button").addEventListener("click",()=>loadData());
 $("#sync-button").addEventListener("click",requestSync);
 $("#hero-sync").addEventListener("click",requestSync);
 $("#continue-research").addEventListener("click",enqueueResearch);
-$("#research-chat-form").addEventListener("submit",submitResearchChat);
 $("#research-form").addEventListener("submit",submitResearchForm);
+$("#research-refresh").addEventListener("click",()=>loadData());
+$("#research-business-type").addEventListener("change",alignResearchDefaults);
+$$('#research-form input, #research-form select').forEach(node=>node.addEventListener(node.matches('input[type="text"], input[type="number"]')?"input":"change",updateResearchPreview));
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
 $("#wa-refresh").addEventListener("click",()=>loadWhatsapp());
 let waSearchTimer;
@@ -631,6 +752,7 @@ $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
 const initialView=["prospects","research","whatsapp","activity","channels","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+updateResearchPreview();
 switchView(initialView);
 loadData();
 setInterval(()=>loadData(true),30_000);
