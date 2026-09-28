@@ -131,6 +131,17 @@ export async function updateOutreachQueue(rowNumber,row) {
   ]);
 }
 
+export async function updateProspectMessage(rowNumber,channel,message) {
+  if(!Number.isInteger(rowNumber)||rowNumber<2) throw new Error("PROSPECT_ROW_INVALID");
+  const normalizedChannel=String(channel||"").toUpperCase();
+  if(!["EMAIL","WHATSAPP"].includes(normalizedChannel)) throw new Error("CHANNEL_INVALID");
+  const column=normalizedChannel==="EMAIL"?"L":"K";
+  await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`Distribuidoras_300!${column}${rowNumber}`,[
+    String(message||"").trim()
+  ]);
+  return {rowNumber,column,channel:normalizedChannel};
+}
+
 async function batchGet(spreadsheetId,ranges,token) {
   const url=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet`);
   ranges.forEach(range=>url.searchParams.append("ranges",range));

@@ -44,9 +44,16 @@
 
       <section class="view is-active" id="prospects">
         <div class="hero-row">
-          <div><p class="eyebrow">Base comercial unificada</p><h2>Todo el trabajo, sin volver a la planilla</h2><p>Filtrá, revisá el análisis, copiá contactos y gestioná cada canal desde una única pantalla.</p></div>
+          <div><p class="eyebrow">Base comercial unificada</p><h2>Encontrá una empresa y escribile</h2><p>Todo está en un solo lugar. Buscá, elegí un contacto y presioná <strong>Escribir</strong>.</p></div>
           <div class="hero-actions"><button class="button button-secondary" id="continue-research">Continuar research</button><button class="button button-primary" id="hero-sync">Actualizar desde Sheets</button></div>
         </div>
+        <section class="simple-guide" aria-label="Cómo usar el panel">
+          <article><span>1</span><div><strong>Buscá</strong><p>Escribí el nombre o elegí un filtro.</p></div></article>
+          <i aria-hidden="true">→</i>
+          <article><span>2</span><div><strong>Elegí</strong><p>Abrí la empresa que te interesa.</p></div></article>
+          <i aria-hidden="true">→</i>
+          <article><span>3</span><div><strong>Escribí</strong><p>Editá y guardá el mensaje.</p></div></article>
+        </section>
         <div class="metrics" id="metrics"></div>
         <section class="workspace" id="workspace">
           <div class="workspace-head">
@@ -58,7 +65,7 @@
               <button class="clear-filters" id="clear-filters">Limpiar</button>
             </div>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro / ubicación</th><th>Contacto</th><th>Señal detectada</th><th>Estado</th><th></th></tr></thead><tbody id="prospect-body"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Rubro y ubicación</th><th>Contacto</th><th>Qué podemos mejorar</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="prospect-body"></tbody></table></div>
           <div class="pagination"><span id="page-label">—</span><div><button id="page-prev" aria-label="Página anterior">←</button><button id="page-next" aria-label="Página siguiente">→</button></div></div>
         </section>
       </section>
@@ -188,7 +195,7 @@
   <aside class="drawer" id="drawer" aria-hidden="true">
     <div class="drawer-head"><div><span class="drawer-kicker" id="drawer-rubro">—</span><h2 id="drawer-company">—</h2><p id="drawer-location">—</p></div><button class="close-button" data-close="drawer" aria-label="Cerrar ficha">×</button></div>
     <div class="drawer-scroll">
-      <section class="contact-panel"><h3>Contacto</h3><div id="drawer-contacts"></div></section>
+      <section class="contact-panel"><div class="contact-panel-title"><div><h3>¿Cómo querés contactarlo?</h3><p>Elegí un canal o copiá el dato.</p></div></div><div id="drawer-contacts"></div></section>
       <section class="detail-section"><div class="section-title"><h3>Análisis del negocio</h3><span id="drawer-rating" class="rating"></span></div><p id="drawer-analysis"></p></section>
       <section class="detail-section"><div class="section-title"><h3>Reseñas críticas</h3><span id="drawer-reviews" class="meta-tag"></span></div><p id="drawer-problems"></p></section>
       <section class="message-tabs">
@@ -196,23 +203,24 @@
         <div class="message-card"><div class="message-meta"><span id="message-channel">EMAIL</span><button id="copy-message">Copiar mensaje</button></div><pre id="message-preview"></pre></div>
       </section>
     </div>
-    <div class="drawer-actions"><p id="drawer-send-status" class="drawer-send-status">Verificando requisitos…</p><button class="button button-secondary" id="drawer-web">Abrir web ↗</button><button class="button button-primary" id="open-send">Revisar y enviar</button></div>
+    <div class="drawer-actions"><p id="drawer-send-status" class="drawer-send-status">Verificando requisitos…</p><button class="button button-secondary" id="drawer-web">Ver sitio web</button><button class="button button-primary" id="open-send">Escribir mensaje</button></div>
   </aside>
   <div class="scrim" id="scrim" data-close="drawer"></div>
 
   <dialog id="send-dialog">
     <form method="dialog" class="send-modal" id="send-form">
-      <div class="modal-head"><div><p class="eyebrow">Confirmación humana</p><h2 id="send-title">Enviar mensaje</h2></div><button type="button" class="close-button" data-modal-close aria-label="Cerrar">×</button></div>
+      <div class="modal-head"><div><p class="eyebrow" id="composer-kicker">Mensaje nuevo</p><h2 id="send-title">Escribir mensaje</h2></div><button type="button" class="close-button" data-modal-close aria-label="Cerrar">×</button></div>
+      <div class="composer-channel-switch" role="tablist" aria-label="Canal del mensaje"><button type="button" data-composer-channel="EMAIL">Email</button><button type="button" data-composer-channel="WHATSAPP">WhatsApp</button></div>
       <div class="recipient-box"><span>Destinatario</span><strong id="send-recipient">—</strong><button type="button" id="copy-recipient">Copiar</button></div>
-      <label class="message-editor">Mensaje<textarea id="send-message" rows="10"></textarea></label>
+      <label class="message-editor"><span>Tu mensaje</span><textarea id="send-message" rows="10" placeholder="Escribí el mensaje acá…"></textarea></label>
       <div class="wa-optin" id="wa-optin">
         <span>Consentimiento de WhatsApp</span>
-        <strong id="optin-status">Sin opt-in inbound durable y reconciliado</strong>
-        <p>El consentimiento se importa desde un evento entrante verificable; no puede autodeclararse en el dashboard.</p>
+        <strong id="optin-status">Este contacto todavía no escribió por WhatsApp</strong>
+        <p>El permiso se detecta automáticamente cuando el contacto inicia la conversación.</p>
       </div>
-      <div class="send-guard"><span>✓</span><p>Se enviará una sola vez. Si el proveedor devuelve un resultado incierto, el sistema bloqueará el reintento.</p></div>
+      <div class="send-guard"><span>✓</span><p>Primero podés guardar el borrador. El botón de envío se habilita cuando el contacto, la revisión y el canal están listos.</p></div>
       <div class="modal-error" id="send-error" role="alert"></div>
-      <div class="modal-actions"><button type="button" class="button button-secondary" data-modal-close>Cancelar</button><button type="submit" class="button button-primary" id="confirm-send">Confirmar envío</button></div>
+      <div class="modal-actions"><button type="button" class="button button-quiet" data-modal-close>Cerrar</button><button type="button" class="button button-secondary" id="save-draft">Guardar borrador</button><button type="submit" class="button button-primary" id="confirm-send">Enviar ahora</button></div>
     </form>
   </dialog>
 
