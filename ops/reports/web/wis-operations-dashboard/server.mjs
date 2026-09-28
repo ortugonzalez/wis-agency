@@ -775,7 +775,7 @@ const server=createServer(async(req,res)=>{
       const recipient=channel==="EMAIL"?prospect.email:prospect.whatsapp;
       if(!recipient) return json(res,400,{ok:false,error:"RECIPIENT_MISSING"});
       if(!sheetsWriteConfigured()) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
-      await updateProspectMessage(rowNumber,channel,message);
+      const draftStorage=await updateProspectMessage(rowNumber,channel,message);
       const snapshot=await readJson(sheetSnapshotPath,{});
       const cached=(snapshot.prospects||[]).find(row=>Number(row.rowNumber)===rowNumber);
       if(cached) {
@@ -788,7 +788,7 @@ const server=createServer(async(req,res)=>{
       let eventLogged=true;
       try { await appendEvent({messageId:`DRAFT-${rowNumber}-${channel}`,rowNumber,empresa:prospect.empresa,channel,recipient,eventType:"DRAFT_SAVED",fromStatus:"BORRADOR",toStatus:"BORRADOR",detail:"Borrador actualizado desde el dashboard",actor:"human-dashboard",source:"DASHBOARD",evidence:`message_sha256=${hash(message)}`}); }
       catch { eventLogged=false; }
-      return json(res,200,{ok:true,rowNumber,channel,savedAt,messageHash:hash(message),eventLogged});
+      return json(res,200,{ok:true,rowNumber,channel,savedAt,messageHash:hash(message),eventLogged,draftStorage});
     }
     if(url.pathname==="/api/research/request"&&req.method==="POST") {
       assertMutationRequest(req);
