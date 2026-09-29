@@ -207,18 +207,33 @@
           <div class="cost-breakdown-grid"><div><h4>Por proveedor</h4><div id="cost-provider-list" class="cost-bars"></div></div><div><h4>Por etapa</h4><div id="cost-stage-list" class="cost-bars"></div></div></div>
         </section>
 
+        <section class="workspace maps-audit-card">
+          <div class="maps-audit-head"><div><p class="eyebrow">Cargo identificado</p><h3>Agosto 2026 · Google Places</h3><p>El gasto de aproximadamente US$ 35 provino del proyecto <strong>WIS Prospección B2B</strong>.</p></div><strong class="maps-audit-total">US$ 32,24</strong></div>
+          <div class="maps-audit-formula">
+            <article><span>Consultas registradas</span><strong>1.921</strong><small>Text Search Enterprise</small></article>
+            <i>−</i><article><span>Cuota sin cargo</span><strong>1.000</strong><small>por mes y cuenta</small></article>
+            <i>=</i><article><span>Consultas cobradas</span><strong>921</strong><small>a US$ 0,035</small></article>
+            <i>→</i><article class="is-result"><span>Subtotal facturado</span><strong>US$ 32,24</strong><small>sin impuesto informado</small></article>
+          </div>
+          <p class="cost-footnote">SKU E967-44BC-B44D · La categoría Enterprise se activa si Text Search solicita, entre otros, rating, cantidad de valoraciones, teléfono o web. Si hubiese solicitado reseñas por API, el cargo habría figurado como Enterprise + Atmosphere.</p>
+        </section>
+
         <section class="workspace simulator-card">
-          <div class="workspace-head"><div><p class="eyebrow">Simulador de escala</p><h3>Probá cuánto costaría el próximo lote</h3><p>Cambiá los campos. No ejecuta nada ni genera cargos.</p></div><span class="meta-tag">Estimación</span></div>
+          <div class="workspace-head"><div><p class="eyebrow">Simulador de escala</p><h3>Probá cuánto costaría el próximo lote</h3><p>Separá descubrimiento y enriquecimiento para no pagar Enterprise en cada búsqueda.</p></div><label class="sim-profile"><span>Escenario rápido</span><select id="sim-maps-profile"><option value="optimized">Optimizado · 300 prospectos</option><option value="historical">Reproducir agosto</option><option value="custom">Personalizado</option></select></label></div>
           <form id="cost-simulator" class="simulator-form">
             <label><span>Prospectos</span><select id="sim-prospects"><option value="300">300</option><option value="1000">1.000</option><option value="10000">10.000</option></select></label>
             <label><span>Modelo</span><select id="sim-model"><option value="gpt-6-luna">Luna · económico</option><option value="gpt-6-sol">Sol · equilibrado</option><option value="gpt-6-astra">Astra · máximo análisis</option></select></label>
             <label><span>Procesamiento</span><select id="sim-tier"><option value="batch">Batch · menor costo</option><option value="standard">Inmediato</option></select></label>
             <label><span>Búsquedas web por prospecto</span><input id="sim-web" type="number" min="0" max="20" step="1" value="0" /></label>
-            <label><span>Consultas Maps por prospecto</span><input id="sim-maps" type="number" min="0" max="20" step="1" value="0" /></label>
+            <label><span>Datos en Text Search</span><select id="sim-places-search-service"><option value="places-text-search-ids-only">Sólo IDs · sin cargo</option><option value="places-text-search-pro" selected>Nombre y ubicación · Pro</option><option value="places-text-search-enterprise">Rating, teléfono o web · Enterprise</option><option value="places-text-search-enterprise-atmosphere">Reseñas · Enterprise + Atmosphere</option></select></label>
+            <label><span>Consultas Text Search totales</span><input id="sim-places-search-calls" type="number" min="0" max="100000" step="1" value="60" /></label>
+            <label><span>Datos de cada finalista</span><select id="sim-place-details-service"><option value="place-details-ids-only">Sólo ID · sin cargo</option><option value="place-details-essentials">Datos básicos · Essentials</option><option value="place-details-pro">Nombre, dirección y Maps · Pro</option><option value="place-details-enterprise">Rating, teléfono y web · Enterprise</option><option value="place-details-enterprise-atmosphere" selected>Rating y reseñas · Enterprise + Atmosphere</option></select></label>
+            <label><span>Consultas Place Details totales</span><input id="sim-place-details-calls" type="number" min="0" max="100000" step="1" value="300" /></label>
             <label><span>Emails por prospecto</span><input id="sim-email" type="number" min="0" max="3" step="1" value="1" /></label>
           </form>
           <div class="simulator-result"><div><span>Costo total estimado</span><strong id="sim-total">US$ 0,00</strong></div><div><span>Por prospecto</span><strong id="sim-per-prospect">US$ 0,00</strong></div><div id="sim-breakdown" class="sim-breakdown"></div></div>
-          <p class="cost-footnote">La estimación usa 15.000 tokens de entrada, 2.500 de salida y 50% de caché por prospecto. Las cuotas gratuitas de Google Places se descuentan antes de calcular.</p>
+          <div class="maps-usage-detail" id="sim-maps-detail"></div>
+          <p class="cost-footnote">La estimación usa 15.000 tokens de entrada, 2.500 de salida y 50% de caché por prospecto. Aplica las cuotas gratuitas actuales de Google Places a nivel mensual; la factura real siempre prevalece.</p>
         </section>
 
         <div class="cost-layout">

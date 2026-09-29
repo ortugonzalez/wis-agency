@@ -1,6 +1,6 @@
 const DAY=86_400_000;
 
-export const PRICING_VERSION="2026-09-28";
+export const PRICING_VERSION="2026-09-24";
 export const PRICING={
   "openai:gpt-6-astra:standard":{kind:"tokens",input:10,cachedInput:1,cacheWrite:12.5,output:50,label:"GPT-6 Astra · Standard"},
   "openai:gpt-6-sol:standard":{kind:"tokens",input:2,cachedInput:.2,cacheWrite:2.5,output:10,label:"GPT-6 Sol · Standard"},
@@ -9,12 +9,25 @@ export const PRICING={
   "openai:gpt-6-sol:batch":{kind:"tokens",input:1,cachedInput:.1,cacheWrite:1.25,output:5,label:"GPT-6 Sol · Batch"},
   "openai:gpt-6-luna:batch":{kind:"tokens",input:.05,cachedInput:.005,cacheWrite:.0625,output:.25,label:"GPT-6 Luna · Batch"},
   "openai:web-search:standard":{kind:"units",unitPrice:.01,unitName:"búsqueda",label:"OpenAI Web Search"},
-  "google:places-text-search-pro:standard":{kind:"units",unitPrice:.032,unitName:"consulta",label:"Google Places Text Search Pro",freeMonthly:5000},
-  "google:place-details-enterprise-atmosphere:standard":{kind:"units",unitPrice:.025,unitName:"consulta",label:"Google Place Details Enterprise + Atmosphere",freeMonthly:1000},
+  "google:places-text-search-ids-only:standard":{kind:"units",unitPrice:0,unitName:"consulta",label:"Google Places Text Search Essentials · IDs Only",freeMonthly:null,sku:"635D-A9DD-C520"},
+  "google:places-text-search-pro:standard":{kind:"units",unitPrice:.032,unitName:"consulta",label:"Google Places Text Search Pro",freeMonthly:5000,sku:"4FDA-34B1-A910"},
+  "google:places-text-search-enterprise:standard":{kind:"units",unitPrice:.035,unitName:"consulta",label:"Google Places Text Search Enterprise",freeMonthly:1000,sku:"E967-44BC-B44D"},
+  "google:places-text-search-enterprise-atmosphere:standard":{kind:"units",unitPrice:.04,unitName:"consulta",label:"Google Places Text Search Enterprise + Atmosphere",freeMonthly:1000,sku:"120C-BEC3-B48F"},
+  "google:place-details-ids-only:standard":{kind:"units",unitPrice:0,unitName:"consulta",label:"Google Place Details Essentials · IDs Only",freeMonthly:null,sku:"5C36-E272-E88F"},
+  "google:place-details-essentials:standard":{kind:"units",unitPrice:.005,unitName:"consulta",label:"Google Place Details Essentials",freeMonthly:10000,sku:"6E05-E1C3-8D85"},
+  "google:place-details-pro:standard":{kind:"units",unitPrice:.017,unitName:"consulta",label:"Google Place Details Pro",freeMonthly:5000,sku:"4ED6-464A-2AFC"},
+  "google:place-details-enterprise:standard":{kind:"units",unitPrice:.02,unitName:"consulta",label:"Google Place Details Enterprise",freeMonthly:1000,sku:"2D9A-3DE0-3766"},
+  "google:place-details-enterprise-atmosphere:standard":{kind:"units",unitPrice:.025,unitName:"consulta",label:"Google Place Details Enterprise + Atmosphere",freeMonthly:1000,sku:"EB23-5ECC-F753"},
   "brevo:transactional-email:standard":{kind:"units",unitPrice:.0018,unitName:"email",label:"Brevo Starter estimado"},
   "whatsapp:baileys:standard":{kind:"units",unitPrice:0,unitName:"mensaje",label:"WhatsApp por Baileys"},
   "google:sheets-api:standard":{kind:"units",unitPrice:0,unitName:"operación",label:"Google Sheets API"}
 };
+
+export const HISTORICAL_COST_AUDITS=[{
+  period:"2026-08",provider:"Google Cloud",project:"WIS Prospeccion B2B",service:"Places API (New)",
+  sku:"E967-44BC-B44D",skuName:"Places API Text Search Enterprise",units:1921,freeUnits:1000,billableUnits:921,
+  unitPriceUsd:.035,subtotalUsd:32.24,taxUsd:null,region:"us-central2",source:"Google Cloud Billing report"
+}];
 
 const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 const clean=(value,max=240)=>String(value??"").replace(/[\u0000-\u001f\u007f]/g," ").replace(/\s+/g," ").trim().slice(0,max);
@@ -63,6 +76,32 @@ export function normalizeCostRecord(input={},now=new Date()) {
 function monthKey(date) { return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,"0")}`; }
 function safeDivide(a,b) { return b>0?money(a/b):null; }
 
+function applyMonthlyFreeTiers(records=[]) {
+  const consumed=new Map();
+  return records.slice().sort((a,b)=>a.timestamp.localeCompare(b.timestamp)).map(row=>{
+    const price=PRICING[pricingKey(row)];
+    const units=Math.max(0,finite(row.units));
+    const key=`${monthKey(new Date(row.timestamp))}:${pricingKey(row)}`;
+    const before=consumed.get(key)||0;
+    consumed.set(key,before+units);
+    const providerMeasured=row.providerCostUsd!==""&&row.providerCostUsd!==null&&row.providerCostUsd!==undefined;
+    if(!price||price.kind!=="units"||!Number.isFinite(price.freeMonthly)||providerMeasured) return {...row,effectiveCostUsd:row.calculatedCostUsd,freeUnitsApplied:0};
+    const freeUnitsApplied=Math.min(units,Math.max(0,price.freeMonthly-before));
+    return {...row,freeUnitsApplied,effectiveCostUsd:money((units-freeUnitsApplied)*price.unitPrice)};
+  });
+}
+
+function estimateMeteredSku(service,units) {
+  const cleanService=clean(service,100).toLowerCase();
+  const price=PRICING[`google:${cleanService}:standard`];
+  const requested=Math.max(0,finite(units));
+  if(!price||price.kind!=="units") return {service:cleanService,label:cleanService||"Sin uso",units:requested,freeCap:0,freeApplied:0,billableUnits:requested,costUsd:0};
+  const freeCap=Number.isFinite(price.freeMonthly)?price.freeMonthly:null;
+  const freeApplied=freeCap===null?requested:Math.min(requested,freeCap);
+  const billableUnits=Math.max(0,requested-freeApplied);
+  return {service:cleanService,label:price.label,sku:price.sku||"",units:requested,freeCap,freeApplied,billableUnits,unitPriceUsd:price.unitPrice,costUsd:money(billableUnits*price.unitPrice)};
+}
+
 export function normalizeCostSettings(rows=[],env={}) {
   const map=Object.fromEntries((rows||[]).map(row=>[String(row.key||row.setting_key||"").trim(),row.value]));
   return {
@@ -76,12 +115,12 @@ export function normalizeCostSettings(rows=[],env={}) {
 
 export function buildCostAnalytics(records=[],settingsInput={},context={},now=new Date()) {
   const settings={currency:"USD",monthlyBudgetUsd:150,fixedMonthlyUsd:0,alertThresholds:[50,75,90,100],...settingsInput};
-  const normalized=(records||[]).map(row=>{
+  const normalized=applyMonthlyFreeTiers((records||[]).map(row=>{
     try { return normalizeCostRecord(row,new Date(row.timestamp||now)); } catch { return null; }
-  }).filter(Boolean);
+  }).filter(Boolean));
   const thisMonth=monthKey(now);
   const mtd=normalized.filter(row=>monthKey(new Date(row.timestamp))===thisMonth);
-  const variableMtd=money(mtd.reduce((sum,row)=>sum+row.calculatedCostUsd,0));
+  const variableMtd=money(mtd.reduce((sum,row)=>sum+(row.effectiveCostUsd??row.calculatedCostUsd),0));
   const daysInMonth=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,0)).getUTCDate();
   const elapsed=Math.max(1,now.getUTCDate());
   const fixedAccrued=money(settings.fixedMonthlyUsd*elapsed/daysInMonth);
@@ -96,7 +135,7 @@ export function buildCostAnalytics(records=[],settingsInput={},context={},now=ne
   for(const row of mtd) {
     const provider=row.provider||"otro";
     const stage=row.stage||"OTHER";
-    const add=(map,key)=>{const value=map.get(key)||{key,costUsd:0,records:0,units:0};value.costUsd=money(value.costUsd+row.calculatedCostUsd);value.records++;value.units+=row.units||0;map.set(key,value);};
+    const add=(map,key)=>{const value=map.get(key)||{key,costUsd:0,records:0,units:0};value.costUsd=money(value.costUsd+(row.effectiveCostUsd??row.calculatedCostUsd));value.records++;value.units+=row.units||0;map.set(key,value);};
     add(providerMap,provider);add(stageMap,stage);
   }
   const prospects=new Set(mtd.map(row=>row.prospectKey||row.sourceRow&&`row-${row.sourceRow}`).filter(Boolean)).size;
@@ -111,13 +150,14 @@ export function buildCostAnalytics(records=[],settingsInput={},context={},now=ne
   if(inputTokens&&cachedTokens/inputTokens<.5) recommendations.push({level:"HIGH",title:"Aumentar prompt caching",detail:`Sólo ${Math.round(cachedTokens/inputTokens*100)}% del input está cacheado. Objetivo recomendado: 50% o más.`});
   if(mtd.some(row=>row.provider==="openai"&&row.pricingTier!=="batch"&&/RESEARCH|COPY/.test(row.stage))) recommendations.push({level:"MEDIUM",title:"Mover trabajo no urgente a Batch",detail:"Research y redacción asincrónica pueden reducir aproximadamente a la mitad el costo del modelo."});
   if(mtd.some(row=>row.model.includes("astra")&&!/EXCEPTION|QA/.test(row.stage))) recommendations.push({level:"HIGH",title:"Reservar Astra para excepciones",detail:"Usá Luna para extracción y Sol para casos ambiguos; Astra sólo para revisión compleja."});
+  recommendations.push({level:"HIGH",title:"Separar descubrimiento y enriquecimiento en Google Maps",detail:"Usá Text Search IDs/Pro para descubrir candidatos y pedí rating, teléfono, web o reseñas sólo para finalistas. Un campo Enterprise eleva el precio de toda la consulta."});
   if(!normalized.length) recommendations.push({level:"INFO",title:"Empezar a medir desde el próximo lote",detail:"El panel está listo, pero todavía no recibió consumos del ejecutor de research/copy."});
   return {
     pricingVersion:PRICING_VERSION,settings,records:normalized.slice().sort((a,b)=>b.timestamp.localeCompare(a.timestamp)).slice(0,500),
     summary:{variableMtd,fixedAccrued,spendMtd,projectedMonth,budgetUsedPct,projectedBudgetPct,alertLevel,daysElapsed:elapsed,daysInMonth},
     unitEconomics:{measuredProspects:prospects,qualified,replies,meetings,costPerProspect:hasMeasuredCost?safeDivide(spendMtd,prospects):null,costPerQualified:hasMeasuredCost?safeDivide(spendMtd,qualified):null,costPerReply:hasMeasuredCost?safeDivide(spendMtd,replies):null,costPerMeeting:hasMeasuredCost?safeDivide(spendMtd,meetings):null},
     tokens:{input:inputTokens,cachedInput:cachedTokens,output:outputTokens,reasoning:mtd.reduce((sum,row)=>sum+row.reasoningTokens,0),cacheRate:inputTokens?Math.round(cachedTokens/inputTokens*1000)/10:0,webSearches:mtd.filter(row=>row.provider==="openai"&&row.service==="web-search").reduce((sum,row)=>sum+row.units,0)},
-    byProvider:[...providerMap.values()].sort((a,b)=>b.costUsd-a.costUsd),byStage:[...stageMap.values()].sort((a,b)=>b.costUsd-a.costUsd),recommendations,
+    byProvider:[...providerMap.values()].sort((a,b)=>b.costUsd-a.costUsd),byStage:[...stageMap.values()].sort((a,b)=>b.costUsd-a.costUsd),recommendations,historicalAudits:HISTORICAL_COST_AUDITS,
     sources:{measured:normalized.length>0,ledgerRows:normalized.length,pricingVersion:PRICING_VERSION,modelPricing:"OpenAI official pricing",providerInvoices:"Provider cost overrides calculated estimates when supplied"}
   };
 }
@@ -131,10 +171,13 @@ export function estimateScenario(input={}) {
   const outputTokens=Math.max(0,finite(input.outputTokensPerProspect,2500))*prospects;
   const ai=calculateUsageCost({provider:"openai",service:model,model,pricingTier,inputTokens,cachedInputTokens:inputTokens*cacheRate,outputTokens});
   const web=calculateUsageCost({provider:"openai",service:"web-search",pricingTier:"standard",units:Math.max(0,finite(input.webSearchesPerProspect,0))*prospects});
-  const placesText=Math.max(0,Math.max(0,finite(input.placesTextPerProspect,0))*prospects-5000)*.032;
-  const placeDetails=Math.max(0,Math.max(0,finite(input.placeDetailsPerProspect,0))*prospects-1000)*.025;
+  const placesTextCalls=input.placesTextCalls!==undefined?finite(input.placesTextCalls):Math.max(0,finite(input.placesTextPerProspect,0))*prospects;
+  const placeDetailsCalls=input.placeDetailsCalls!==undefined?finite(input.placeDetailsCalls):Math.max(0,finite(input.placeDetailsPerProspect,0))*prospects;
+  const placesText=estimateMeteredSku(input.placesTextService||"places-text-search-pro",placesTextCalls);
+  const placeDetails=estimateMeteredSku(input.placeDetailsService||"place-details-enterprise-atmosphere",placeDetailsCalls);
   const emails=Math.max(0,finite(input.emailsPerProspect,1))*prospects*.0018;
   const fixed=Math.max(0,finite(input.fixedMonthlyUsd,0));
-  const total=money(ai+web+placesText+placeDetails+emails+fixed);
-  return {prospects,totalUsd:total,costPerProspect:safeDivide(total,prospects),breakdown:{ai:money(ai),webSearch:money(web),places:money(placesText+placeDetails),email:money(emails),fixed:money(fixed)}};
+  const places=money(placesText.costUsd+placeDetails.costUsd);
+  const total=money(ai+web+places+emails+fixed);
+  return {prospects,totalUsd:total,costPerProspect:safeDivide(total,prospects),breakdown:{ai:money(ai),webSearch:money(web),places,email:money(emails),fixed:money(fixed)},placesUsage:{textSearch:placesText,placeDetails}};
 }
