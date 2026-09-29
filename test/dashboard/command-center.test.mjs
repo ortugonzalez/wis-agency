@@ -209,3 +209,28 @@ test("simulador descuenta cuotas gratuitas de Places y devuelve costo unitario",
   assert.ok(estimate.totalUsd>0);
   assert.ok(Math.abs(estimate.costPerProspect-estimate.totalUsd/300)<1e-8);
 });
+
+test("reproduce exactamente el cargo histórico de Google Places de agosto",()=>{
+  const estimate=estimateScenario({prospects:300,model:"gpt-6-luna",pricingTier:"batch",inputTokensPerProspect:0,outputTokensPerProspect:0,emailsPerProspect:0,placesTextService:"places-text-search-enterprise",placesTextCalls:1921,placeDetailsCalls:0});
+  assert.equal(estimate.placesUsage.textSearch.freeApplied,1000);
+  assert.equal(estimate.placesUsage.textSearch.billableUnits,921);
+  assert.equal(Math.round(estimate.breakdown.places*100)/100,32.24);
+});
+
+test("modelo optimizado mantiene 300 prospectos dentro de las cuotas gratuitas",()=>{
+  const estimate=estimateScenario({prospects:300,model:"gpt-6-luna",pricingTier:"batch",inputTokensPerProspect:0,outputTokensPerProspect:0,emailsPerProspect:0,placesTextService:"places-text-search-pro",placesTextCalls:60,placeDetailsService:"place-details-enterprise-atmosphere",placeDetailsCalls:300});
+  assert.equal(estimate.breakdown.places,0);
+  assert.equal(estimate.placesUsage.textSearch.freeApplied,60);
+  assert.equal(estimate.placesUsage.placeDetails.freeApplied,300);
+});
+
+test("agrega la cuota gratuita mensual antes de proyectar gasto medido",()=>{
+  const records=[
+    {provider:"google",service:"places-text-search-enterprise",units:800,timestamp:"2026-09-01T12:00:00.000Z"},
+    {provider:"google",service:"places-text-search-enterprise",units:300,timestamp:"2026-09-02T12:00:00.000Z"}
+  ];
+  const analytics=buildCostAnalytics(records,{monthlyBudgetUsd:100,fixedMonthlyUsd:0},{},new Date("2026-09-15T12:00:00.000Z"));
+  assert.equal(analytics.summary.variableMtd,3.5);
+  assert.equal(analytics.records.find(row=>row.units===800).effectiveCostUsd,0);
+  assert.equal(analytics.records.find(row=>row.units===300).effectiveCostUsd,3.5);
+});

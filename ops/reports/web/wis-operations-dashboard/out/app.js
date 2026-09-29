@@ -197,7 +197,7 @@ function renderCosts() {
   $("#cost-stage-list").innerHTML=costBarRows(costs.byStage);
   $("#pricing-version").textContent=`Tarifas ${costs.pricingVersion||"—"}`;
   $("#cost-recommendations").innerHTML=(costs.recommendations||[]).map(item=>`<article class="recommendation is-${String(item.level||"info").toLowerCase()}"><span>${item.level==="HIGH"?"!":item.level==="MEDIUM"?"↗":"i"}</span><div><strong>${esc(item.title)}</strong><p>${esc(item.detail)}</p></div></article>`).join("")||'<div class="cost-empty">No hay recomendaciones pendientes.</div>';
-  $("#cost-ledger").innerHTML=(costs.records||[]).slice(0,12).map(row=>`<article><span class="ledger-provider">${esc(row.provider)}</span><div><strong>${esc(row.empresa||row.stage||row.operationId||"Operación")}</strong><p>${esc([row.service,row.stage,row.model].filter(Boolean).join(" · "))}</p></div><b>${esc(usd(row.calculatedCostUsd))}</b><time>${esc(relativeDate(row.timestamp))}</time></article>`).join("")||'<div class="cost-empty">El próximo research, borrador o envío aparecerá aquí automáticamente.</div>';
+  $("#cost-ledger").innerHTML=(costs.records||[]).slice(0,12).map(row=>`<article><span class="ledger-provider">${esc(row.provider)}</span><div><strong>${esc(row.empresa||row.stage||row.operationId||"Operación")}</strong><p>${esc([row.service,row.stage,row.model,row.freeUnitsApplied?`${row.freeUnitsApplied} dentro de cuota`:""].filter(Boolean).join(" · "))}</p></div><b>${esc(usd(row.effectiveCostUsd??row.calculatedCostUsd))}</b><time>${esc(relativeDate(row.timestamp))}</time></article>`).join("")||'<div class="cost-empty">El próximo research, borrador o envío aparecerá aquí automáticamente.</div>';
 }
 
 let simulatorTimer;
@@ -205,7 +205,8 @@ async function updateCostSimulator() {
   clearTimeout(simulatorTimer);
   simulatorTimer=setTimeout(async()=>{
     try {
-      const response=await fetch("/api/costs/estimate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prospects:Number($("#sim-prospects").value),model:$("#sim-model").value,pricingTier:$("#sim-tier").value,webSearchesPerProspect:Number($("#sim-web").value),placesTextPerProspect:Number($("#sim-maps").value),placeDetailsPerProspect:Number($("#sim-maps").value),emailsPerProspect:Number($("#sim-email").value),fixedMonthlyUsd:Number($("#cost-fixed").value)})});
+      const historical=$("#sim-maps-profile").value==="historical";
+      const response=await fetch("/api/costs/estimate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prospects:Number($("#sim-prospects").value),model:$("#sim-model").value,pricingTier:$("#sim-tier").value,inputTokensPerProspect:historical?0:15000,outputTokensPerProspect:historical?0:2500,webSearchesPerProspect:Number($("#sim-web").value),placesTextService:$("#sim-places-search-service").value,placesTextCalls:Number($("#sim-places-search-calls").value),placeDetailsService:$("#sim-place-details-service").value,placeDetailsCalls:Number($("#sim-place-details-calls").value),emailsPerProspect:Number($("#sim-email").value),fixedMonthlyUsd:historical?0:Number($("#cost-fixed").value)})});
       const payload=await response.json();
       if(!response.ok) throw new Error(payload.error);
       const result=payload.estimate;
@@ -213,8 +214,34 @@ async function updateCostSimulator() {
       $("#sim-per-prospect").textContent=usd(result.costPerProspect);
       const labels={ai:"IA",webSearch:"Búsquedas",places:"Google Maps",email:"Emails",fixed:"Costos fijos"};
       $("#sim-breakdown").innerHTML=Object.entries(result.breakdown).map(([key,value])=>`<span>${labels[key]||key}: <b>${esc(usd(value))}</b></span>`).join("");
+      const usage=result.placesUsage||{};
+      $("#sim-maps-detail").innerHTML=[usage.textSearch,usage.placeDetails].filter(Boolean).map(item=>`<article><div><strong>${esc(item.label)}</strong><span>${compact(item.units)} consultas · ${item.freeCap===null?"sin cargo":`${compact(item.freeApplied)} incluidas / ${compact(item.billableUnits)} cobradas`}</span></div><b>${esc(usd(item.costUsd))}</b></article>`).join("");
     } catch(error) { $("#sim-breakdown").textContent=error.message||"No se pudo calcular."; }
   },180);
+}
+
+let applyingMapsProfile=false;
+function applyMapsProfile() {
+  applyingMapsProfile=true;
+  const profile=$("#sim-maps-profile").value;
+  const prospects=Math.max(1,Number($("#sim-prospects").value)||300);
+  if(profile==="historical") {
+    $("#sim-prospects").value="300";
+    $("#sim-places-search-service").value="places-text-search-enterprise";
+    $("#sim-places-search-calls").value="1921";
+    $("#sim-place-details-service").value="place-details-enterprise-atmosphere";
+    $("#sim-place-details-calls").value="0";
+    $("#sim-web").value="0";
+    $("#sim-email").value="0";
+  } else if(profile==="optimized") {
+    $("#sim-places-search-service").value="places-text-search-pro";
+    $("#sim-places-search-calls").value=String(Math.ceil(prospects/5));
+    $("#sim-place-details-service").value="place-details-enterprise-atmosphere";
+    $("#sim-place-details-calls").value=String(prospects);
+    $("#sim-email").value="1";
+  }
+  applyingMapsProfile=false;
+  updateCostSimulator();
 }
 
 async function saveCostSettings(event) {
@@ -858,6 +885,9 @@ $$('#research-form input, #research-form select').forEach(node=>node.addEventLis
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
 $("#cost-settings-form").addEventListener("submit",saveCostSettings);
 $$('#cost-simulator input, #cost-simulator select').forEach(node=>node.addEventListener("input",updateCostSimulator));
+$("#sim-maps-profile").addEventListener("change",applyMapsProfile);
+$$('#sim-places-search-service, #sim-places-search-calls, #sim-place-details-service, #sim-place-details-calls').forEach(node=>node.addEventListener(node.tagName==="SELECT"?"change":"input",()=>{if(!applyingMapsProfile) $("#sim-maps-profile").value="custom";}));
+$("#sim-prospects").addEventListener("change",()=>{if($("#sim-maps-profile").value==="optimized") applyMapsProfile();});
 $("#cost-fixed").addEventListener("input",updateCostSimulator);
 $("#wa-refresh").addEventListener("click",()=>loadWhatsapp());
 let waSearchTimer;
