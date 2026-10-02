@@ -65,7 +65,8 @@ function metric(label,value,note,tone="") {
 
 function renderMetrics() {
   const s=store.data.stats || {};
-  const sources=s.prospectsBySheet||{};
+  const sources={...(s.prospectsBySheet||{})};
+  sources.Hoteles_Argentina_300=(sources.Hoteles_Argentina_300||0)+(sources.Hoteles_LATAM_500||0);
   $("#metrics").innerHTML=[
     metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0}`),
     metric("Con ambos canales",s.bothChannels ?? 0,"Email + WhatsApp","blue"),
@@ -140,7 +141,7 @@ function renderTable() {
   $("#page-next").disabled=store.page>=pages;
   $("#prospect-body").innerHTML=rows.length ? rows.map(row=>`
     <tr data-open-row="${esc(row.prospectId)}">
-      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>${row.phase==="contacts"?"Hoteles Argentina":`Fila ${esc(row.rowNumber)}`}</small></div></div></td>
+      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>${row.campaignId==="hoteles-latam-500"?"Hoteles LATAM":row.phase==="contacts"?"Hoteles Argentina":`Fila ${esc(row.rowNumber)}`}</small></div></div></td>
       <td><div class="rubric-cell"><strong>${esc(row.rubro||"Sin rubro")}</strong><span>${esc(row.ubicacion||"Sin ubicación")}</span></div></td>
       <td><div class="contact-stack">${contactChip("email",row.email,row.rowNumber)}${contactChip("whatsapp",row.whatsapp,row.rowNumber,waCopyValue(row))}${!row.email&&!row.whatsapp?'<span>Sin contacto verificable</span>':""}</div></td>
       <td><div class="problem-cell"><p>${esc(row.phase==="contacts"?"Contacto validado · análisis reservado para la fase 2":row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
