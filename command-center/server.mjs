@@ -6,16 +6,22 @@ import { fileURLToPath } from "node:url";
 import {
   appendOutreachEvent,
   appendOutreachQueue,
+  appendCommercialProspects,
   appendCostUsage,
+  appendResearchEvidence,
   appendTaskCommand,
   buildLiveSnapshot,
+  COMMERCIAL_SHEETS,
   sheetsLiveConfigured,
   sheetsWriteConfigured,
   updateOutreachQueue,
   updateProspectMessage,
+  updateTaskCommandStatus,
   upsertCostSetting
 } from "./sheets-live.mjs";
 import { buildCostAnalytics, estimateScenario, normalizeCostRecord, normalizeCostSettings, PRICING, PRICING_VERSION } from "./costs.mjs";
+import { buildZeroCostGuard, HOTEL_CAMPAIGN, HOTEL_CAMPAIGN_ID, HOTEL_SHEET, HOTEL_LATAM_CAMPAIGN_ID, HOTEL_LATAM_SHEET, hotelCampaignProfile } from "./hotel-research.mjs";
+import { runHotelResearchBatch } from "./hotel-research-worker.mjs";
 
 const standaloneRoot=process.env.WIS_STANDALONE_ROOT?resolve(process.env.WIS_STANDALONE_ROOT):null;
 const root = standaloneRoot||fileURLToPath(new URL("../../../..", import.meta.url));
@@ -30,9 +36,11 @@ const statePath = join(configDir, "dashboard-state.json");
 const channelVerificationPath = join(configDir, "channel-verification.json");
 const port = Number(process.env.PORT || process.env.WIS_DASHBOARD_PORT || 4174);
 const bindHost = process.env.WIS_BIND_HOST || "127.0.0.1";
-const allowedActions = new Set(["CONTINUE_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS", "EVALUATE_APOLLO"]);
+const allowedActions = new Set(["CONTINUE_RESEARCH", "PAUSE_RESEARCH", "RETRY_BLOCKED_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS", "EVALUATE_APOLLO"]);
 const mime = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml" };
 const activeSendLocks = new Set();
+const activeResearchRuns = new Map();
+const pausedResearchCampaigns = new Set();
 let liveSyncPromise=null;
 let lastLiveSyncAt=0;
 
@@ -145,7 +153,12 @@ function explicitE164(value) {
 }
 
 function normalizeProspect(row,index) {
+  const sourceSheet=String(row.sourceSheet||"Distribuidoras_300").trim();
   return {
+    prospectId:String(row.prospectId||`${sourceSheet}:${row.rowNumber||index+2}`),
+    sourceSheet,
+    campaignId:String(row.campaignId||COMMERCIAL_SHEETS[sourceSheet]?.campaignId||"distribuidoras-300"),
+    phase:String(row.phase||COMMERCIAL_SHEETS[sourceSheet]?.phase||"outreach"),
     rowNumber:Number(row.rowNumber||index+2),
     rubro:String(row.rubro||"").trim(),
     empresa:String(row.empresa||"").trim(),
@@ -165,7 +178,17 @@ function normalizeProspect(row,index) {
 }
 
 function candidateReady(row) {
+  if(row.phase==="contacts") return Boolean(row.empresa&&(row.email||row.whatsapp));
   return /^\s*\d+\s*\/\s*\d+\s*$/.test(row.reviewsAnalyzed)&&Boolean(row.analysis&&row.problems&&(row.emailMessage||row.whatsappMessage));
+}
+
+function prospectKeyFor(prospect) {
+  return `${String(prospect.sourceSheet||"Distribuidoras_300").toLowerCase().replace(/_/g,"-")}-row-${prospect.rowNumber}`;
+}
+
+function sameProspect(row,prospect) {
+  const rowSheet=String(row.sourceSheet||row.source_sheet||"Distribuidoras_300");
+  return Number(row.rowNumber||row.source_row)===prospect.rowNumber&&rowSheet===String(prospect.sourceSheet||"Distribuidoras_300");
 }
 
 function acquireSendLocks(lockKeys) {
@@ -176,7 +199,8 @@ function acquireSendLocks(lockKeys) {
 }
 
 function approvalGate(snapshot, prospect, channel) {
-  const qa=(snapshot.qa||[]).find(row=>Number(row.rowNumber)===prospect.rowNumber);
+  if(prospect.phase==="contacts") return {eligible:false,reason:"HOTEL_CONTACTS_ONLY"};
+  const qa=(snapshot.qa||[]).find(row=>sameProspect(row,prospect));
   if(!qa||qa.status!=="PASSED"||!qa.reviewer||!qa.author||key(qa.reviewer)===key(qa.author)) {
     return {eligible:false,reason:"INDEPENDENT_QA_REQUIRED"};
   }
@@ -202,7 +226,7 @@ function approvalGate(snapshot, prospect, channel) {
   if(!/^[a-f0-9]{64}$/.test(approvedMessageHash||"")) {
     return {eligible:false,reason:"APPROVED_MESSAGE_HASH_REQUIRED"};
   }
-  const prospectKey=qa.prospectKey||`distribuidoras-300-row-${prospect.rowNumber}`;
+  const prospectKey=qa.prospectKey||prospectKeyFor(prospect);
   const idempotencyKey=`${prospectKey}|${approval.campaignId}|${channel}|1`;
   const stopped=snapshot.outreachQueue.some(row=>(row.prospectKey===prospectKey||Number(row.rowNumber)===prospect.rowNumber)&&
     /RESPONDIDO|REPLY|MEETING|REUNION|OPTOUT|REBOTADO|HARD_BOUNCE|OUTCOME_UNKNOWN|CERRADO/i.test(row.eventType||row.status||""));
@@ -240,22 +264,26 @@ function titleCase(value) {
 function normalizeResearchRequest(input={}) {
   const prompt=cleanText(input.prompt,1000);
   const inferredQuantity=prompt.match(/\b(\d{1,3})\b/)?.[1];
-  const quantity=Math.max(1,Math.min(300,Number(input.quantity||inferredQuantity||25)));
   const promptKey=key(prompt);
   let businessType=cleanText(input.businessType,40).toLowerCase();
-  if(!businessType) businessType=promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
-  if(!["distribuidoras","logisticas","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
+  if(!businessType) businessType=promptKey.includes("hotel")?"hoteles":promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
+  if(!["distribuidoras","logisticas","hoteles","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
+  const hotelCampaign=businessType==="hoteles"||[HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID].includes(input.campaignId)||[HOTEL_SHEET,HOTEL_LATAM_SHEET].includes(input.destination);
+  const hotelProfile=hotelCampaignProfile(input);
+  const quantityLimit=hotelProfile.campaignId===HOTEL_LATAM_CAMPAIGN_ID?500:300;
+  const quantity=Math.max(1,Math.min(quantityLimit,Number(input.quantity||inferredQuantity||25)));
   const knownCountries=["Argentina","Chile","Uruguay","Paraguay","Bolivia","Perú","Colombia","México","Brasil","Ecuador"];
   const promptCountry=knownCountries.find(country=>promptKey.includes(key(country)))||"";
   let industry=cleanText(input.industry,90);
   if(!industry&&prompt) {
-    const match=prompt.match(/(?:distribuidoras?|log[ií]sticas?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
+    const match=prompt.match(/(?:hoteles?|hoster[ií]as?|apart\s+hoteles?|distribuidoras?|log[ií]sticas?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
     industry=cleanText(match?.[1],90);
   }
+  if(hotelCampaign) industry="Hotelería y alojamiento";
   if(industry&&(promptCountry&&key(industry).includes(key(promptCountry))||/\bempleados?\b/i.test(industry))) {
-    industry=businessType==="logisticas"?"Logística y transporte":businessType==="distribuidoras"?"Distribución general":"Servicios B2B";
+    industry=businessType==="hoteles"?"Hotelería y alojamiento":businessType==="logisticas"?"Logística y transporte":businessType==="distribuidoras"?"Distribución general":"Servicios B2B";
   }
-  const country=cleanText(input.country,60)||promptCountry;
+  const country=hotelCampaign?hotelProfile.country:cleanText(input.country,60)||promptCountry;
   const region=cleanText(input.region,80);
   let location=cleanText(input.location,90);
   if(!location&&prompt) {
@@ -263,14 +291,14 @@ function normalizeResearchRequest(input={}) {
     location=cleanText(match?.[1],90);
   }
   location=region&&country?`${region}, ${country}`:region||country||location||"Argentina";
-  const reviews=input.reviews==="none"?"none":"1-3";
-  const contact=["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
+  const reviews=hotelCampaign?"none":input.reviews==="none"?"none":"1-3";
+  const contact=hotelCampaign?"both":["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
   const inferredEmployeeSize=prompt.match(/\b(1-10|11-20|11-50|20-50|51-200|201-500)\s+empleados?\b/i)?.[1];
-  const employeeSize=["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:(inferredEmployeeSize||"11-50");
-  const minimumReviews=[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
-  const destination=["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
+  const employeeSize=hotelCampaign?"professional":["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:(inferredEmployeeSize||"11-50");
+  const minimumReviews=hotelCampaign?20:[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
+  const destination=hotelCampaign?hotelProfile.destination:["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
   const priority=["NORMAL","HIGH","URGENT"].includes(input.priority)?input.priority:"NORMAL";
-  const businessLabel={distribuidoras:"distribuidoras",logisticas:"logísticas",proveedores:"proveedores B2B",empresas:"empresas de servicios",otro:"empresas"}[businessType];
+  const businessLabel={distribuidoras:"distribuidoras",logisticas:"logísticas",hoteles:"hoteles independientes",proveedores:"proveedores B2B",empresas:"empresas de servicios",otro:"empresas"}[businessType];
   const batchName=cleanText(input.batchName,80)||`${quantity} ${businessLabel} · ${industry||"General"} · ${country||location}`;
   const objective=cleanText(input.objective,400)||"Detectar problemas recurrentes y oportunidades concretas para WIS";
   if(!industry) throw Object.assign(new Error("RESEARCH_INDUSTRY_REQUIRED"),{status:400});
@@ -282,17 +310,21 @@ function normalizeResearchRequest(input={}) {
     country:titleCase(country||location),
     region:titleCase(region),
     employeeSize,
-    minimumReviews:reviews==="none"?0:minimumReviews,
+    minimumReviews:hotelCampaign?minimumReviews:reviews==="none"?0:minimumReviews,
     excludeLargeCorporations:input.excludeLargeCorporations!==false,
     destination,
     priority,
     batchName,
+    campaignId:hotelCampaign?hotelProfile.campaignId:cleanText(input.campaignId,80),
+    phase:hotelCampaign?"contacts":cleanText(input.phase||"full",30),
+    professionalOperation:hotelCampaign||input.professionalOperation===true,
+    zeroCostMode:hotelCampaign||input.zeroCostMode===true,
     reviews,
     contact,
     objective,
     prompt,
     reviewRule:reviews==="1-3"?"Analizar sólo reseñas de 1, 2 y 3 estrellas e informar analizadas/total accesible":"Sin análisis de reseñas",
-    outreachRule:"Preparar borradores; no enviar sin QA y aprobación"
+    outreachRule:hotelCampaign?"Fase de contactos: no redactar ni enviar mensajes":"Preparar borradores; no enviar sin QA y aprobación"
   };
 }
 
@@ -343,13 +375,16 @@ function researchState(sheetCommands=[],localCommands=[]) {
       completed:unique.filter(row=>row.status==="DONE").length,
       blocked:unique.filter(row=>["BLOCKED","CANCELLED","FAILED"].includes(row.status)).length
     },
-    executor:{connected:false,label:"Ejecutor de research pendiente de conexión"}
+    executor:{
+      connected:process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true",
+      label:process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true"?"Ejecutor conectado · costo cero obligatorio":"Ejecutor preparado · activación pendiente"
+    }
   };
 }
 
 function whatsappOptInGate(snapshot, prospect, now=new Date()) {
-  const qa=(snapshot.qa||[]).find(row=>Number(row.rowNumber)===prospect.rowNumber);
-  const prospectKey=qa?.prospectKey||`distribuidoras-300-row-${prospect.rowNumber}`;
+  const qa=(snapshot.qa||[]).find(row=>sameProspect(row,prospect));
+  const prospectKey=qa?.prospectKey||prospectKeyFor(prospect);
   const optIn=(snapshot.optIns||[]).find(row=>
     row.verified===true&&row.reconciled===true&&row.direction==="INBOUND"&&row.eventType==="OPT_IN"&&
     row.prospectKey===prospectKey&&row.phoneE164===prospect.whatsappE164&&
@@ -393,7 +428,7 @@ function channelLimitGate(events, channel, now=new Date()) {
 }
 
 function eventMatchesProspect(event,prospect) {
-  return (event.source==="DASHBOARD"&&Number(event.rowNumber)===prospect.rowNumber)||
+  return (event.source==="DASHBOARD"&&sameProspect(event,prospect))||
     (prospect.email&&key(event.recipient)===key(prospect.email))||
     (event.empresa&&key(event.empresa)===key(prospect.empresa));
 }
@@ -478,6 +513,14 @@ async function whatsappProviderGet(resource,params={}) {
   return {data:body.data??null,meta:body.meta??null,source:config.source};
 }
 
+function googleProviderUsageSnapshot() {
+  return {
+    observedAt:process.env.WIS_GOOGLE_USAGE_OBSERVED_AT||"",
+    "places-text-search-pro":Number(process.env.WIS_GOOGLE_USAGE_TEXT_SEARCH_PRO||0),
+    "place-details-enterprise":Number(process.env.WIS_GOOGLE_USAGE_PLACE_DETAILS_ENTERPRISE||0)
+  };
+}
+
 async function dashboardPayload() {
   try { await refreshLiveSheets(false); } catch { /* keep the last valid snapshot and surface degraded sync below */ }
   const [snapshot,state,localEvents,localCommands,verification,localCosts]=await Promise.all([
@@ -494,7 +537,7 @@ async function dashboardPayload() {
   const sentEvents=events.filter(row=>isSuccessfulSend(row)||/RESPONDIDO/i.test(row.eventType||row.status||""));
   const contactedRows=new Set();
   for(const prospect of prospects) {
-    const matched=sentEvents.some(event=>(event.source==="DASHBOARD"&&Number(event.rowNumber)===prospect.rowNumber) ||
+    const matched=sentEvents.some(event=>(event.source==="DASHBOARD"&&sameProspect(event,prospect)) ||
       (prospect.email&&key(event.recipient)===key(prospect.email)) || (event.empresa&&key(event.empresa)===key(prospect.empresa)));
     if(matched) { prospect.lastStatus="ENVIADO"; contactedRows.add(prospect.rowNumber); }
   }
@@ -522,6 +565,8 @@ async function dashboardPayload() {
   const meetings=events.filter(row=>/MEETING|REUNION/i.test(row.eventType||row.status||"")).length;
   const costSettings=normalizeCostSettings(snapshot.costSettings||[],process.env);
   const costs=buildCostAnalytics(uniqueCosts,costSettings,{qualified:prospects.filter(candidateReady).length,replies,meetings});
+  costs.zeroCostHotels=buildZeroCostGuard(uniqueCosts,googleProviderUsageSnapshot());
+  const prospectsBySheet=Object.fromEntries(Object.keys(COMMERCIAL_SHEETS).map(sourceSheet=>[sourceSheet,prospects.filter(row=>row.sourceSheet===sourceSheet).length]));
   return {
     generatedAt:new Date().toISOString(),
     prospects,
@@ -531,6 +576,7 @@ async function dashboardPayload() {
     costs,
     stats:{
       prospects:prospects.length,
+      prospectsBySheet,
       bothChannels:prospects.filter(row=>row.email&&row.whatsapp).length,
       ready:prospects.filter(candidateReady).length,
       contacted:contactedRows.size,
@@ -552,7 +598,7 @@ async function dashboardPayload() {
       status:snapshot.source==="GOOGLE_SHEETS_LIVE"?"LIVE":snapshot.fetchedAt?"SNAPSHOT":"ERROR",
       fetchedAt:snapshot.fetchedAt,
       source:snapshot.source||"NONE",
-      detail:snapshot.fetchedAt?`${prospects.length} filas leídas de Distribuidoras_300.`:"Todavía no existe un snapshot de Google Sheets."
+      detail:snapshot.fetchedAt?`${prospects.length} filas leídas de ${Object.entries(prospectsBySheet).map(([sheet,count])=>`${sheet}: ${count}`).join(" · ")}.`:"Todavía no existe un snapshot de Google Sheets."
     }
   };
 }
@@ -573,6 +619,75 @@ async function recordCostUsage(input={}) {
   try { await appendFile(costUsagePath,`${JSON.stringify(record)}\n`,"utf8"); }
   catch(error) { if(!sheetsWriteConfigured()) throw error; }
   return record;
+}
+
+async function startHotelResearch(command,request) {
+  const profile=hotelCampaignProfile(request);
+  const researchLockKey=profile.campaignId;
+  if(activeResearchRuns.has(researchLockKey)) return activeResearchRuns.get(researchLockKey);
+  const run=(async()=>{
+    const cleanRequest={...request};
+    delete cleanRequest.error;
+    try {
+      let lastResult={status:"BLOCKED",reason:"NOT_STARTED",rows:[]};
+      while(true) {
+        const snapshot=await refreshLiveSheets(true)||await readJson(sheetSnapshotPath,{});
+        const existingProspects=(snapshot?.prospects||[]).filter(row=>row.sourceSheet===profile.destination);
+        const total=Number(cleanRequest.quantity||profile.target);
+        const progress={completed:existingProspects.length,total};
+        if(progress.completed>=total) {
+          await updateTaskCommandStatus(command.commandId,"DONE",{schemaVersion:3,...cleanRequest,progress,lastBatch:{rows:0,status:"DONE",reason:"CAMPAIGN_TARGET_REACHED"},costGuard:{status:"CONFIRMED_ZERO",reason:"WITHIN_FREE_QUOTA"}});
+          return {status:"DONE",reason:"CAMPAIGN_TARGET_REACHED",rows:[]};
+        }
+        if(pausedResearchCampaigns.has(profile.campaignId)) {
+          await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,progress,lastBatch:{rows:0,status:"BLOCKED",reason:"PAUSED_BY_USER"}});
+          return {status:"BLOCKED",reason:"PAUSED_BY_USER",rows:[]};
+        }
+        const localCosts=await readNdjson(costUsagePath,2000);
+        const mergedCosts=new Map();
+        for(const row of [...(snapshot?.costLedger||[]),...localCosts]) {
+          const key=row.usageId||row.usage_id||row.idempotencyKey||row.idempotency_key||`${row.timestamp}:${row.operationId||row.operation_id}`;
+          if(!mergedCosts.has(key)) mergedCosts.set(key,row);
+        }
+        const guard=buildZeroCostGuard([...mergedCosts.values()],googleProviderUsageSnapshot(),new Date(),profile.campaignId);
+        const batchId=`${command.commandId}-LOT-${Math.floor(progress.completed/25)+1}`;
+        await updateTaskCommandStatus(command.commandId,"IN_PROGRESS",{schemaVersion:3,...cleanRequest,progress,costGuard:{status:guard.status,reason:guard.reason},activeBatch:batchId});
+        const result=await runHotelResearchBatch({
+          commandId:command.commandId,
+          request:{...cleanRequest,batchSize:Math.min(25,total-progress.completed),batchId},
+          existingProspects,
+          guard,
+          shouldStop:()=>pausedResearchCampaigns.has(profile.campaignId),
+          reserveCost:(service,metadata)=>recordCostUsage({operationId:`${command.commandId}:${service}:${randomUUID().slice(0,8)}`,idempotencyKey:`COST:${command.commandId}:${metadata.batchId||batchId}:${service}:${metadata.placeId||metadata.city||randomUUID()}`,runId:command.commandId,stage:"HOTEL_RESEARCH",provider:"google",service,units:1,unitName:"consulta",providerCostUsd:0,costSource:"PROVIDER_FREE_QUOTA",metadata,recordedBy:"prospect-research"}),
+          appendRows:appendCommercialProspects,
+          appendEvidence:appendResearchEvidence
+        });
+        lastResult=result;
+        const refreshed=await refreshLiveSheets(true)||snapshot;
+        const completed=(refreshed?.prospects||[]).filter(row=>row.sourceSheet===profile.destination).length;
+        const rows=result.rows||[];
+        const qaPassed=rows.every(row=>Array.isArray(row)&&row.length===12&&row.slice(7).every(value=>!String(value||"").trim())&&Boolean(String(row[1]||"").trim())&&Boolean(String(row[2]||"").trim())&&Boolean(String(row[4]||"").trim())&&Boolean(String(row[6]||"").trim())&&Boolean(String(row[3]||"").trim()||String(row[5]||"").trim()));
+        if(rows.length) await appendResearchEvidence({evidenceId:`EVD-${Date.now()}-${randomUUID().slice(0,8)}`,timestamp:new Date().toISOString(),commandId:command.commandId,campaignId:profile.campaignId,batchId,prospectKey:"",sourceUrl:`https://docs.google.com/spreadsheets/d/${process.env.WIS_COMMERCIAL_SHEET_ID||"1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8"}/edit`,evidenceType:"BATCH_QA",decision:qaPassed?"VALIDATED":"REJECTED",detail:JSON.stringify({rows:rows.length,completed,total,destination:profile.destination,columnsWritten:"A:G",deferredColumnsBlank:qaPassed,providerCostUsd:0,result:qaPassed?"PASS":"FAIL"}),score:qaPassed?100:0,recordedBy:"qa-ops"});
+        if(!qaPassed||result.status==="BLOCKED"||!rows.length) {
+          const reason=!qaPassed?"BATCH_QA_FAILED":result.reason||"NO_VERIFIED_ROWS";
+          await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:result.status,reason},costGuard:{status:guard.status,reason:guard.reason}});
+          return {...result,status:"BLOCKED",reason};
+        }
+        if(completed>=total) {
+          await updateTaskCommandStatus(command.commandId,"DONE",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:"VALIDATED",reason:"CAMPAIGN_TARGET_REACHED"},costGuard:{status:guard.status,reason:guard.reason}});
+          return {...result,status:"DONE",reason:"CAMPAIGN_TARGET_REACHED"};
+        }
+        await updateTaskCommandStatus(command.commandId,"IN_PROGRESS",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:"VALIDATED",reason:result.reason},costGuard:{status:guard.status,reason:guard.reason}});
+        await new Promise(resolve=>setTimeout(resolve,2_000));
+      }
+    } catch(error) {
+      console.error("hotel research failed",{commandId:command.commandId,error:error?.stack||error?.message||String(error)});
+      try { await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,error:error.message||"HOTEL_RESEARCH_FAILED"}); } catch { /* preserve root failure */ }
+      return {status:"BLOCKED",reason:error.message||"HOTEL_RESEARCH_FAILED",rows:[]};
+    } finally { activeResearchRuns.delete(researchLockKey); }
+  })();
+  activeResearchRuns.set(researchLockKey,run);
+  return run;
 }
 
 async function postJson(url,payload,headers={}) {
@@ -630,8 +745,10 @@ async function processSend(input) {
   const channel=String(input.channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(channel)) return {status:400,body:{ok:false,error:"CHANNEL_INVALID"}};
   const payload=await dashboardPayload();
-  const prospect=payload.prospects.find(row=>row.rowNumber===Number(input.rowNumber));
+  const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
+  const prospect=payload.prospects.find(row=>row.rowNumber===Number(input.rowNumber)&&row.sourceSheet===sourceSheet);
   if(!prospect) return {status:404,body:{ok:false,error:"PROSPECT_NOT_FOUND"}};
+  if(prospect.phase==="contacts") return {status:409,body:{ok:false,error:"HOTEL_CONTACTS_ONLY"}};
   const recipient=channel==="EMAIL"?prospect.email:prospect.whatsapp;
   if(!recipient) return {status:400,body:{ok:false,error:"RECIPIENT_MISSING"}};
   if(channel==="WHATSAPP"&&!prospect.whatsappE164) return {status:400,body:{ok:false,error:"WHATSAPP_PHONE_INVALID"}};
@@ -653,7 +770,7 @@ async function processSend(input) {
   if(optIn&&!optIn.eligible) return {status:409,body:{ok:false,error:optIn.reason}};
   if(channel==="WHATSAPP") {
     const emailSent=payload.events.some(row=>row.channel==="EMAIL"&&isSuccessfulSend(row)&&
-      ((row.source==="DASHBOARD"&&Number(row.rowNumber)===prospect.rowNumber)||(prospect.email&&key(row.recipient)===key(prospect.email))));
+      ((row.source==="DASHBOARD"&&sameProspect(row,prospect))||(prospect.email&&key(row.recipient)===key(prospect.email))));
     if(!emailSent) return {status:409,body:{ok:false,error:"EMAIL_FIRST_REQUIRED"}};
   }
   const idempotencyKey=gate.idempotencyKey;
@@ -665,7 +782,7 @@ async function processSend(input) {
   try {
     const freshPayload=await dashboardPayload();
     const freshSnapshot=await readJson(sheetSnapshotPath,{});
-    const freshProspect=freshPayload.prospects.find(row=>row.rowNumber===prospect.rowNumber);
+    const freshProspect=freshPayload.prospects.find(row=>row.rowNumber===prospect.rowNumber&&row.sourceSheet===prospect.sourceSheet);
     const freshGate=approvalGate(freshSnapshot,freshProspect,channel);
     if(!freshGate.eligible) return {status:409,body:{ok:false,error:freshGate.reason}};
     const freshStopGate=prospectStopGate([...freshPayload.events,...(freshSnapshot.outreachQueue||[])],freshProspect,channel);
@@ -677,7 +794,7 @@ async function processSend(input) {
     if(!sheetsWriteConfigured()) return {status:409,body:{ok:false,error:"DURABLE_OPERATIONS_WRITE_REQUIRED"}};
     queueRecord={
       messageId,idempotencyKey,prospectKey:freshGate.prospectKey,campaignId:freshGate.campaignId,batchId:freshGate.batchId,
-      sourceSheet:"Distribuidoras_300",rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,sequence:1,recipient,
+      sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,sequence:1,recipient,
       messageVersion:freshGate.messageVersion,approvalId:freshGate.approvalId,eligibility:"VERIFIED",status:"EN_COLA",
       scheduledAt:new Date().toISOString(),attempts:0,nextAction:"Enviar por adaptador aprobado",
       optInVerified:channel==="WHATSAPP",optInSource:optIn?.source||"",optInRecordedAt:optIn?.recordedAt||"",
@@ -686,7 +803,7 @@ async function processSend(input) {
     const queued=await appendOutreachQueue(queueRecord);
     queueRowNumber=queued.rowNumber;
     if(!queueRowNumber) throw new Error("OUTREACH_QUEUE_APPEND_UNCONFIRMED");
-    const baseEvent={messageId,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
+    const baseEvent={messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
     await appendEvent({...baseEvent,eventType:"SEND_ATTEMPT"});
     const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey}):await sendWhatsapp({prospect,message,idempotencyKey});
     if(!result.ok) {
@@ -707,7 +824,7 @@ async function processSend(input) {
       queueRecord={...queueRecord,status:"OUTCOME_UNKNOWN",lastError:error.name||"NETWORK_ERROR",attempts:1,nextAction:"Reconciliar proveedor antes de reintentar"};
       try { await updateOutreachQueue(queueRowNumber,queueRecord); } catch { /* preserve original uncertain result */ }
     }
-    const event=await appendEvent({messageId,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"});
+    const event=await appendEvent({messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"});
     return {status:502,body:{ok:false,error:"OUTCOME_UNKNOWN",eventId:event.eventId,detail:"Resultado incierto: no se reintentará hasta reconciliar."}};
   } finally {
     releaseLocks();
@@ -744,6 +861,10 @@ const server=createServer(async(req,res)=>{
     }
     if(url.pathname==="/api/dashboard"&&req.method==="GET") return json(res,200,await dashboardPayload());
     if(url.pathname==="/api/costs/pricing"&&req.method==="GET") return json(res,200,{version:PRICING_VERSION,pricing:PRICING});
+    if(url.pathname==="/api/research/campaigns/hotels"&&req.method==="GET") {
+      const payload=await dashboardPayload();
+      return json(res,200,{campaign:HOTEL_CAMPAIGN,costGuard:payload.costs?.zeroCostHotels||null,stats:{total:payload.stats?.prospectsBySheet?.[HOTEL_SHEET]||0}});
+    }
     if(url.pathname==="/api/costs/estimate"&&req.method==="POST") {
       assertMutationRequest(req);
       return json(res,200,{ok:true,estimate:estimateScenario(await requestBody(req))});
@@ -825,14 +946,16 @@ const server=createServer(async(req,res)=>{
       const message=String(input.message||"").trim();
       if(!message) return json(res,400,{ok:false,error:"MESSAGE_REQUIRED"});
       const payload=await dashboardPayload();
-      const prospect=payload.prospects.find(row=>row.rowNumber===rowNumber);
+      const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
+      const prospect=payload.prospects.find(row=>row.rowNumber===rowNumber&&row.sourceSheet===sourceSheet);
       if(!prospect) return json(res,404,{ok:false,error:"PROSPECT_NOT_FOUND"});
+      if(prospect.phase==="contacts") return json(res,409,{ok:false,error:"HOTEL_CONTACTS_ONLY"});
       const recipient=channel==="EMAIL"?prospect.email:prospect.whatsapp;
       if(!recipient) return json(res,400,{ok:false,error:"RECIPIENT_MISSING"});
       if(!sheetsWriteConfigured()) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
-      const draftStorage=await updateProspectMessage(rowNumber,channel,message);
+      const draftStorage=await updateProspectMessage(rowNumber,channel,message,sourceSheet);
       const snapshot=await readJson(sheetSnapshotPath,{});
-      const cached=(snapshot.prospects||[]).find(row=>Number(row.rowNumber)===rowNumber);
+      const cached=(snapshot.prospects||[]).find(row=>Number(row.rowNumber)===rowNumber&&String(row.sourceSheet||"Distribuidoras_300")===sourceSheet);
       if(cached) {
         if(channel==="EMAIL") cached.emailMessage=message;
         else cached.whatsappMessage=message;
@@ -841,9 +964,9 @@ const server=createServer(async(req,res)=>{
       }
       const savedAt=new Date().toISOString();
       let eventLogged=true;
-      try { await appendEvent({messageId:`DRAFT-${rowNumber}-${channel}`,rowNumber,empresa:prospect.empresa,channel,recipient,eventType:"DRAFT_SAVED",fromStatus:"BORRADOR",toStatus:"BORRADOR",detail:"Borrador actualizado desde el dashboard",actor:"human-dashboard",source:"DASHBOARD",evidence:`message_sha256=${hash(message)}`}); }
+      try { await appendEvent({messageId:`DRAFT-${sourceSheet}-${rowNumber}-${channel}`,rowNumber,sourceSheet,empresa:prospect.empresa,channel,recipient,eventType:"DRAFT_SAVED",fromStatus:"BORRADOR",toStatus:"BORRADOR",detail:"Borrador actualizado desde el dashboard",actor:"human-dashboard",source:"DASHBOARD",evidence:`message_sha256=${hash(message)}`}); }
       catch { eventLogged=false; }
-      try { await recordCostUsage({operationId:`DRAFT-${rowNumber}-${channel}`,idempotencyKey:`COST:DRAFT:${rowNumber}:${channel}:${hash(message)}`,prospectKey:`distribuidoras-300-row-${rowNumber}`,sourceRow:rowNumber,empresa:prospect.empresa,stage:"COPY",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{channel,event:"DRAFT_SAVED"},recordedBy:"human-dashboard"}); } catch { /* no bloquear el guardado por telemetría */ }
+      try { await recordCostUsage({operationId:`DRAFT-${sourceSheet}-${rowNumber}-${channel}`,idempotencyKey:`COST:DRAFT:${sourceSheet}:${rowNumber}:${channel}:${hash(message)}`,prospectKey:prospectKeyFor(prospect),sourceRow:rowNumber,empresa:prospect.empresa,stage:"COPY",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{channel,event:"DRAFT_SAVED",sourceSheet},recordedBy:"human-dashboard"}); } catch { /* no bloquear el guardado por telemetría */ }
       return json(res,200,{ok:true,rowNumber,channel,savedAt,messageHash:hash(message),eventLogged,draftStorage});
     }
     if(url.pathname==="/api/research/request"&&req.method==="POST") {
@@ -856,7 +979,8 @@ const server=createServer(async(req,res)=>{
       const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
       const existing=existingSheet||existingLocal;
       if(existing) return json(res,200,{ok:true,command:existing,request,deduplicated:true});
-      const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location} · ${request.employeeSize} empleados`.slice(0,120);
+      const sizeLabel=request.businessType==="hoteles"?"operación profesional":`${request.employeeSize} empleados`;
+      const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location} · ${sizeLabel}`.slice(0,120);
       const command={
         commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,
         createdAt:new Date().toISOString(),
@@ -866,30 +990,47 @@ const server=createServer(async(req,res)=>{
         requestedBy:"human-dashboard",
         status:"NEW",
         idempotencyKey,
-        evidence:JSON.stringify({schemaVersion:2,...request,progress:{completed:0,total:request.quantity}})
+        evidence:JSON.stringify({schemaVersion:3,...request,progress:{completed:0,total:request.quantity},costPolicy:request.zeroCostMode?{mode:"ZERO_COST",textSearchLimit:240,placeDetailsLimit:450,safetyMarginPct:20}:null})
       };
       if(sheetsWriteConfigured()) await appendTaskCommand(command);
       else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
       try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
       catch(error) { if(!sheetsWriteConfigured()) throw error; }
       try { await recordCostUsage({operationId:command.commandId,idempotencyKey:`COST:${command.idempotencyKey}`,runId:command.commandId,stage:"RESEARCH_REQUEST",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{quantity:request.quantity,businessType:request.businessType,industry:request.industry},recordedBy:"human-dashboard"}); } catch { /* el pedido queda válido aunque falle la telemetría */ }
-      return json(res,202,{ok:true,command,request,deduplicated:false});
+      const hotelExecutor=[HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID].includes(request.campaignId)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true";
+      if(hotelExecutor) void startHotelResearch(command,request);
+      return json(res,202,{ok:true,command,request,deduplicated:false,executorStarted:hotelExecutor});
     }
     if(url.pathname==="/api/actions"&&req.method==="POST") {
       assertMutationRequest(req);
       const input=await requestBody(req);
       if(!allowedActions.has(input.action)) return json(res,400,{ok:false,error:"ACTION_NOT_ALLOWED"});
+      const actionCampaignId=String(input.scope||"").includes("LATAM")?HOTEL_LATAM_CAMPAIGN_ID:HOTEL_CAMPAIGN_ID;
+      if(input.action==="PAUSE_RESEARCH") pausedResearchCampaigns.add(actionCampaignId);
+      if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)) pausedResearchCampaigns.delete(actionCampaignId);
       const idempotencyKey=String(input.idempotencyKey||`${input.action}:${new Date().toISOString().slice(0,16)}`).slice(0,180);
       const liveSnapshot=sheetsLiveConfigured()?await refreshLiveSheets(true):await readJson(sheetSnapshotPath,{});
       const existingSheet=(liveSnapshot?.commands||[]).find(item=>(item.idempotency_key||item.idempotencyKey)===idempotencyKey);
       const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
       const existing=existingSheet||existingLocal;
-      if(existing) return json(res,200,{ok:true,command:existing,deduplicated:true});
+      if(existing) {
+        if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true") {
+          const candidates=[...(liveSnapshot?.commands||[]),...(await readNdjson(commandsPath,200))].map(researchCommand);
+          const hotel=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
+          if(hotel) void startHotelResearch(hotel,hotel.request);
+        }
+        return json(res,200,{ok:true,command:existing,deduplicated:true});
+      }
       const command={commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,createdAt:new Date().toISOString(),action:input.action,scope:String(input.scope||"NEXT_PENDING_BATCH").slice(0,120),source:"WIS_DASHBOARD",requestedBy:"human-dashboard",status:"NEW",idempotencyKey,evidence:"Comando creado desde el panel autenticado; pendiente de ejecutor"};
       if(sheetsWriteConfigured()) await appendTaskCommand(command);
       else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
       try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
       catch(error) { if(!sheetsWriteConfigured()) throw error; }
+      if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true") {
+        const candidates=[...(liveSnapshot?.commands||[]),...(await readNdjson(commandsPath,200))].map(researchCommand);
+        const hotel=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
+        if(hotel) void startHotelResearch(hotel,hotel.request);
+      }
       return json(res,202,{ok:true,command});
     }
     const requested=url.pathname==="/"? "index.html":url.pathname.slice(1);

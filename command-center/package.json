@@ -5,6 +5,6 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check costs.mjs && node --check out/app.js"
+    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check costs.mjs && node --check hotel-research.mjs && node --check hotel-research-worker.mjs && node --check out/app.js"
   }
 }

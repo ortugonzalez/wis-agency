@@ -45,6 +45,7 @@ function relativeDate(value) {
 
 function prospectStatus(prospect) {
   if (/ENVIADO|DELIVERED|SENT|RESPONDIDO|CERRADO/i.test(prospect.lastStatus || "")) return "sent";
+  if (prospect.phase==="contacts" && prospect.empresa && (prospect.email || prospect.whatsapp)) return "contacts-ready";
   const coverage=/^\s*\d+\s*\/\s*\d+\s*$/.test(prospect.reviewsAnalyzed || "");
   if (coverage && prospect.analysis && prospect.problems && (prospect.emailMessage || prospect.whatsappMessage)) return "ready";
   return "needs-work";
@@ -53,6 +54,7 @@ function prospectStatus(prospect) {
 function statusBadge(prospect) {
   const status=prospectStatus(prospect);
   if(status==="sent") return '<span class="status status-sent">Contactado</span>';
+  if(status==="contacts-ready") return '<span class="status status-ready">Contacto validado</span>';
   if(status==="ready") return '<span class="status status-ready">Listo para revisar</span>';
   return '<span class="status status-review">Requiere trabajo</span>';
 }
@@ -63,8 +65,9 @@ function metric(label,value,note,tone="") {
 
 function renderMetrics() {
   const s=store.data.stats || {};
+  const sources=s.prospectsBySheet||{};
   $("#metrics").innerHTML=[
-    metric("Prospectos",s.prospects ?? store.data.prospects.length,"Fuente: Distribuidoras_300"),
+    metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0}`),
     metric("Con ambos canales",s.bothChannels ?? 0,"Email + WhatsApp","blue"),
     metric("Listos para revisar",s.ready ?? 0,"Cobertura de reseñas completa","amber"),
     metric("Contactados",s.contacted ?? 0,"Historial consolidado","red")
@@ -89,6 +92,7 @@ function populateRubroFilter() {
 function applyFilters(resetPage=true) {
   if(resetPage) store.page=1;
   const query=normalize($("#search").value);
+  const campaign=$("#filter-campaign").value;
   const rubro=$("#filter-rubro").value;
   const contact=$("#filter-contact").value;
   const status=$("#filter-status").value;
@@ -96,7 +100,7 @@ function applyFilters(resetPage=true) {
     const haystack=normalize([row.empresa,row.rubro,row.ubicacion,row.email,row.whatsapp,row.problems,row.analysis].join(" "));
     const contactMatch=!contact || (contact==="email"&&row.email) || (contact==="whatsapp"&&row.whatsapp) ||
       (contact==="both"&&row.email&&row.whatsapp) || (contact==="missing"&&(!row.email||!row.whatsapp));
-    return (!query||haystack.includes(query)) && (!rubro||row.rubro===rubro) && contactMatch && (!status||prospectStatus(row)===status);
+    return (!query||haystack.includes(query)) && (!campaign||row.campaignId===campaign) && (!rubro||row.rubro===rubro) && contactMatch && (!status||prospectStatus(row)===status);
   });
   renderTable();
 }
@@ -106,6 +110,7 @@ function waCopyValue(prospect) {
 }
 
 function sendBlocker(prospect,channelName) {
+  if(prospect.phase==="contacts") return "HOTEL_CONTACTS_ONLY";
   const isWa=channelName==="WHATSAPP";
   const recipient=isWa?prospect.whatsapp:prospect.email;
   if(!recipient) return "RECIPIENT_MISSING";
@@ -134,18 +139,18 @@ function renderTable() {
   $("#page-prev").disabled=store.page<=1;
   $("#page-next").disabled=store.page>=pages;
   $("#prospect-body").innerHTML=rows.length ? rows.map(row=>`
-    <tr data-open-row="${row.rowNumber}">
-      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>Fila ${esc(row.rowNumber)}</small></div></div></td>
+    <tr data-open-row="${esc(row.prospectId)}">
+      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>${row.phase==="contacts"?"Hoteles Argentina":`Fila ${esc(row.rowNumber)}`}</small></div></div></td>
       <td><div class="rubric-cell"><strong>${esc(row.rubro||"Sin rubro")}</strong><span>${esc(row.ubicacion||"Sin ubicación")}</span></div></td>
       <td><div class="contact-stack">${contactChip("email",row.email,row.rowNumber)}${contactChip("whatsapp",row.whatsapp,row.rowNumber,waCopyValue(row))}${!row.email&&!row.whatsapp?'<span>Sin contacto verificable</span>':""}</div></td>
-      <td><div class="problem-cell"><p>${esc(row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
+      <td><div class="problem-cell"><p>${esc(row.phase==="contacts"?"Contacto validado · análisis reservado para la fase 2":row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
       <td>${statusBadge(row)}</td>
-      <td><div class="row-actions"><button class="write-button" data-compose="${row.rowNumber}" data-channel="${row.email?"EMAIL":"WHATSAPP"}" ${!row.email&&!row.whatsapp?"disabled":""}>Escribir</button><button class="row-button" data-open="${row.rowNumber}" aria-label="Ver detalles de ${esc(row.empresa)}">Ver</button></div></td>
+      <td><div class="row-actions">${row.phase==="contacts"?"":`<button class="write-button" data-compose="${esc(row.prospectId)}" data-channel="${row.email?"EMAIL":"WHATSAPP"}" ${!row.email&&!row.whatsapp?"disabled":""}>Escribir</button>`}<button class="row-button" data-open="${esc(row.prospectId)}" aria-label="Ver detalles de ${esc(row.empresa)}">Ver</button></div></td>
     </tr>`).join("") : '<tr><td colspan="6" class="empty-state">No hay prospectos que coincidan con estos filtros.</td></tr>';
   $$("[data-copy]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();copy(button.dataset.copy,button.dataset.copyLabel);}));
-  $$("[data-open-row]").forEach(row=>row.addEventListener("click",()=>openDrawer(Number(row.dataset.openRow))));
-  $$("[data-open]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openDrawer(Number(button.dataset.open));}));
-  $$("[data-compose]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openComposer(Number(button.dataset.compose),button.dataset.channel);}));
+  $$("[data-open-row]").forEach(row=>row.addEventListener("click",()=>openDrawer(row.dataset.openRow)));
+  $$("[data-open]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openDrawer(button.dataset.open);}));
+  $$("[data-compose]").forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();openComposer(button.dataset.compose,button.dataset.channel);}));
 }
 
 const usd=value=>Number(value||0).toLocaleString("es-AR",{style:"currency",currency:"USD",minimumFractionDigits:Number(value||0)<1?4:2,maximumFractionDigits:Number(value||0)<1?4:2});
@@ -483,6 +488,17 @@ function renderResearch() {
   const executorNode=$("#research-executor-state");
   executorNode.className=`executor-state ${executor.connected?"is-connected":"is-pending"}`;
   executorNode.innerHTML=`<i></i> ${esc(executor.connected?(executor.label||"Ejecutor conectado"):(executor.label||"Ejecutor pendiente"))}`;
+  const guard=store.data.costs?.zeroCostHotels||{};
+  const zeroCostCopy=$("#hotel-zero-cost-copy");
+  if(zeroCostCopy) {
+    const search=guard.services?.["places-text-search-pro"];
+    const details=guard.services?.["place-details-enterprise"];
+    zeroCostCopy.innerHTML=guard.status==="CONFIRMED_ZERO"
+      ? `<strong>$0 confirmado.</strong> Quedan ${esc(search?.remaining||0)} búsquedas y ${esc(details?.remaining||0)} detalles dentro del límite seguro de esta campaña.`
+      : guard.status==="BLOCKED"
+        ? "<strong>Consultas pagas bloqueadas.</strong> El lote queda listo para continuar mediante Chrome y fuentes públicas."
+        : "<strong>Uso de Google todavía no verificado.</strong> Ninguna llamada de Places se ejecutará; el lote queda listo para continuar con Chrome y fuentes públicas.";
+  }
   $("#research-monitor-caption").textContent=requests.length
     ? `${requests.length} pedido${requests.length===1?"":"s"} registrado${requests.length===1?"":"s"} · actualización automática cada 30 segundos`
     : "Todavía no hay pedidos de research registrados";
@@ -558,20 +574,20 @@ async function loadData(silent=false) {
   }
 }
 
-function openDrawer(rowNumber) {
-  const prospect=store.data.prospects.find(row=>row.rowNumber===rowNumber);
+function openDrawer(prospectId) {
+  const prospect=store.data.prospects.find(row=>row.prospectId===prospectId);
   if(!prospect) return;
   store.selected=prospect;
   $("#drawer-rubro").textContent=prospect.rubro||"Sin rubro";
   $("#drawer-company").textContent=prospect.empresa||"Sin nombre";
   $("#drawer-location").textContent=prospect.ubicacion||"Sin ubicación";
   $("#drawer-rating").textContent=prospect.rating?`★ ${prospect.rating}`:"Sin rating";
-  $("#drawer-reviews").textContent=prospect.reviewsAnalyzed||"Cobertura pendiente";
-  $("#drawer-analysis").textContent=prospect.analysis||"Análisis pendiente.";
-  $("#drawer-problems").textContent=prospect.problems||"No se registraron problemas.";
+  $("#drawer-reviews").textContent=prospect.phase==="contacts"?"Fase 2":prospect.reviewsAnalyzed||"Cobertura pendiente";
+  $("#drawer-analysis").textContent=prospect.phase==="contacts"?"El análisis de reseñas se realizará sólo cuando se autorice la fase 2.":prospect.analysis||"Análisis pendiente.";
+  $("#drawer-problems").textContent=prospect.phase==="contacts"?"En esta fase se validan únicamente los contactos corporativos.":prospect.problems||"No se registraron problemas.";
   $("#drawer-contacts").innerHTML=[
     {channel:"EMAIL",label:"Email",value:prospect.email,copy:prospect.email},{channel:"WHATSAPP",label:"WhatsApp",value:prospect.whatsapp,copy:waCopyValue(prospect)}
-  ].map(item=>`<article class="contact-card ${item.value?"":"is-missing"}"><div><span>${item.label}</span><strong>${esc(item.value||"No disponible")}</strong></div><div class="contact-card-actions">${item.value?`<button class="contact-write" data-drawer-write="${item.channel}">Escribir</button><button data-drawer-copy="${esc(item.copy)}" data-label="${item.label}">Copiar</button>`:`<small>Sin dato</small>`}</div></article>`).join("");
+  ].map(item=>`<article class="contact-card ${item.value?"":"is-missing"}"><div><span>${item.label}</span><strong>${esc(item.value||"No disponible")}</strong></div><div class="contact-card-actions">${item.value?`${prospect.phase==="contacts"?"":`<button class="contact-write" data-drawer-write="${item.channel}">Escribir</button>`}<button data-drawer-copy="${esc(item.copy)}" data-label="${item.label}">Copiar</button>`:`<small>Sin dato</small>`}</div></article>`).join("");
   $$("[data-drawer-copy]").forEach(button=>button.addEventListener("click",()=>copy(button.dataset.drawerCopy,button.dataset.label)));
   $$("[data-drawer-write]").forEach(button=>button.addEventListener("click",()=>{store.messageChannel=button.dataset.drawerWrite;openSendDialog();}));
   $("#drawer-web").disabled=!prospect.web;
@@ -596,17 +612,20 @@ function renderMessagePreview() {
   $("#message-preview").textContent=store.messageChannel==="EMAIL" ? (prospect.emailMessage||"Borrador de email pendiente.") : (prospect.whatsappMessage||"Borrador de WhatsApp pendiente.");
   const recipient=store.messageChannel==="EMAIL"?prospect.email:prospect.whatsapp;
   const blocker=sendBlocker(prospect,store.messageChannel);
-  $("#open-send").disabled=!recipient;
+  const contactsOnly=prospect.phase==="contacts";
+  $("#open-send").hidden=contactsOnly;
+  $("#open-send").disabled=contactsOnly||!recipient;
   $("#open-send").textContent=!recipient?"Canal no disponible":`Escribir por ${store.messageChannel==="EMAIL"?"email":"WhatsApp"}`;
   $("#open-send").classList.toggle("button-primary",Boolean(recipient));
   $("#open-send").classList.toggle("button-secondary",!recipient);
-  $("#drawer-send-status").textContent=blocker?`Podés preparar el mensaje. Para enviarlo: ${sendErrors[blocker]||blocker}`:"Todo listo para enviar.";
+  $("#drawer-send-status").textContent=contactsOnly?"Fase 1 activa: copiar y validar contactos. Los mensajes están deshabilitados.":blocker?`Podés preparar el mensaje. Para enviarlo: ${sendErrors[blocker]||blocker}`:"Todo listo para enviar.";
   $("#drawer-send-status").classList.toggle("is-ready",!blocker);
 }
 
-function openComposer(rowNumber,channel) {
-  const prospect=store.data.prospects.find(row=>row.rowNumber===rowNumber);
+function openComposer(prospectId,channel) {
+  const prospect=store.data.prospects.find(row=>row.prospectId===prospectId);
   if(!prospect) return toast("No encontramos este contacto. Actualizá los datos.",true);
+  if(prospect.phase==="contacts") return toast("Los mensajes de hoteles se habilitarán en la fase 2.",true);
   store.selected=prospect;
   store.messageChannel=channel==="WHATSAPP"?"WHATSAPP":"EMAIL";
   openSendDialog();
@@ -673,6 +692,7 @@ const sendErrors={
   MESSAGE_CHANGED:"el texto cambió después de la aprobación y debe revisarse nuevamente.",
   GOOGLE_SHEETS_WRITES_DISABLED:"no se pudo guardar en Google Sheets.",
   MESSAGE_REQUIRED:"escribí un mensaje antes de guardarlo."
+  ,HOTEL_CONTACTS_ONLY:"la campaña de hoteles está limitada a contactos hasta autorizar la fase 2."
 };
 
 async function saveDraft() {
@@ -683,7 +703,7 @@ async function saveDraft() {
   button.disabled=true;
   button.textContent="Guardando…";
   try {
-    const response=await fetch("/api/outreach/draft",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({rowNumber:prospect.rowNumber,channel:store.messageChannel,message})});
+    const response=await fetch("/api/outreach/draft",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,channel:store.messageChannel,message})});
     const payload=await response.json();
     if(!response.ok) throw new Error(sendErrors[payload.error]||payload.error||"No se pudo guardar el borrador");
     if(store.messageChannel==="EMAIL") prospect.emailMessage=message;
@@ -710,6 +730,7 @@ async function sendMessage(event) {
   try {
     const response=await fetch("/api/outreach/send",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
       rowNumber:prospect.rowNumber,
+      sourceSheet:prospect.sourceSheet,
       channel:store.messageChannel,
       message:$("#send-message").value,
       confirmed:true
@@ -788,6 +809,7 @@ async function createResearchRequest(input,button) {
 
 async function submitResearchForm(event) {
   event.preventDefault();
+  const hotelLatam=$("#research-business-type").value==="hoteles"&&$("#research-destination").value==="Hoteles_LATAM_500";
   await createResearchRequest({
     batchName:$("#research-batch-name").value,
     quantity:Number($("#research-quantity").value),
@@ -802,7 +824,11 @@ async function submitResearchForm(event) {
     minimumReviews:Number($("#research-minimum-reviews").value),
     contact:$("#research-contact").value,
     destination:$("#research-destination").value,
-    objective:$("#research-objective").value
+    objective:$("#research-objective").value,
+    campaignId:$("#research-business-type").value==="hoteles"?(hotelLatam?"hoteles-latam-500":"hoteles-argentina-300"):"",
+    phase:$("#research-business-type").value==="hoteles"?"contacts":"full",
+    professionalOperation:$("#research-business-type").value==="hoteles",
+    zeroCostMode:$("#research-business-type").value==="hoteles"
   },$("#research-form-submit"));
 }
 
@@ -829,7 +855,17 @@ function updateResearchPreview() {
 
 function alignResearchDefaults() {
   const type=$("#research-business-type").value;
-  if(type==="logisticas") {
+  const hotel=type==="hoteles";
+  if(hotel) {
+    $("#research-quantity").value="500";
+    $("#research-industry").value="Hotelería y alojamiento";
+    $("#research-employee-size").value="professional";
+    $("#research-country").value="Latinoamérica";
+    $("#research-reviews").value="none";
+    $("#research-minimum-reviews").value="20";
+    $("#research-contact").value="both";
+    $("#research-destination").value="Hoteles_LATAM_500";
+  } else if(type==="logisticas") {
     $("#research-industry").value="Logística y transporte";
     $("#research-destination").value="Logisticas_LATAM";
   } else if(type==="distribuidoras") {
@@ -839,6 +875,32 @@ function alignResearchDefaults() {
     $("#research-destination").value="Prospectos_Custom";
   }
   updateResearchPreview();
+}
+
+function alignHotelDestination() {
+  if($("#research-business-type").value!=="hoteles") return updateResearchPreview();
+  const latam=$("#research-destination").value==="Hoteles_LATAM_500"||$("#research-country").value==="Latinoamérica";
+  if(latam) {
+    $("#research-destination").value="Hoteles_LATAM_500";
+    $("#research-country").value="Latinoamérica";
+    $("#research-quantity").value="500";
+  } else if($("#research-destination").value==="Hoteles_Argentina_300") {
+    $("#research-country").value="Argentina";
+    $("#research-quantity").value="300";
+  }
+  updateResearchPreview();
+}
+
+async function researchControl(action,label) {
+  try {
+    const latam=$("#research-destination").value==="Hoteles_LATAM_500";
+    const scope=latam?"HOTELS_LATAM_500":"HOTELS_ARGENTINA_300";
+    const response=await fetch("/api/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,scope,idempotencyKey:`${action}:${scope}:${new Date().toISOString().slice(0,16)}`})});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error);
+    toast(payload.deduplicated?`${label} ya estaba registrado.`:`${label} registrado.`);
+    await loadData(true);
+  } catch(error) { toast(error.message||`No se pudo registrar: ${label}.`,true); }
 }
 
 async function prepareApolloPilot() {
@@ -869,8 +931,8 @@ function switchView(id) {
 }
 
 $$("[data-view]").forEach(button=>button.addEventListener("click",()=>switchView(button.dataset.view)));
-["#search","#filter-rubro","#filter-contact","#filter-status"].forEach(selector=>$(selector).addEventListener(selector==="#search"?"input":"change",()=>applyFilters()));
-$("#clear-filters").addEventListener("click",()=>{$("#search").value="";$("#filter-rubro").value="";$("#filter-contact").value="";$("#filter-status").value="";applyFilters();});
+["#search","#filter-campaign","#filter-rubro","#filter-contact","#filter-status"].forEach(selector=>$(selector).addEventListener(selector==="#search"?"input":"change",()=>applyFilters()));
+$("#clear-filters").addEventListener("click",()=>{$("#search").value="";$("#filter-campaign").value="";$("#filter-rubro").value="";$("#filter-contact").value="";$("#filter-status").value="";applyFilters();});
 $("#page-prev").addEventListener("click",()=>{store.page--;renderTable();});
 $("#page-next").addEventListener("click",()=>{store.page++;renderTable();});
 $("#event-filter").addEventListener("change",renderEvents);
@@ -880,7 +942,11 @@ $("#hero-sync").addEventListener("click",requestSync);
 $("#continue-research").addEventListener("click",enqueueResearch);
 $("#research-form").addEventListener("submit",submitResearchForm);
 $("#research-refresh").addEventListener("click",()=>loadData());
+$("#research-pause").addEventListener("click",()=>researchControl("PAUSE_RESEARCH","Pausa"));
+$("#research-retry").addEventListener("click",()=>researchControl("RETRY_BLOCKED_RESEARCH","Reintento seguro"));
 $("#research-business-type").addEventListener("change",alignResearchDefaults);
+$("#research-destination").addEventListener("change",alignHotelDestination);
+$("#research-country").addEventListener("change",alignHotelDestination);
 $$('#research-form input, #research-form select').forEach(node=>node.addEventListener(node.matches('input[type="text"], input[type="number"]')?"input":"change",updateResearchPreview));
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
 $("#cost-settings-form").addEventListener("submit",saveCostSettings);
@@ -918,7 +984,7 @@ $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
 const initialView=["prospects","research","whatsapp","activity","channels","costs","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
-updateResearchPreview();
+alignResearchDefaults();
 switchView(initialView);
 loadData();
 setInterval(()=>loadData(true),30_000);
