@@ -17,6 +17,7 @@
       <nav aria-label="Navegación principal">
         <button class="nav-item is-active" data-view="prospects"><span>⌘</span>Prospectos <b id="nav-prospect-count">—</b></button>
         <button class="nav-item" data-view="research"><span>✦</span>Nuevo research</button>
+        <button class="nav-item" data-view="automation"><span>▶</span>Automatización <b id="nav-automation-state">—</b></button>
         <button class="nav-item" data-view="whatsapp"><span>◌</span>WhatsApp <b id="nav-wa-count">—</b></button>
         <button class="nav-item" data-view="activity"><span>↗</span>Actividad <b id="nav-activity-count">—</b></button>
         <button class="nav-item" data-view="channels"><span>◉</span>Canales</button>
@@ -130,6 +131,64 @@
           <div class="workspace-head"><div><h3>Research solicitados</h3><p id="research-monitor-caption">Leyendo Task_Commands…</p></div><div class="research-monitor-actions"><span class="executor-state" id="research-executor-state"><i></i> Ejecutor pendiente</span><button class="button button-secondary" id="research-pause" type="button">Pausar</button><button class="button button-secondary" id="research-retry" type="button">Reintentar bloqueados</button><button class="icon-button" id="research-refresh" aria-label="Actualizar pedidos">↻</button></div></div>
           <div class="research-summary" id="research-summary"></div>
           <div class="research-run-list" id="research-run-list"><div class="research-empty"><span class="research-spinner"></span><p>Cargando pedidos…</p></div></div>
+        </section>
+      </section>
+
+      <section class="view" id="automation">
+        <div class="automation-hero">
+          <div>
+            <p class="eyebrow">Equipo automático WIS</p>
+            <h2>Una línea de trabajo clara, con frenos seguros</h2>
+            <p>Research, redacción y QA pueden avanzar por lotes. Email y WhatsApp siempre quedan bloqueados hasta cumplir sus permisos.</p>
+          </div>
+          <div class="automation-status-card" id="automation-status-card">
+            <span class="automation-live-dot"></span>
+            <div><small>Estado solicitado</small><strong id="automation-status">Cargando…</strong><p id="automation-executor">Esperando señal del heartbeat</p></div>
+          </div>
+        </div>
+
+        <section class="automation-control-grid">
+          <article class="workspace automation-primary-control">
+            <div class="workspace-head"><div><p class="eyebrow">Control general</p><h3>¿Qué querés que haga el equipo?</h3><p>Cada acción se guarda en Task_Commands. El heartbeat confirma después si pudo ejecutarla.</p></div><span class="meta-tag">Durable</span></div>
+            <div class="automation-main-actions">
+              <button class="button button-primary" type="button" data-pipeline-action="PIPELINE_ACTIVATE">Activar equipo</button>
+              <button class="button button-secondary" type="button" data-pipeline-action="PIPELINE_PAUSE">Pausar</button>
+              <button class="button button-secondary" type="button" data-pipeline-action="PIPELINE_RESUME">Continuar</button>
+              <button class="button panic-button" type="button" data-pipeline-action="PIPELINE_PANIC_STOP">Detener todo</button>
+            </div>
+            <p class="automation-confirmation" id="automation-confirmation" role="status" aria-live="polite">Ningún botón de esta pantalla envía emails ni WhatsApp.</p>
+          </article>
+
+          <article class="workspace automation-config-card">
+            <div class="workspace-head"><div><p class="eyebrow">Ritmo de trabajo</p><h3>Configuración simple</h3></div></div>
+            <form id="automation-config-form" class="automation-config-form">
+              <label><span>Cada cuánto revisar</span><select id="automation-interval"><option value="10">Cada 10 minutos</option><option value="15">Cada 15 minutos</option><option value="30">Cada 30 minutos</option><option value="60">Cada 1 hora</option></select></label>
+              <label><span>Prospectos por lote</span><input id="automation-batch-size" type="number" min="1" max="25" value="25" /></label>
+              <label><span>Especialistas simultáneos</span><select id="automation-specialists"><option value="1">1 especialista</option><option value="2">2 especialistas</option><option value="3" selected>3 especialistas</option></select></label>
+              <fieldset><legend>Etapas automáticas</legend><label><input id="automation-research" type="checkbox" checked /> Research</label><label><input id="automation-copy" type="checkbox" checked /> Redacción</label><label><input id="automation-qa" type="checkbox" checked /> QA</label></fieldset>
+              <button class="button button-secondary" type="submit">Guardar configuración</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="workspace automation-team-card">
+          <div class="workspace-head"><div><p class="eyebrow">Estado en vivo</p><h3>Quién está trabajando</h3><p id="automation-team-caption">Los estados aparecen cuando llegan evidencias durables.</p></div><button class="icon-button" id="automation-refresh" aria-label="Actualizar equipo">↻</button></div>
+          <div class="automation-lanes" id="automation-lanes"></div>
+        </section>
+
+        <section class="automation-detail-grid">
+          <article class="workspace automation-gates-card">
+            <div class="workspace-head"><div><p class="eyebrow">Protecciones</p><h3>Qué hace falta antes de enviar</h3></div><span class="safe-lock">Bloqueado por defecto</span></div>
+            <div class="gate-list">
+              <article><span>@</span><div><strong>Email</strong><p id="automation-email-gate">QA + aprobación de lote + destinatario verificable.</p></div></article>
+              <article><span>WA</span><div><strong>WhatsApp</strong><p id="automation-whatsapp-gate">Email previo + opt-in + aprobación de lote.</p></div></article>
+            </div>
+            <div class="automation-counters" id="automation-counters"></div>
+          </article>
+          <article class="workspace automation-command-card">
+            <div class="workspace-head"><div><p class="eyebrow">Trazabilidad</p><h3>Últimas órdenes</h3></div><span class="meta-tag">Task_Commands</span></div>
+            <div class="automation-command-list" id="automation-command-list"><div class="empty-state">Cargando órdenes…</div></div>
+          </article>
         </section>
       </section>
 
@@ -291,6 +350,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="research">Research</button><button data-view="whatsapp">WhatsApp</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button><button data-view="apollo">Apollo</button></nav>
+  <nav class="mobile-nav"><button class="is-active" data-view="prospects">Prospectos</button><button data-view="research">Research</button><button data-view="automation">Equipo</button><button data-view="whatsapp">WhatsApp</button><button data-view="activity">Actividad</button><button data-view="channels">Canales</button><button data-view="apollo">Apollo</button></nav>
 </body>
 </html>

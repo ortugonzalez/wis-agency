@@ -5,7 +5,7 @@ const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300
 const PAGE_SIZE = 18;
 
 const store = {
-  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{}, research:{requests:[],summary:{}}, costs:{summary:{},unitEconomics:{},tokens:{},records:[],recommendations:[]} },
+  data: { prospects:[], events:[], queue:[], stats:{}, channels:{}, sync:{}, research:{requests:[],summary:{}}, automation:{status:"INACTIVE",config:{},executor:{},lanes:[],recentCommands:[],counters:{},gates:{}}, costs:{summary:{},unitEconomics:{},tokens:{},records:[],recommendations:[]} },
   filtered: [],
   page: 1,
   selected: null,
@@ -542,6 +542,114 @@ function renderResearch() {
   }).join("");
 }
 
+const automationStatusLabels={
+  ACTIVE:"Activo",PAUSED:"Pausado",PANIC_STOPPED:"Detenido",INACTIVE:"Sin activar",
+  WORKING:"Trabajando",QUEUED:"En cola",READY:"Listo",IDLE:"En espera",LOCKED:"Protegido",
+  WAITING_HEARTBEAT:"Esperando heartbeat",STOPPED:"Detenido",BLOCKED:"Bloqueado",WAITING_APPROVAL:"Esperando aprobación",
+  NEW:"Pendiente",IN_PROGRESS:"En ejecución",DONE:"Completado",CANCELLED:"Cancelado"
+};
+
+function automationStatusClass(status) {
+  if(["ACTIVE","WORKING","READY","DONE"].includes(status)) return "is-live";
+  if(["PANIC_STOPPED","STOPPED","BLOCKED"].includes(status)) return "is-danger";
+  if(["PAUSED","WAITING_HEARTBEAT","WAITING_APPROVAL","QUEUED"].includes(status)) return "is-waiting";
+  if(status==="LOCKED") return "is-locked";
+  return "is-idle";
+}
+
+function renderAutomation() {
+  const automation=store.data.automation||{};
+  const executor=automation.executor||{};
+  const config=automation.config||{};
+  const status=automation.status||"INACTIVE";
+  const statusCard=$("#automation-status-card");
+  statusCard.className=`automation-status-card ${automationStatusClass(status)}`;
+  $("#automation-status").textContent=automationStatusLabels[status]||status;
+  $("#automation-executor").textContent=executor.connected
+    ? `${executor.label||"Heartbeat conectado"} · ${relativeDate(executor.heartbeatAt)}`
+    : executor.label||"Heartbeat sin señal reciente";
+  $("#nav-automation-state").textContent=status==="ACTIVE"?"ON":status==="PAUSED"?"II":status==="PANIC_STOPPED"?"STOP":"—";
+  $("#automation-team-caption").textContent=executor.detail||"Los estados aparecen cuando llegan evidencias durables.";
+
+  $("#automation-interval").value=String(config.intervalMinutes||10);
+  $("#automation-batch-size").value=String(config.batchSize||25);
+  $("#automation-specialists").value=String(config.maxSpecialists||3);
+  $("#automation-research").checked=config.autoResearch!==false;
+  $("#automation-copy").checked=config.autoCopy!==false;
+  $("#automation-qa").checked=config.autoQa!==false;
+
+  const lanes=automation.lanes||[];
+  $("#automation-lanes").innerHTML=lanes.length?lanes.map(lane=>`
+    <article class="automation-lane ${automationStatusClass(lane.status)}">
+      <span class="automation-lane-icon">${lane.id==="email"?"@":lane.id==="whatsapp"?"WA":lane.id==="research"?"R":lane.id==="copy"?"C":lane.id==="qa"?"Q":"W"}</span>
+      <div><strong>${esc(lane.label)}</strong><p>${esc(lane.detail||"")}</p></div>
+      <b>${esc(automationStatusLabels[lane.status]||lane.status)}</b>
+    </article>`).join(""):'<div class="empty-state">Todavía no hay estados de agentes.</div>';
+
+  const counters=automation.counters||{};
+  $("#automation-counters").innerHTML=[
+    ["Órdenes pendientes",counters.pendingCommands||0],
+    ["En ejecución",counters.activeCommands||0],
+    ["Esperan aprobación",counters.waitingApproval||0],
+    ["Opt-ins válidos",counters.verifiedOptIns||0]
+  ].map(([label,value])=>`<div><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join("");
+  $("#automation-email-gate").textContent=automation.gates?.email||"QA + aprobación de lote + destinatario verificable.";
+  $("#automation-whatsapp-gate").textContent=automation.gates?.whatsapp||"Email previo + opt-in + aprobación de lote.";
+
+  const commands=automation.recentCommands||[];
+  const actionLabels={PIPELINE_ACTIVATE:"Activar equipo",PIPELINE_PAUSE:"Pausar equipo",PIPELINE_RESUME:"Continuar equipo",PIPELINE_PANIC_STOP:"Detener todo",PIPELINE_UPDATE_CONFIG:"Actualizar configuración",REQUEST_RESEARCH:"Nuevo research",CONTINUE_RESEARCH:"Continuar research",RUN_QA:"Ejecutar QA",PREPARE_DRAFTS:"Preparar borradores",PIPELINE_HEARTBEAT:"Heartbeat"};
+  $("#automation-command-list").innerHTML=commands.length?commands.map(command=>{
+    const progress=command.progress&&typeof command.progress==="object"?[command.progress.completed,command.progress.total].filter(value=>value!==undefined).join("/"):command.progress;
+    const detail=[command.scope,command.leaseOwner?`Lease: ${command.leaseOwner}`:"",command.attempt?`Intento ${command.attempt}`:"",progress?`Avance ${progress}`:"",command.error?`Error: ${command.error}`:""].filter(Boolean).join(" · ");
+    return `
+    <article class="automation-command">
+      <span class="command-state ${automationStatusClass(command.status)}"></span>
+      <div><strong>${esc(actionLabels[command.action]||command.action)}</strong><p>${esc(detail||"Pipeline comercial")}</p></div>
+      <div><b>${esc(automationStatusLabels[command.status]||command.status)}</b><time>${esc(relativeDate(command.updatedAt||command.createdAt))}</time></div>
+    </article>`;
+  }).join(""):'<div class="empty-state">Todavía no hay órdenes registradas.</div>';
+}
+
+function pipelineConfigFromForm() {
+  return {
+    intervalMinutes:Number($("#automation-interval").value),
+    batchSize:Number($("#automation-batch-size").value),
+    maxSpecialists:Number($("#automation-specialists").value),
+    autoResearch:$("#automation-research").checked,
+    autoCopy:$("#automation-copy").checked,
+    autoQa:$("#automation-qa").checked,
+    emailMode:"APPROVAL_REQUIRED",
+    whatsappMode:"OPTIN_AND_APPROVAL_REQUIRED",
+    dryRun:true
+  };
+}
+
+async function requestPipelineControl(action) {
+  if(action==="PIPELINE_PANIC_STOP"&&!window.confirm("Esto detendrá el trabajo automático pendiente. Los datos ya guardados no se borrarán. ¿Querés continuar?")) return;
+  const buttons=$$("[data-pipeline-action], #automation-config-form button");
+  buttons.forEach(button=>button.disabled=true);
+  const confirmation=$("#automation-confirmation");
+  confirmation.className="automation-confirmation is-working";
+  confirmation.textContent="Guardando la orden…";
+  try {
+    const response=await fetch("/api/automation/control",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,config:pipelineConfigFromForm(),confirmed:action==="PIPELINE_PANIC_STOP"})});
+    const payload=await response.json();
+    if(!response.ok) throw new Error(payload.error||"No se pudo registrar la orden");
+    store.data.automation=payload.automation||store.data.automation;
+    renderAutomation();
+    confirmation.className="automation-confirmation is-success";
+    confirmation.textContent=`Orden guardada: ${automationStatusLabels[store.data.automation?.status]||action}. Esperando confirmación del heartbeat.`;
+    toast("Orden registrada sin ejecutar envíos externos.");
+    setTimeout(()=>loadData(true),1500);
+  } catch(error) {
+    confirmation.className="automation-confirmation is-error";
+    confirmation.textContent=error.message||"No se pudo registrar la orden.";
+    toast(confirmation.textContent,true);
+  } finally {
+    buttons.forEach(button=>button.disabled=false);
+  }
+}
+
 function renderAll() {
   renderMetrics();
   populateRubroFilter();
@@ -551,6 +659,7 @@ function renderAll() {
   renderChannels();
   renderSync();
   renderResearch();
+  renderAutomation();
   renderCosts();
   updateCostSimulator();
 }
@@ -926,7 +1035,7 @@ async function prepareApolloPilot() {
 function switchView(id) {
   $$(".view").forEach(view=>view.classList.toggle("is-active",view.id===id));
   $$("[data-view]").forEach(button=>button.classList.toggle("is-active",button.dataset.view===id));
-  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",whatsapp:"WhatsApp",activity:"Actividad",channels:"Canales",costs:"Costos",apollo:"Apollo"}[id]||"Prospectos";
+  $("#page-title").textContent={prospects:"Prospectos",research:"Nuevo research",automation:"Automatización",whatsapp:"WhatsApp",activity:"Actividad",channels:"Canales",costs:"Costos",apollo:"Apollo"}[id]||"Prospectos";
   history.replaceState(null,"",`#${id}`);
   if(id==="whatsapp"&&!store.whatsapp.loaded) loadWhatsapp();
 }
@@ -943,6 +1052,9 @@ $("#hero-sync").addEventListener("click",requestSync);
 $("#continue-research").addEventListener("click",enqueueResearch);
 $("#research-form").addEventListener("submit",submitResearchForm);
 $("#research-refresh").addEventListener("click",()=>loadData());
+$("#automation-refresh").addEventListener("click",()=>loadData());
+$$('[data-pipeline-action]').forEach(button=>button.addEventListener("click",()=>requestPipelineControl(button.dataset.pipelineAction)));
+$("#automation-config-form").addEventListener("submit",event=>{event.preventDefault();requestPipelineControl("PIPELINE_UPDATE_CONFIG");});
 $("#research-pause").addEventListener("click",()=>researchControl("PAUSE_RESEARCH","Pausa"));
 $("#research-retry").addEventListener("click",()=>researchControl("RETRY_BLOCKED_RESEARCH","Reintento seguro"));
 $("#research-business-type").addEventListener("change",alignResearchDefaults);
@@ -984,7 +1096,7 @@ $("#send-message").addEventListener("input",()=>{$("#save-draft").disabled=!$("#
 $("#send-form").addEventListener("submit",sendMessage);
 document.addEventListener("keydown",event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("#search").focus();}if(event.key==="Escape")closeDrawer();});
 
-const initialView=["prospects","research","whatsapp","activity","channels","costs","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
+const initialView=["prospects","research","automation","whatsapp","activity","channels","costs","apollo"].includes(location.hash.slice(1))?location.hash.slice(1):"prospects";
 alignResearchDefaults();
 switchView(initialView);
 loadData();

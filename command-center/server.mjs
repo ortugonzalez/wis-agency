@@ -36,6 +36,7 @@ const statePath = join(configDir, "dashboard-state.json");
 const channelVerificationPath = join(configDir, "channel-verification.json");
 const port = Number(process.env.PORT || process.env.WIS_DASHBOARD_PORT || 4174);
 const bindHost = process.env.WIS_BIND_HOST || "127.0.0.1";
+const pipelineControlActions = new Set(["PIPELINE_ACTIVATE", "PIPELINE_PAUSE", "PIPELINE_RESUME", "PIPELINE_PANIC_STOP", "PIPELINE_UPDATE_CONFIG"]);
 const allowedActions = new Set(["CONTINUE_RESEARCH", "PAUSE_RESEARCH", "RETRY_BLOCKED_RESEARCH", "RUN_QA", "REFRESH_SNAPSHOT", "PREPARE_DRAFTS", "EVALUATE_APOLLO"]);
 const mime = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml" };
 const activeSendLocks = new Set();
@@ -382,6 +383,134 @@ function researchState(sheetCommands=[],localCommands=[]) {
   };
 }
 
+const defaultPipelineConfig=Object.freeze({
+  schemaVersion:1,
+  intervalMinutes:10,
+  batchSize:25,
+  maxSpecialists:3,
+  autoResearch:true,
+  autoCopy:true,
+  autoQa:true,
+  emailMode:"APPROVAL_REQUIRED",
+  whatsappMode:"OPTIN_AND_APPROVAL_REQUIRED",
+  dryRun:true
+});
+
+function commandEvidence(row={}) {
+  if(row.evidence&&typeof row.evidence==="object") return row.evidence;
+  try { return JSON.parse(row.evidence||"{}"); } catch { return {}; }
+}
+
+function normalizePipelineConfig(input={},base=defaultPipelineConfig) {
+  const intervalMinutes=Math.max(10,Math.min(1440,Math.round(Number(input.intervalMinutes??base.intervalMinutes)||10)));
+  const batchSize=Math.max(1,Math.min(25,Math.round(Number(input.batchSize??base.batchSize)||25)));
+  const maxSpecialists=Math.max(1,Math.min(3,Math.round(Number(input.maxSpecialists??base.maxSpecialists)||3)));
+  return {
+    schemaVersion:1,
+    intervalMinutes,
+    batchSize,
+    maxSpecialists,
+    autoResearch:input.autoResearch===undefined?base.autoResearch:input.autoResearch===true,
+    autoCopy:input.autoCopy===undefined?base.autoCopy:input.autoCopy===true,
+    autoQa:input.autoQa===undefined?base.autoQa:input.autoQa===true,
+    emailMode:"APPROVAL_REQUIRED",
+    whatsappMode:"OPTIN_AND_APPROVAL_REQUIRED",
+    dryRun:input.dryRun===undefined?base.dryRun:input.dryRun!==false
+  };
+}
+
+function normalizeCommand(row={}) {
+  const evidence=commandEvidence(row);
+  return {
+    commandId:cleanText(row.commandId||row.command_id,100),
+    createdAt:cleanText(row.createdAt||row.created_at,60),
+    updatedAt:cleanText(row.updatedAt||row.updated_at||row.createdAt||row.created_at,60),
+    action:cleanText(row.action,60).toUpperCase(),
+    scope:cleanText(row.scope,180),
+    status:cleanText(row.status||"NEW",40).toUpperCase()||"NEW",
+    idempotencyKey:cleanText(row.idempotencyKey||row.idempotency_key,200),
+    evidence,
+    leaseOwner:cleanText(row.leaseOwner||row.lease_owner||evidence.leaseOwner||evidence.lease_owner,100),
+    leaseExpiresAt:cleanText(row.leaseExpiresAt||row.lease_expires_at||evidence.leaseExpiresAt||evidence.lease_expires_at,60),
+    attempt:Math.max(0,Number(row.attempt||row.attempts||evidence.attempt||evidence.attempts||0)),
+    progress:evidence.progress||row.progress||null,
+    error:cleanText(row.error||row.last_error||evidence.error||evidence.lastError,240)
+  };
+}
+
+function commandIdentity(row) {
+  return row.idempotencyKey||row.commandId||`${row.action}:${row.createdAt}`;
+}
+
+function pipelineAutomationState(sheetCommands=[],localCommands=[],runs=[],snapshot={}) {
+  const commandMap=new Map();
+  for(const raw of [...sheetCommands,...localCommands]) {
+    const row=normalizeCommand(raw);
+    const identity=commandIdentity(row);
+    if(!identity) continue;
+    const current=commandMap.get(identity);
+    if(!current||String(row.updatedAt||row.createdAt).localeCompare(String(current.updatedAt||current.createdAt))>=0) commandMap.set(identity,row);
+  }
+  const commands=[...commandMap.values()];
+  commands.sort((a,b)=>String(b.updatedAt||b.createdAt).localeCompare(String(a.updatedAt||a.createdAt)));
+  const controls=commands.filter(row=>pipelineControlActions.has(row.action));
+  let config={...defaultPipelineConfig};
+  for(const row of controls.slice().reverse()) config=normalizePipelineConfig(row.evidence?.config||row.evidence,config);
+  const latest=controls[0]||null;
+  const stateByAction={PIPELINE_ACTIVATE:"ACTIVE",PIPELINE_RESUME:"ACTIVE",PIPELINE_PAUSE:"PAUSED",PIPELINE_PANIC_STOP:"PANIC_STOPPED"};
+  const latestLifecycle=controls.find(row=>row.action!=="PIPELINE_UPDATE_CONFIG")||null;
+  const status=stateByAction[latestLifecycle?.action]||"INACTIVE";
+  const heartbeatCommands=commands.filter(row=>["PIPELINE_HEARTBEAT","DISPATCHER_HEARTBEAT","HEARTBEAT_PULSE"].includes(row.action));
+  const latestRun=(runs||[]).map(row=>({
+    at:row.updated_at||row.updatedAt||row.ended_at||row.endedAt||row.started_at||row.startedAt||row.timestamp,
+    status:String(row.status||"").toUpperCase(),
+    agent:row.agent||row.owner||row.role
+  })).filter(row=>row.at&&/dispatcher|orchestrator|heartbeat/i.test(row.agent||"")).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0];
+  const heartbeatAt=heartbeatCommands[0]?.updatedAt||heartbeatCommands[0]?.createdAt||latestRun?.at||null;
+  const heartbeatAge=heartbeatAt&&Number.isFinite(Date.parse(heartbeatAt))?Date.now()-Date.parse(heartbeatAt):Infinity;
+  const executorConnected=heartbeatAge<=Math.max(config.intervalMinutes*2+5,25)*60_000;
+  const pendingCommands=commands.filter(row=>row.status==="NEW").length;
+  const activeCommands=commands.filter(row=>row.status==="IN_PROGRESS").length;
+  const waitingApproval=commands.filter(row=>row.status==="WAITING_APPROVAL").length;
+  const researchRows=commands.filter(row=>["REQUEST_RESEARCH","CONTINUE_RESEARCH"].includes(row.action));
+  const copyRows=commands.filter(row=>/COPY|DRAFT/.test(row.action));
+  const qaRows=commands.filter(row=>/QA/.test(row.action));
+  const laneStatus=rows=>rows.some(row=>row.status==="IN_PROGRESS")?"WORKING":rows.some(row=>row.status==="NEW")?"QUEUED":rows.some(row=>row.status==="BLOCKED")?"BLOCKED":rows.length?"READY":"IDLE";
+  const activeApprovals=(snapshot.approvals||[]).filter(row=>row.decision==="APPROVED"&&Date.parse(row.expiresAt)>Date.now());
+  const qaPassed=(snapshot.qa||[]).filter(row=>row.status==="PASSED").length;
+  const verifiedOptIns=(snapshot.optIns||[]).filter(row=>row.verified===true&&row.reconciled===true&&row.direction==="INBOUND").length;
+  return {
+    status,
+    active:status==="ACTIVE",
+    latestControl:latest,
+    latestLifecycle,
+    config,
+    executor:{
+      connected:executorConnected,
+      label:executorConnected?"Heartbeat conectado":"Heartbeat sin señal reciente",
+      heartbeatAt,
+      detail:executorConnected?"El ejecutor puede reclamar comandos pendientes.":"Los comandos quedan guardados; no se afirma ejecución hasta recibir un heartbeat."
+    },
+    counters:{pendingCommands,activeCommands,waitingApproval,qaPassed,activeApprovals:activeApprovals.length,verifiedOptIns},
+    lanes:[
+      {id:"orchestrator",label:"Orquestador",status:status==="PANIC_STOPPED"?"STOPPED":status==="PAUSED"?"PAUSED":executorConnected&&status==="ACTIVE"?"WORKING":status==="ACTIVE"?"WAITING_HEARTBEAT":"IDLE",detail:executorConnected?`Heartbeat ${new Date(heartbeatAt).toLocaleString("es-AR")}`:"Esperando señal durable"},
+      {id:"research",label:"Research",status:laneStatus(researchRows),detail:`${researchRows.filter(row=>row.status==="NEW").length} pedidos pendientes`},
+      {id:"copy",label:"Redacción",status:laneStatus(copyRows),detail:`${copyRows.filter(row=>row.status==="NEW").length} lotes pendientes`},
+      {id:"qa",label:"QA independiente",status:laneStatus(qaRows),detail:`${qaPassed} registros aprobados`},
+      {id:"email",label:"Email",status:activeApprovals.length?"WAITING_APPROVAL":"LOCKED",detail:"Aprobación exacta + idempotencia obligatorias"},
+      {id:"whatsapp",label:"WhatsApp",status:verifiedOptIns?"WAITING_APPROVAL":"LOCKED",detail:`${verifiedOptIns} opt-in verificables · email primero`}
+    ],
+    commandQueue:commands.filter(row=>["NEW","IN_PROGRESS","READY"].includes(row.status)).slice(0,200),
+    recentCommands:commands.slice(0,12).map(({evidence,...row})=>({...row,config:evidence?.config||null})),
+    gates:{
+      externalSendsBlocked:true,
+      email:"QA independiente + aprobación de lote + destinatario verificable + sin duplicado",
+      whatsapp:"Email previo + opt-in inbound reconciliado + ventana 24 h + aprobación de lote",
+      note:"Estos controles sólo escriben comandos durables. Ningún botón ejecuta un envío externo."
+    }
+  };
+}
+
 function whatsappOptInGate(snapshot, prospect, now=new Date()) {
   const qa=(snapshot.qa||[]).find(row=>sameProspect(row,prospect));
   const prospectKey=qa?.prospectKey||prospectKeyFor(prospect);
@@ -553,6 +682,7 @@ async function dashboardPayload() {
     prospect.whatsappOptIn=whatsappOptInGate(snapshot,prospect);
   }
   const research=researchState(snapshot.commands||[],localCommands);
+  const automation=pipelineAutomationState(snapshot.commands||[],localCommands,snapshot.runs||[],snapshot);
   const costRows=[...(snapshot.costLedger||[]),...localCosts];
   const uniqueCosts=[];
   const seenCosts=new Set();
@@ -573,6 +703,7 @@ async function dashboardPayload() {
     queue,
     events:events.slice(0,500),
     research,
+    automation,
     costs,
     stats:{
       prospects:prospects.length,
@@ -860,6 +991,53 @@ const server=createServer(async(req,res)=>{
       return res.end(JSON.stringify({error:"AUTH_REQUIRED"}));
     }
     if(url.pathname==="/api/dashboard"&&req.method==="GET") return json(res,200,await dashboardPayload());
+    if(url.pathname==="/api/automation"&&req.method==="GET") {
+      const payload=await dashboardPayload();
+      return json(res,200,{ok:true,automation:payload.automation});
+    }
+    if(url.pathname==="/api/automation/commands"&&req.method==="GET") {
+      const payload=await dashboardPayload();
+      const status=cleanText(url.searchParams.get("status"),40).toUpperCase();
+      const commands=(payload.automation?.commandQueue||[]).filter(row=>!status||row.status===status);
+      return json(res,200,{ok:true,commands,executor:payload.automation?.executor,config:payload.automation?.config});
+    }
+    if(url.pathname==="/api/automation/control"&&req.method==="POST") {
+      assertMutationRequest(req);
+      const input=await requestBody(req);
+      const action=cleanText(input.action,60).toUpperCase();
+      if(!pipelineControlActions.has(action)) return json(res,400,{ok:false,error:"PIPELINE_ACTION_NOT_ALLOWED"});
+      if(action==="PIPELINE_PANIC_STOP"&&input.confirmed!==true) return json(res,400,{ok:false,error:"PANIC_CONFIRMATION_REQUIRED"});
+      const payload=await dashboardPayload();
+      const config=normalizePipelineConfig(input.config||{},payload.automation?.config||defaultPipelineConfig);
+      const createdAt=new Date().toISOString();
+      const idempotencyKey=cleanText(input.idempotencyKey,180)||`${action}:${createdAt.slice(0,16)}:${hash(JSON.stringify(config)).slice(0,12)}`;
+      const existing=(payload.automation?.recentCommands||[]).find(row=>row.idempotencyKey===idempotencyKey);
+      if(existing) return json(res,200,{ok:true,command:existing,automation:payload.automation,deduplicated:true});
+      const command={
+        commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,
+        createdAt,
+        action,
+        scope:"WIS_COMMERCIAL_PIPELINE",
+        source:"WIS_DASHBOARD",
+        requestedBy:"human-dashboard",
+        status:"NEW",
+        idempotencyKey,
+        evidence:JSON.stringify({
+          schemaVersion:1,
+          requestedAction:action,
+          config,
+          safety:{externalSendsBlocked:true,email:"APPROVAL_REQUIRED",whatsapp:"OPTIN_AND_APPROVAL_REQUIRED",emailFirst:true},
+          note:"Orden durable pendiente de heartbeat; el dashboard no crea subagentes ni envía mensajes."
+        })
+      };
+      if(sheetsWriteConfigured()) await appendTaskCommand(command);
+      else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
+      try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
+      catch(error) { if(!sheetsWriteConfigured()) throw error; }
+      const currentSnapshot=await readJson(sheetSnapshotPath,{});
+      const automation=pipelineAutomationState(currentSnapshot.commands||[],await readNdjson(commandsPath,200),currentSnapshot.runs||[],currentSnapshot);
+      return json(res,202,{ok:true,command,automation,deduplicated:false});
+    }
     if(url.pathname==="/api/costs/pricing"&&req.method==="GET") return json(res,200,{version:PRICING_VERSION,pricing:PRICING});
     if(url.pathname==="/api/research/campaigns/hotels"&&req.method==="GET") {
       const payload=await dashboardPayload();
@@ -1048,4 +1226,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizeProspect, normalizeResearchRequest, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
