@@ -1,4 +1,4 @@
-import { createSign } from "node:crypto";
+import { createHash, createSign } from "node:crypto";
 
 const SHEETS_READ_SCOPE="https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEETS_WRITE_SCOPE="https://www.googleapis.com/auth/spreadsheets";
@@ -8,7 +8,8 @@ const DEFAULT_OPERATIONS_ID="1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w";
 export const COMMERCIAL_SHEETS={
   Distribuidoras_300:{campaignId:"distribuidoras-300",phase:"outreach",range:"A1:L350"},
   Hoteles_Argentina_300:{campaignId:"hoteles-argentina-300",phase:"contacts",range:"A1:L350",target:300},
-  Hoteles_LATAM_500:{campaignId:"hoteles-latam-500",phase:"contacts",range:"A1:L600",target:500}
+  Hoteles_LATAM_500:{campaignId:"hoteles-latam-500",phase:"contacts",range:"A1:L600",target:500},
+  Logisticas_LATAM:{campaignId:"logisticas-latam-chile",phase:"outreach",range:"A1:L600",logicalRows:true}
 };
 const DRAFTS_SHEET="Message_Drafts";
 const DRAFT_HEADERS=["draft_key","source_sheet","source_row","channel","message","updated_at","updated_by"];
@@ -173,6 +174,13 @@ function allowedCommercialSheet(sourceSheet) {
   return value;
 }
 
+export function commercialDataRow(sourceSheet,rowNumber) {
+  const normalizedSheet=allowedCommercialSheet(sourceSheet);
+  const logical=Number(rowNumber);
+  if(!Number.isInteger(logical)||logical<1) throw new Error("PROSPECT_ROW_INVALID");
+  return COMMERCIAL_SHEETS[normalizedSheet].logicalRows?logical+1:logical;
+}
+
 async function upsertMessageDraft(rowNumber,channel,message,sourceSheet="Distribuidoras_300") {
   await ensureDraftsSheet();
   const spreadsheetId=operationsId();
@@ -231,17 +239,20 @@ export async function updateOutreachQueue(rowNumber,row) {
 }
 
 export async function updateProspectMessage(rowNumber,channel,message,sourceSheet="Distribuidoras_300") {
-  if(!Number.isInteger(rowNumber)||rowNumber<2) throw new Error("PROSPECT_ROW_INVALID");
+  if(!Number.isInteger(rowNumber)) throw new Error("PROSPECT_ROW_INVALID");
   const normalizedChannel=String(channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(normalizedChannel)) throw new Error("CHANNEL_INVALID");
   const normalizedSheet=allowedCommercialSheet(sourceSheet);
+  const minimumLogicalRow=COMMERCIAL_SHEETS[normalizedSheet].logicalRows?1:2;
+  if(rowNumber<minimumLogicalRow) throw new Error("PROSPECT_ROW_INVALID");
   if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts") throw new Error("HOTEL_CONTACTS_ONLY");
   const column=normalizedChannel==="EMAIL"?"L":"K";
   const normalizedMessage=String(message||"").trim();
   const draftKey=await upsertMessageDraft(rowNumber,normalizedChannel,normalizedMessage,normalizedSheet);
+  const sheetRowNumber=commercialDataRow(normalizedSheet,rowNumber);
   let commercialSheetUpdated=true;
   try {
-    await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`${normalizedSheet}!${column}${rowNumber}`,[normalizedMessage]);
+    await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`${normalizedSheet}!${column}${sheetRowNumber}`,[normalizedMessage]);
   } catch(error) {
     if(!String(error?.message||"").endsWith("_403")) throw error;
     commercialSheetUpdated=false;
@@ -357,12 +368,14 @@ function number(value,fallback=0) {
 }
 
 function parseApproval(row) {
-  if(row.decision!=="APPROVED"||!/^OUTREACH_BATCH/i.test(row.action||"")) return null;
+  if(row.decision!=="APPROVED"||row.decided_by!=="human-user"||!/^OUTREACH_BATCH/i.test(row.action||"")) return null;
   try {
     const evidence=JSON.parse(row.evidence||"{}");
     return {
       approvalId:row.approval_id,
+      taskId:row.task_id,
       decision:row.decision,
+      decidedAt:row.decided_at,
       expiresAt:evidence.expiresAt,
       campaignId:evidence.campaignId,
       batchId:evidence.batchId,
@@ -370,9 +383,52 @@ function parseApproval(row) {
       messageVersions:evidence.messageVersions,
       sequences:evidence.sequences,
       prospectRows:evidence.prospectRows,
-      recipientLimit:evidence.recipientLimit
+      prospectKeys:evidence.prospectKeys,
+      recipients:evidence.recipients,
+      recipientEmails:evidence.recipientEmails,
+      recipientLimit:evidence.recipientLimit,
+      sourceSheet:evidence.sourceSheet||Object.entries(COMMERCIAL_SHEETS).find(([,profile])=>profile.campaignId===evidence.campaignId)?.[0]||"",
+      qa:evidence.qa||null
     };
   } catch { return null; }
+}
+
+function sha256(value) {
+  return createHash("sha256").update(String(value??""),"utf8").digest("hex");
+}
+
+export function qaRecordsFromApprovals(approvals,drafts) {
+  const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
+  return approvals.flatMap(approval=>{
+    if(approval.qa?.status!=="PASSED"||approval.qa?.independent!==true||!approval.qa?.reviewer) return [];
+    return (approval.prospectRows||[]).map((rowNumber,index)=>{
+      const prospectKey=approval.prospectKeys?.[index];
+      if(!prospectKey) return null;
+      const messageHashes={};
+      let author="";
+      let hashesMatch=true;
+      for(const channel of approval.channels||[]) {
+        const draft=draftsByKey.get(`${prospectKey}:${channel}`)||draftsByKey.get(`${approval.sourceSheet}:${rowNumber}:${channel}`);
+        const expected=approval.qa?.messageHashes?.[channel]?.[prospectKey];
+        if(!draft||!/^[a-f0-9]{64}$/.test(expected||"")||sha256(draft.message)!==expected) hashesMatch=false;
+        else {
+          messageHashes[channel]=expected;
+          author=author||draft.updated_by;
+        }
+      }
+      return {
+        sourceSheet:approval.sourceSheet,
+        rowNumber:Number(rowNumber),
+        prospectKey,
+        batchId:approval.batchId,
+        messageVersion:approval.messageVersions?.[0]||"",
+        messageHashes,
+        status:hashesMatch?"PASSED":"FAILED",
+        reviewer:approval.qa.reviewer,
+        author
+      };
+    }).filter(Boolean);
+  });
 }
 
 export async function buildLiveSnapshot() {
@@ -398,14 +454,19 @@ export async function buildLiveSnapshot() {
   catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
   const drafts=objects(draftRanges[0]?.values);
   const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
+  const approvals=objects(operations[2]?.values).map(parseApproval).filter(Boolean);
   const prospects=[];
   Object.entries(COMMERCIAL_SHEETS).forEach(([sourceSheet,profile],sheetIndex)=>{
     objects(commercial[sheetIndex]?.values).forEach((row,index)=>{
-      const rowNumber=index+2;
-      const emailDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:EMAIL`);
-      const whatsappDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:WHATSAPP`);
+      const rowNumber=profile.logicalRows?index+1:index+2;
+      const approval=approvals.find(item=>item.campaignId===profile.campaignId&&item.prospectRows?.includes(rowNumber));
+      const approvalIndex=approval?.prospectRows?.indexOf(rowNumber)??-1;
+      const prospectKey=approvalIndex>=0?approval.prospectKeys?.[approvalIndex]||"":"";
+      const emailDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:EMAIL`)||(prospectKey?draftsByKey.get(`${prospectKey}:EMAIL`):null);
+      const whatsappDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:WHATSAPP`)||(prospectKey?draftsByKey.get(`${prospectKey}:WHATSAPP`):null);
       prospects.push({
     prospectId:`${sourceSheet}:${rowNumber}`,
+    prospectKey,
     sourceSheet,
     campaignId:profile.campaignId,
     phase:profile.phase,
@@ -477,7 +538,7 @@ export async function buildLiveSnapshot() {
       source:"GOOGLE_SHEETS"
     };
   });
-  const approvals=objects(operations[2]?.values).map(parseApproval).filter(Boolean);
+  const qa=qaRecordsFromApprovals(approvals,drafts);
   return {
     schemaVersion:2,
     fetchedAt:new Date().toISOString(),
@@ -487,7 +548,7 @@ export async function buildLiveSnapshot() {
     sheetNames:Object.keys(COMMERCIAL_SHEETS),
     operationsSpreadsheetId:operationsId,
     prospects,
-    qa:[],
+    qa,
     approvals,
     outreachQueue:queue,
     events,
@@ -497,6 +558,6 @@ export async function buildLiveSnapshot() {
     costLedger:objects(costRanges[0]?.values),
     costSettings:objects(costRanges[1]?.values),
     optIns:[],
-    providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"
+    providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"&&Array.isArray(queue)
   };
 }

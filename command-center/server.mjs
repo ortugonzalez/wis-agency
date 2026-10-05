@@ -157,6 +157,7 @@ function normalizeProspect(row,index) {
   const sourceSheet=String(row.sourceSheet||"Distribuidoras_300").trim();
   return {
     prospectId:String(row.prospectId||`${sourceSheet}:${row.rowNumber||index+2}`),
+    prospectKey:String(row.prospectKey||"").trim(),
     sourceSheet,
     campaignId:String(row.campaignId||COMMERCIAL_SHEETS[sourceSheet]?.campaignId||"distribuidoras-300"),
     phase:String(row.phase||COMMERCIAL_SHEETS[sourceSheet]?.phase||"outreach"),
@@ -180,10 +181,11 @@ function normalizeProspect(row,index) {
 
 function candidateReady(row) {
   if(row.phase==="contacts") return Boolean(row.empresa&&(row.email||row.whatsapp));
-  return /^\s*\d+\s*\/\s*\d+\s*$/.test(row.reviewsAnalyzed)&&Boolean(row.analysis&&row.problems&&(row.emailMessage||row.whatsappMessage));
+  return /^\s*\d+\s*\/\s*\d+/.test(row.reviewsAnalyzed)&&Boolean(row.analysis&&row.problems&&(row.emailMessage||row.whatsappMessage));
 }
 
 function prospectKeyFor(prospect) {
+  if(prospect.prospectKey) return prospect.prospectKey;
   return `${String(prospect.sourceSheet||"Distribuidoras_300").toLowerCase().replace(/_/g,"-")}-row-${prospect.rowNumber}`;
 }
 
@@ -214,6 +216,10 @@ function approvalGate(snapshot, prospect, channel) {
     Array.isArray(row.messageVersions)&&row.messageVersions.includes(qa.messageVersion) &&
     Array.isArray(row.sequences)&&row.sequences.includes(1) &&
     Array.isArray(row.prospectRows)&&row.prospectRows.includes(prospect.rowNumber) &&
+    Array.isArray(row.prospectKeys)&&row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===qa.prospectKey &&
+    (!prospect.prospectKey||row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===prospect.prospectKey) &&
+    Array.isArray(row.recipients)&&key(row.recipients[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.empresa) &&
+    (channel!=="EMAIL"||(Array.isArray(row.recipientEmails)&&key(row.recipientEmails[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.email))) &&
     Number.isInteger(Number(row.recipientLimit))&&Number(row.recipientLimit)>0 &&
     row.prospectRows.length===Number(row.recipientLimit) &&
     new Set(row.prospectRows.map(Number)).size===Number(row.recipientLimit) &&
@@ -246,6 +252,7 @@ function approvalGate(snapshot, prospect, channel) {
     batchId:approval.batchId,
     messageVersion:qa.messageVersion,
     approvedMessageHash,
+    approvedAt:approval.decidedAt,
     idempotencyKey,
     prospectKey
   };
@@ -579,15 +586,17 @@ function channelHealth(verification={}) {
   const whatsappConnected=(verification.whatsapp?.identityVerified===true&&verification.whatsapp?.sessionConnected===true)||
     (process.env.WIS_WHATSAPP_IDENTITY_VERIFIED==="true"&&process.env.WIS_WHATSAPP_SESSION_CONNECTED==="true");
   const signatureApproved=(verification.email?.signatureApproved===true||process.env.WIS_EMAIL_SIGNATURE_APPROVED==="true")&&Boolean(process.env.WIS_EMAIL_SIGNATURE_HTML);
+  const emailApprovalAllowlist=String(process.env.WIS_EMAIL_ALLOWED_APPROVAL_IDS||"").split(",").map(value=>value.trim()).filter(Boolean);
+  const emailOutboundEnabled=process.env.WIS_EMAIL_OUTBOUND_ENABLED==="true";
   const whatsappPaused=verification.whatsapp?.outboundPaused!==undefined?verification.whatsapp.outboundPaused!==false:process.env.WIS_WHATSAPP_OUTBOUND_PAUSED!=="false";
   return {
     email:{
       provider:process.env.BREVO_API_KEY?"Brevo transactional":"Gmail / Brevo",
       account:"Ortu - WIS <ortu@wis-agency.com>",
-      canSend:emailConfigured&&emailConnected&&signatureApproved&&process.env.WIS_EMAIL_OUTBOUND_ENABLED==="true",
+      canSend:emailConfigured&&emailConnected&&signatureApproved&&emailApprovalAllowlist.length>0&&emailOutboundEnabled,
       configured:emailConfigured,
       connected:emailConnected,
-      detail:!emailConnected?"Falta verificar el alias y el remitente predeterminado.":!signatureApproved?"Alias verificado; falta aprobar y cargar la firma HTML WIS.":!emailConfigured?"Alias y firma verificados; falta el webhook exclusivo de envío.":"El adaptador está conectado y permanece pausado hasta habilitar el canal."
+      detail:!emailConnected?"Falta verificar el alias y el remitente predeterminado.":!signatureApproved?"Alias verificado; falta aprobar y cargar la firma HTML WIS.":!emailConfigured?"Alias y firma verificados; falta el webhook exclusivo de envío.":!emailApprovalAllowlist.length?"Brevo conectado; falta una lista blanca de aprobaciones.":emailOutboundEnabled?"Brevo habilitado sólo para las aprobaciones incluidas en la lista blanca.":"Brevo conectado; la salida permanece pausada."
     },
     whatsapp:{
       provider:"Workflow WIS · 5679",
@@ -598,6 +607,11 @@ function channelHealth(verification={}) {
       detail:!whatsappConnected?"Falta verificar la identidad y la sesión exclusiva de la línea 5679.":whatsappPaused?"Identidad y sesión 5679 verificadas; la salida continúa pausada.":!waConfigured?"La línea está verificada; falta conectar el workflow WIS exclusivo.":"El workflow WIS está conectado y permanece bloqueado hasta habilitar el canal."
     }
   };
+}
+
+function emailApprovalAllowed(approvalId) {
+  const allowed=String(process.env.WIS_EMAIL_ALLOWED_APPROVAL_IDS||"").split(",").map(value=>value.trim()).filter(Boolean);
+  return allowed.includes(String(approvalId||""));
 }
 
 async function whatsappProviderConfig() {
@@ -829,10 +843,31 @@ async function postJson(url,payload,headers={}) {
   return {ok:response.ok,status:response.status,body:parsed};
 }
 
-async function sendEmail({prospect,message,idempotencyKey}) {
+async function reconcileBrevoRecipient({email,approvedAt}) {
+  if(!process.env.BREVO_API_KEY) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_UNAVAILABLE",status:409};
+  const url=new URL("https://api.brevo.com/v3/smtp/statistics/events");
+  url.searchParams.set("email",email);
+  url.searchParams.set("limit","50");
+  url.searchParams.set("sort","desc");
+  const response=await fetch(url,{headers:{"api-key":process.env.BREVO_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(15_000)});
+  let body={};
+  try { body=await response.json(); } catch { /* fail closed below */ }
+  if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502};
+  const approvedAtMs=Date.parse(approvedAt||"");
+  if(!Number.isFinite(approvedAtMs)) return {ok:false,error:"APPROVAL_TIMESTAMP_INVALID",status:409};
+  const duplicate=body.events.find(event=>{
+    const eventMs=Date.parse(event.date||event.timestamp||"");
+    return Number.isFinite(eventMs)&&eventMs>=approvedAtMs&&/delivered|sent|request|deferred|blocked|hardBounces|softBounces|invalid|error/i.test(String(event.event||""));
+  });
+  if(duplicate) return {ok:false,error:"PROVIDER_DUPLICATE_RECIPIENT",status:409};
+  return {ok:true};
+}
+
+async function sendEmail({prospect,message,idempotencyKey,approvalId}) {
   const directBrevo=Boolean(process.env.BREVO_API_KEY);
   if(!directBrevo&&(!process.env.WIS_EMAIL_WEBHOOK_URL||!process.env.WIS_EMAIL_WEBHOOK_TOKEN)) return {ok:false,error:"EMAIL_PROVIDER_NOT_CONFIGURED",status:409};
   if(process.env.WIS_EMAIL_OUTBOUND_ENABLED!=="true") return {ok:false,error:"CHANNEL_BLOCKED",status:409};
+  if(!emailApprovalAllowed(approvalId)) return {ok:false,error:"EMAIL_APPROVAL_NOT_ALLOWED",status:409};
   const firstLine=message.split(/\r?\n/,1)[0];
   const subject=/^asunto\s*:/i.test(firstLine)?firstLine.replace(/^asunto\s*:\s*/i,"").trim():`Una idea para ${prospect.empresa}`;
   const body=/^asunto\s*:/i.test(firstLine)?message.split(/\r?\n/).slice(1).join("\n").trim():message;
@@ -875,6 +910,7 @@ async function processSend(input) {
   if(input.confirmed!==true) return {status:400,body:{ok:false,error:"HUMAN_CONFIRMATION_REQUIRED"}};
   const channel=String(input.channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(channel)) return {status:400,body:{ok:false,error:"CHANNEL_INVALID"}};
+  if(sheetsLiveConfigured()) await refreshLiveSheets(true);
   const payload=await dashboardPayload();
   const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
   const prospect=payload.prospects.find(row=>row.rowNumber===Number(input.rowNumber)&&row.sourceSheet===sourceSheet);
@@ -888,6 +924,7 @@ async function processSend(input) {
   const snapshot=await readJson(sheetSnapshotPath,{});
   const gate=approvalGate(snapshot,prospect,channel);
   if(!gate.eligible) return {status:409,body:{ok:false,error:gate.reason}};
+  if(channel==="EMAIL"&&!emailApprovalAllowed(gate.approvalId)) return {status:409,body:{ok:false,error:"EMAIL_APPROVAL_NOT_ALLOWED"}};
   if(hash(message)!==gate.approvedMessageHash) return {status:409,body:{ok:false,error:"MESSAGE_CHANGED"}};
   const verification=await readJson(channelVerificationPath,{});
   const health=channelHealth(verification);
@@ -922,6 +959,10 @@ async function processSend(input) {
     if(!freshLimitGate.eligible) return {status:409,body:{ok:false,error:freshLimitGate.reason}};
     const previous=freshPayload.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
+    if(channel==="EMAIL") {
+      const reconciliation=await reconcileBrevoRecipient({email:freshProspect.email,approvedAt:freshGate.approvedAt});
+      if(!reconciliation.ok) return {status:reconciliation.status||409,body:{ok:false,error:reconciliation.error}};
+    }
     if(!sheetsWriteConfigured()) return {status:409,body:{ok:false,error:"DURABLE_OPERATIONS_WRITE_REQUIRED"}};
     queueRecord={
       messageId,idempotencyKey,prospectKey:freshGate.prospectKey,campaignId:freshGate.campaignId,batchId:freshGate.batchId,
@@ -936,7 +977,7 @@ async function processSend(input) {
     if(!queueRowNumber) throw new Error("OUTREACH_QUEUE_APPEND_UNCONFIRMED");
     const baseEvent={messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
     await appendEvent({...baseEvent,eventType:"SEND_ATTEMPT"});
-    const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey}):await sendWhatsapp({prospect,message,idempotencyKey});
+    const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey,approvalId:freshGate.approvalId}):await sendWhatsapp({prospect,message,idempotencyKey});
     if(!result.ok) {
       queueRecord={...queueRecord,status:"BLOQUEADO",lastError:result.error,attempts:1,nextAction:"Corregir configuración; no reintentar automáticamente"};
       await updateOutreachQueue(queueRowNumber,queueRecord);
@@ -946,6 +987,7 @@ async function processSend(input) {
     queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
     await updateOutreachQueue(queueRowNumber,queueRecord);
     const event=await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
+    try { await refreshLiveSheets(true); } catch { /* el registro durable ya fue persistido */ }
     try {
       await recordCostUsage({operationId:messageId,idempotencyKey:`COST:${idempotencyKey}`,prospectKey:gate.prospectKey,sourceRow:prospect.rowNumber,empresa:prospect.empresa,stage:"SEND",provider:channel==="EMAIL"?"brevo":"whatsapp",service:channel==="EMAIL"?"transactional-email":"baileys",units:1,unitName:channel==="EMAIL"?"email":"mensaje",metadata:{channel,messageId},recordedBy:"wis-command-center"});
     } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
@@ -1226,4 +1268,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
