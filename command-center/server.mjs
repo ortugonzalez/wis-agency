@@ -879,6 +879,7 @@ function httpsJson(url,{method="GET",headers={},payload=null,timeoutMs=25_000,ma
       method,
       headers:{
         accept:"application/json",
+        "accept-encoding":"identity",
         ...(encoded?{"content-type":"application/json","content-length":Buffer.byteLength(encoded)}:{}),
         ...headers
       }
@@ -891,9 +892,10 @@ function httpsJson(url,{method="GET",headers={},payload=null,timeoutMs=25_000,ma
       });
       response.on("end",()=>{
         let body={};
-        try { body=raw?JSON.parse(raw):{}; } catch { body={raw:raw.slice(0,500)}; }
+        let parsed=true;
+        try { body=raw?JSON.parse(raw):{}; } catch { parsed=false; body={}; }
         const status=Number(response.statusCode||0);
-        resolvePromise({ok:status>=200&&status<300,status,body});
+        resolvePromise({ok:status>=200&&status<300,status,body,parsed});
       });
     });
     request.setTimeout(timeoutMs,()=>request.destroy(Object.assign(new Error("HTTPS_TIMEOUT"),{name:"TimeoutError"})));
@@ -911,10 +913,13 @@ async function reconcileBrevoRecipient({email,approvedAt},requestJson=httpsJson)
   url.searchParams.set("sort","desc");
   const response=await requestJson(url,{headers:{"api-key":process.env.BREVO_API_KEY},timeoutMs:15_000});
   const body=response.body||{};
-  if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502,providerStatus:response.status||0};
+  const validBody=response.parsed!==false&&body&&typeof body==="object"&&!Array.isArray(body);
+  const validEvents=body.events===undefined||body.events===null||Array.isArray(body.events);
+  if(response.status!==200||!response.ok||!validBody||!validEvents) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502,providerStatus:response.status||0};
+  const events=Array.isArray(body.events)?body.events:[];
   const approvedAtMs=Date.parse(approvedAt||"");
   if(!Number.isFinite(approvedAtMs)) return {ok:false,error:"APPROVAL_TIMESTAMP_INVALID",status:409};
-  const duplicate=body.events.find(event=>{
+  const duplicate=events.find(event=>{
     const eventMs=Date.parse(event.date||event.timestamp||"");
     return Number.isFinite(eventMs)&&eventMs>=approvedAtMs&&/delivered|sent|request|deferred|blocked|hardBounces|softBounces|invalid|error/i.test(String(event.event||""));
   });
