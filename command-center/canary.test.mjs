@@ -80,6 +80,16 @@ test("Brevo reconciliation fails closed and detects a provider duplicate",async(
     const failed=await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},failedRequest);
     assert.equal(failed.error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
     assert.equal(failed.providerStatus,500);
+    const emptyRequest=async()=>({ok:true,status:200,parsed:true,body:{}});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},emptyRequest)).ok,true);
+    const nullEventsRequest=async()=>({ok:true,status:200,parsed:true,body:{events:null}});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},nullEventsRequest)).ok,true);
+    const invalidJsonRequest=async()=>({ok:true,status:200,parsed:false,body:{}});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},invalidJsonRequest)).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+    for(const status of [201,204]) {
+      const wrongSuccessStatus=async()=>({ok:true,status,parsed:true,body:{}});
+      assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},wrongSuccessStatus)).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+    }
   } finally {
     delete process.env.BREVO_API_KEY;
   }
