@@ -216,7 +216,8 @@ function approvalGate(snapshot, prospect, channel) {
     Array.isArray(row.messageVersions)&&row.messageVersions.includes(qa.messageVersion) &&
     Array.isArray(row.sequences)&&row.sequences.includes(1) &&
     Array.isArray(row.prospectRows)&&row.prospectRows.includes(prospect.rowNumber) &&
-    Array.isArray(row.prospectKeys)&&row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===(qa.prospectKey||prospect.prospectKey) &&
+    Array.isArray(row.prospectKeys)&&row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===qa.prospectKey &&
+    (!prospect.prospectKey||row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===prospect.prospectKey) &&
     Array.isArray(row.recipients)&&key(row.recipients[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.empresa) &&
     (channel!=="EMAIL"||(Array.isArray(row.recipientEmails)&&key(row.recipientEmails[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.email))) &&
     Number.isInteger(Number(row.recipientLimit))&&Number(row.recipientLimit)>0 &&

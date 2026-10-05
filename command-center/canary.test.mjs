@@ -50,6 +50,7 @@ test("approval gate binds campaign, batch, row, recipient, hash and durable queu
 test("approval gate rejects a changed recipient and a missing provider reconciliation",()=>{
   const qa=qaRecordsFromApprovals([approval],[{draft_key:"cl-silo-logistica-casablanca:EMAIL",message,updated_by:"outreach-copy"}]);
   assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:true},{...prospect,email:"attacker@example.com"},"EMAIL").reason,"BATCH_APPROVAL_REQUIRED");
+  assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:true},{...prospect,prospectKey:"cl-attacker"},"EMAIL").reason,"BATCH_APPROVAL_REQUIRED");
   assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:false},prospect,"EMAIL").reason,"DURABLE_IDEMPOTENCY_SNAPSHOT_REQUIRED");
 });
 
