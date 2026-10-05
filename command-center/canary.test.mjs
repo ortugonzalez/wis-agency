@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { approvalGate, emailApprovalAllowed } from "./server.mjs";
+import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, whatsappOptInGate } from "./server.mjs";
 import { commercialDataRow, qaRecordsFromApprovals } from "./sheets-live.mjs";
 
 const message="Asunto: Prueba\n\nMensaje aprobado";
@@ -17,6 +17,8 @@ const approval={
   sequences:[1],
   prospectRows:[1],
   prospectKeys:["cl-silo-logistica-casablanca"],
+  recipients:["SILO Logística"],
+  recipientEmails:["contacto@silo-logistica.cl"],
   recipientLimit:1,
   sourceSheet:"Logisticas_LATAM",
   qa:{status:"PASSED",reviewer:"qa-ops",independent:true,messageHashes:{EMAIL:{"cl-silo-logistica-casablanca":messageHash}}}
@@ -35,13 +37,51 @@ test("approved A2 draft becomes independent QA only when its hash matches",()=>{
   assert.notEqual(qa[0].author,qa[0].reviewer);
 });
 
-test("approval gate binds campaign, batch, row, hash and durable queue",()=>{
-  const prospect={sourceSheet:"Logisticas_LATAM",rowNumber:1,prospectKey:"cl-silo-logistica-casablanca",phase:"outreach"};
+const prospect={sourceSheet:"Logisticas_LATAM",rowNumber:1,prospectKey:"cl-silo-logistica-casablanca",empresa:"SILO Logística",email:"contacto@silo-logistica.cl",phase:"outreach"};
+
+test("approval gate binds campaign, batch, row, recipient, hash and durable queue",()=>{
   const qa=qaRecordsFromApprovals([approval],[{draft_key:"cl-silo-logistica-casablanca:EMAIL",message,updated_by:"outreach-copy"}]);
   const gate=approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:true},prospect,"EMAIL");
   assert.equal(gate.eligible,true);
   assert.equal(gate.approvalId,approval.approvalId);
   assert.equal(gate.approvedMessageHash,messageHash);
+});
+
+test("approval gate rejects a changed recipient and a missing provider reconciliation",()=>{
+  const qa=qaRecordsFromApprovals([approval],[{draft_key:"cl-silo-logistica-casablanca:EMAIL",message,updated_by:"outreach-copy"}]);
+  assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:true},{...prospect,email:"attacker@example.com"},"EMAIL").reason,"BATCH_APPROVAL_REQUIRED");
+  assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[],providerReconciliationLoaded:false},prospect,"EMAIL").reason,"DURABLE_IDEMPOTENCY_SNAPSHOT_REQUIRED");
+});
+
+test("approval gate rejects an already durable idempotency key",()=>{
+  const qa=qaRecordsFromApprovals([approval],[{draft_key:"cl-silo-logistica-casablanca:EMAIL",message,updated_by:"outreach-copy"}]);
+  const idempotencyKey="cl-silo-logistica-casablanca|logisticas-latam-chile|EMAIL|1";
+  assert.equal(approvalGate({qa,approvals:[approval],outreachQueue:[{idempotencyKey}],providerReconciliationLoaded:true},prospect,"EMAIL").reason,"DUPLICATE_IDEMPOTENCY_KEY");
+});
+
+test("changed copy fails QA hash validation",()=>{
+  const qa=qaRecordsFromApprovals([approval],[{draft_key:"cl-silo-logistica-casablanca:EMAIL",message:`${message} editado`,updated_by:"outreach-copy"}]);
+  assert.equal(qa[0].status,"FAILED");
+});
+
+test("channel cadence and WhatsApp opt-in gates remain closed",()=>{
+  const now=new Date("2026-10-05T14:00:00.000Z");
+  assert.equal(channelLimitGate([{channel:"EMAIL",eventType:"SENT",timestamp:"2026-10-05T13:50:00.000Z"}],"EMAIL",now).reason,"MINIMUM_INTERVAL_NOT_REACHED");
+  assert.equal(whatsappOptInGate({optIns:[]},{prospectKey:"cl-silo-logistica-casablanca",whatsappE164:"+56942948926"},now).reason,"DURABLE_OPTIN_REQUIRED");
+});
+
+test("Brevo reconciliation fails closed and detects a provider duplicate",async()=>{
+  const originalFetch=globalThis.fetch;
+  process.env.BREVO_API_KEY="test";
+  try {
+    globalThis.fetch=async()=>({ok:true,json:async()=>({events:[{event:"delivered",date:"2026-10-05T12:30:00.000Z"}]})});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"})).error,"PROVIDER_DUPLICATE_RECIPIENT");
+    globalThis.fetch=async()=>({ok:false,json:async()=>({})});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"})).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+  } finally {
+    globalThis.fetch=originalFetch;
+    delete process.env.BREVO_API_KEY;
+  }
 });
 
 test("Brevo allowlist is exact",()=>{

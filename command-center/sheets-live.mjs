@@ -239,10 +239,12 @@ export async function updateOutreachQueue(rowNumber,row) {
 }
 
 export async function updateProspectMessage(rowNumber,channel,message,sourceSheet="Distribuidoras_300") {
-  if(!Number.isInteger(rowNumber)||rowNumber<2) throw new Error("PROSPECT_ROW_INVALID");
+  if(!Number.isInteger(rowNumber)) throw new Error("PROSPECT_ROW_INVALID");
   const normalizedChannel=String(channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(normalizedChannel)) throw new Error("CHANNEL_INVALID");
   const normalizedSheet=allowedCommercialSheet(sourceSheet);
+  const minimumLogicalRow=COMMERCIAL_SHEETS[normalizedSheet].logicalRows?1:2;
+  if(rowNumber<minimumLogicalRow) throw new Error("PROSPECT_ROW_INVALID");
   if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts") throw new Error("HOTEL_CONTACTS_ONLY");
   const column=normalizedChannel==="EMAIL"?"L":"K";
   const normalizedMessage=String(message||"").trim();
@@ -373,6 +375,7 @@ function parseApproval(row) {
       approvalId:row.approval_id,
       taskId:row.task_id,
       decision:row.decision,
+      decidedAt:row.decided_at,
       expiresAt:evidence.expiresAt,
       campaignId:evidence.campaignId,
       batchId:evidence.batchId,
@@ -382,6 +385,7 @@ function parseApproval(row) {
       prospectRows:evidence.prospectRows,
       prospectKeys:evidence.prospectKeys,
       recipients:evidence.recipients,
+      recipientEmails:evidence.recipientEmails,
       recipientLimit:evidence.recipientLimit,
       sourceSheet:evidence.sourceSheet||Object.entries(COMMERCIAL_SHEETS).find(([,profile])=>profile.campaignId===evidence.campaignId)?.[0]||"",
       qa:evidence.qa||null
@@ -554,6 +558,6 @@ export async function buildLiveSnapshot() {
     costLedger:objects(costRanges[0]?.values),
     costSettings:objects(costRanges[1]?.values),
     optIns:[],
-    providerReconciliationLoaded:Array.isArray(queue)
+    providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"&&Array.isArray(queue)
   };
 }

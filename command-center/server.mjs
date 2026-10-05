@@ -216,6 +216,9 @@ function approvalGate(snapshot, prospect, channel) {
     Array.isArray(row.messageVersions)&&row.messageVersions.includes(qa.messageVersion) &&
     Array.isArray(row.sequences)&&row.sequences.includes(1) &&
     Array.isArray(row.prospectRows)&&row.prospectRows.includes(prospect.rowNumber) &&
+    Array.isArray(row.prospectKeys)&&row.prospectKeys[row.prospectRows.indexOf(prospect.rowNumber)]===(qa.prospectKey||prospect.prospectKey) &&
+    Array.isArray(row.recipients)&&key(row.recipients[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.empresa) &&
+    (channel!=="EMAIL"||(Array.isArray(row.recipientEmails)&&key(row.recipientEmails[row.prospectRows.indexOf(prospect.rowNumber)])===key(prospect.email))) &&
     Number.isInteger(Number(row.recipientLimit))&&Number(row.recipientLimit)>0 &&
     row.prospectRows.length===Number(row.recipientLimit) &&
     new Set(row.prospectRows.map(Number)).size===Number(row.recipientLimit) &&
@@ -248,6 +251,7 @@ function approvalGate(snapshot, prospect, channel) {
     batchId:approval.batchId,
     messageVersion:qa.messageVersion,
     approvedMessageHash,
+    approvedAt:approval.decidedAt,
     idempotencyKey,
     prospectKey
   };
@@ -838,6 +842,26 @@ async function postJson(url,payload,headers={}) {
   return {ok:response.ok,status:response.status,body:parsed};
 }
 
+async function reconcileBrevoRecipient({email,approvedAt}) {
+  if(!process.env.BREVO_API_KEY) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_UNAVAILABLE",status:409};
+  const url=new URL("https://api.brevo.com/v3/smtp/statistics/events");
+  url.searchParams.set("email",email);
+  url.searchParams.set("limit","50");
+  url.searchParams.set("sort","desc");
+  const response=await fetch(url,{headers:{"api-key":process.env.BREVO_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(15_000)});
+  let body={};
+  try { body=await response.json(); } catch { /* fail closed below */ }
+  if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502};
+  const approvedAtMs=Date.parse(approvedAt||"");
+  if(!Number.isFinite(approvedAtMs)) return {ok:false,error:"APPROVAL_TIMESTAMP_INVALID",status:409};
+  const duplicate=body.events.find(event=>{
+    const eventMs=Date.parse(event.date||event.timestamp||"");
+    return Number.isFinite(eventMs)&&eventMs>=approvedAtMs&&/delivered|sent|request|deferred|blocked|hardBounces|softBounces|invalid|error/i.test(String(event.event||""));
+  });
+  if(duplicate) return {ok:false,error:"PROVIDER_DUPLICATE_RECIPIENT",status:409};
+  return {ok:true};
+}
+
 async function sendEmail({prospect,message,idempotencyKey,approvalId}) {
   const directBrevo=Boolean(process.env.BREVO_API_KEY);
   if(!directBrevo&&(!process.env.WIS_EMAIL_WEBHOOK_URL||!process.env.WIS_EMAIL_WEBHOOK_TOKEN)) return {ok:false,error:"EMAIL_PROVIDER_NOT_CONFIGURED",status:409};
@@ -885,6 +909,7 @@ async function processSend(input) {
   if(input.confirmed!==true) return {status:400,body:{ok:false,error:"HUMAN_CONFIRMATION_REQUIRED"}};
   const channel=String(input.channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(channel)) return {status:400,body:{ok:false,error:"CHANNEL_INVALID"}};
+  if(sheetsLiveConfigured()) await refreshLiveSheets(true);
   const payload=await dashboardPayload();
   const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
   const prospect=payload.prospects.find(row=>row.rowNumber===Number(input.rowNumber)&&row.sourceSheet===sourceSheet);
@@ -933,6 +958,10 @@ async function processSend(input) {
     if(!freshLimitGate.eligible) return {status:409,body:{ok:false,error:freshLimitGate.reason}};
     const previous=freshPayload.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
+    if(channel==="EMAIL") {
+      const reconciliation=await reconcileBrevoRecipient({email:freshProspect.email,approvedAt:freshGate.approvedAt});
+      if(!reconciliation.ok) return {status:reconciliation.status||409,body:{ok:false,error:reconciliation.error}};
+    }
     if(!sheetsWriteConfigured()) return {status:409,body:{ok:false,error:"DURABLE_OPERATIONS_WRITE_REQUIRED"}};
     queueRecord={
       messageId,idempotencyKey,prospectKey:freshGate.prospectKey,campaignId:freshGate.campaignId,batchId:freshGate.batchId,
@@ -957,6 +986,7 @@ async function processSend(input) {
     queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
     await updateOutreachQueue(queueRowNumber,queueRecord);
     const event=await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
+    try { await refreshLiveSheets(true); } catch { /* el registro durable ya fue persistido */ }
     try {
       await recordCostUsage({operationId:messageId,idempotencyKey:`COST:${idempotencyKey}`,prospectKey:gate.prospectKey,sourceRow:prospect.rowNumber,empresa:prospect.empresa,stage:"SEND",provider:channel==="EMAIL"?"brevo":"whatsapp",service:channel==="EMAIL"?"transactional-email":"baileys",units:1,unitName:channel==="EMAIL"?"email":"mensaje",metadata:{channel,messageId},recordedBy:"wis-command-center"});
     } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
@@ -1237,4 +1267,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
