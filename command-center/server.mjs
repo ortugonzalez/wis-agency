@@ -934,6 +934,7 @@ async function sendWhatsapp({prospect,message,idempotencyKey}) {
 }
 
 async function processSend(input) {
+  let stage="VALIDATING_INPUT";
   if(input.confirmed!==true) return {status:400,body:{ok:false,error:"HUMAN_CONFIRMATION_REQUIRED"}};
   const channel=String(input.channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(channel)) return {status:400,body:{ok:false,error:"CHANNEL_INVALID"}};
@@ -969,12 +970,22 @@ async function processSend(input) {
     if(!emailSent) return {status:409,body:{ok:false,error:"EMAIL_FIRST_REQUIRED"}};
   }
   const idempotencyKey=gate.idempotencyKey;
+  if(input.dryRun===true) {
+    stage="PROVIDER_RECONCILIATION";
+    if(channel==="EMAIL") {
+      const reconciliation=await reconcileBrevoRecipient({email:prospect.email,approvedAt:gate.approvedAt});
+      if(!reconciliation.ok) return {status:reconciliation.status||409,body:{ok:false,error:reconciliation.error,stage}};
+    }
+    return {status:200,body:{ok:true,dryRun:true,stage:"READY_TO_QUEUE",approvalId:gate.approvalId,idempotencyKey}};
+  }
   const releaseLocks=acquireSendLocks([`message:${idempotencyKey}`,`channel:${channel}`]);
   if(!releaseLocks) return {status:409,body:{ok:false,error:"SEND_IN_PROGRESS"}};
   const messageId=`MSG-${Date.now()}-${hash(idempotencyKey).slice(0,10)}`;
   let queueRowNumber=null;
   let queueRecord=null;
+  let providerAttempted=false;
   try {
+    stage="REFRESHING_SEND_CONTEXT";
     const freshSnapshot=await readJson(sheetSnapshotPath,{});
     const freshContext=await sendContext(freshSnapshot,{sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber});
     const freshProspect=freshContext.prospect;
@@ -988,10 +999,12 @@ async function processSend(input) {
     const previous=freshContext.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
     if(channel==="EMAIL") {
+      stage="PROVIDER_RECONCILIATION";
       const reconciliation=await reconcileBrevoRecipient({email:freshProspect.email,approvedAt:freshGate.approvedAt});
       if(!reconciliation.ok) return {status:reconciliation.status||409,body:{ok:false,error:reconciliation.error}};
     }
     if(!sheetsWriteConfigured()) return {status:409,body:{ok:false,error:"DURABLE_OPERATIONS_WRITE_REQUIRED"}};
+    stage="QUEUE_APPEND";
     queueRecord={
       messageId,idempotencyKey,prospectKey:freshGate.prospectKey,campaignId:freshGate.campaignId,batchId:freshGate.batchId,
       sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber,empresa:prospect.empresa,channel,sequence:1,recipient,
@@ -1004,7 +1017,10 @@ async function processSend(input) {
     queueRowNumber=queued.rowNumber;
     if(!queueRowNumber) throw new Error("OUTREACH_QUEUE_APPEND_UNCONFIRMED");
     const baseEvent={messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
+    stage="ATTEMPT_EVENT_APPEND";
     await appendEvent({...baseEvent,eventType:"SEND_ATTEMPT"});
+    stage="PROVIDER_SEND";
+    providerAttempted=true;
     const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey,approvalId:freshGate.approvalId}):await sendWhatsapp({prospect,message,idempotencyKey});
     if(!result.ok) {
       queueRecord={...queueRecord,status:"BLOQUEADO",lastError:result.error,attempts:1,nextAction:"Corregir configuración; no reintentar automáticamente"};
@@ -1021,12 +1037,39 @@ async function processSend(input) {
     } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
     return {status:200,body:{ok:true,eventId:event.eventId,idempotencyKey}};
   } catch(error) {
+    console.error("outreach send failed",{
+      messageId,
+      rowNumber:prospect.rowNumber,
+      sourceSheet:prospect.sourceSheet,
+      channel,
+      stage,
+      providerAttempted,
+      error:error?.stack||error?.message||String(error)
+    });
+    if(!providerAttempted) {
+      if(queueRowNumber&&queueRecord) {
+        queueRecord={...queueRecord,status:"BLOQUEADO",lastError:error.message||"PRE_SEND_FAILED",attempts:0,nextAction:"Corregir la persistencia antes de reintentar"};
+        try { await updateOutreachQueue(queueRowNumber,queueRecord); } catch { /* preserve the original pre-send failure */ }
+      }
+      let event=null;
+      try {
+        event=await appendEvent({messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"BLOQUEADO",eventType:"SEND_BLOCKED",detail:"PRE_SEND_FAILED",evidence:`stage=${stage}; provider_attempted=false`});
+      } catch(eventError) {
+        console.error("outreach pre-send event persistence failed",{messageId,stage,error:eventError?.message||String(eventError)});
+      }
+      return {status:502,body:{ok:false,error:"PRE_SEND_FAILED",stage,eventId:event?.eventId||null,detail:"El proveedor no fue contactado; el envío no salió."}};
+    }
     if(queueRowNumber&&queueRecord) {
       queueRecord={...queueRecord,status:"OUTCOME_UNKNOWN",lastError:error.name||"NETWORK_ERROR",attempts:1,nextAction:"Reconciliar proveedor antes de reintentar"};
       try { await updateOutreachQueue(queueRowNumber,queueRecord); } catch { /* preserve original uncertain result */ }
     }
-    const event=await appendEvent({messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"});
-    return {status:502,body:{ok:false,error:"OUTCOME_UNKNOWN",eventId:event.eventId,detail:"Resultado incierto: no se reintentará hasta reconciliar."}};
+    let event=null;
+    try {
+      event=await appendEvent({messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"wis-command-center",fromStatus:queueRowNumber?"EN_COLA":"APROBADO",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"});
+    } catch(eventError) {
+      console.error("outreach uncertain event persistence failed",{messageId,stage,error:eventError?.message||String(eventError)});
+    }
+    return {status:502,body:{ok:false,error:"OUTCOME_UNKNOWN",eventId:event?.eventId||null,detail:"Resultado incierto: no se reintentará hasta reconciliar."}};
   } finally {
     releaseLocks();
   }
