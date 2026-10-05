@@ -17,6 +17,7 @@
 *session*.json
 
 # Runtime and generated artifacts
+.wis-runtime/
 node_modules/
 .next/
 dist/
