@@ -802,6 +802,8 @@ const sendErrors={
   MESSAGE_CHANGED:"el texto cambió después de la aprobación y debe revisarse nuevamente.",
   GOOGLE_SHEETS_WRITES_DISABLED:"no se pudo guardar en Google Sheets.",
   MESSAGE_REQUIRED:"escribí un mensaje antes de guardarlo."
+  ,PRE_SEND_FAILED:"El proveedor no fue contactado y el email no salió. Revisá el detalle técnico antes de reintentar."
+  ,SERVICE_RESPONSE_INVALID:"El servicio se reinició antes de confirmar el resultado. No se reintentó automáticamente."
   ,HOTEL_CONTACTS_ONLY:"la campaña de hoteles está limitada a contactos hasta autorizar la fase 2."
 };
 
@@ -845,7 +847,10 @@ async function sendMessage(event) {
       message:$("#send-message").value,
       confirmed:true
     })});
-    const payload=await response.json();
+    const responseText=await response.text();
+    let payload={};
+    try { payload=responseText?JSON.parse(responseText):{}; }
+    catch { payload={error:"SERVICE_RESPONSE_INVALID",detail:"El servicio se reinició antes de confirmar el resultado. No se reintentó automáticamente."}; }
     if(!response.ok) throw new Error(sendErrors[payload.error]||payload.detail||payload.error||"No se pudo enviar");
     $("#send-dialog").close();
     toast(`${isWa?"WhatsApp":"Email"} enviado y registrado sin duplicados.`);
