@@ -72,15 +72,13 @@ test("channel cadence and WhatsApp opt-in gates remain closed",()=>{
 });
 
 test("Brevo reconciliation fails closed and detects a provider duplicate",async()=>{
-  const originalFetch=globalThis.fetch;
   process.env.BREVO_API_KEY="test";
   try {
-    globalThis.fetch=async()=>({ok:true,json:async()=>({events:[{event:"delivered",date:"2026-10-05T12:30:00.000Z"}]})});
-    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"})).error,"PROVIDER_DUPLICATE_RECIPIENT");
-    globalThis.fetch=async()=>({ok:false,json:async()=>({})});
-    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"})).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+    const duplicateRequest=async()=>({ok:true,status:200,body:{events:[{event:"delivered",date:"2026-10-05T12:30:00.000Z"}]}});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},duplicateRequest)).error,"PROVIDER_DUPLICATE_RECIPIENT");
+    const failedRequest=async()=>({ok:false,status:500,body:{}});
+    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},failedRequest)).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
   } finally {
-    globalThis.fetch=originalFetch;
     delete process.env.BREVO_API_KEY;
   }
 });

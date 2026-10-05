@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { request as httpsRequest } from "node:https";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -870,15 +871,45 @@ async function postJson(url,payload,headers={}) {
   return {ok:response.ok,status:response.status,body:parsed};
 }
 
-async function reconcileBrevoRecipient({email,approvedAt}) {
+function httpsJson(url,{method="GET",headers={},payload=null,timeoutMs=25_000,maxBytes=1_000_000}={}) {
+  return new Promise((resolvePromise,rejectPromise)=>{
+    const encoded=payload===null?null:JSON.stringify(payload);
+    const request=httpsRequest(url,{
+      method,
+      headers:{
+        accept:"application/json",
+        ...(encoded?{"content-type":"application/json","content-length":Buffer.byteLength(encoded)}:{}),
+        ...headers
+      }
+    },response=>{
+      let raw="";
+      response.setEncoding("utf8");
+      response.on("data",chunk=>{
+        raw+=chunk;
+        if(raw.length>maxBytes) request.destroy(new Error("HTTPS_RESPONSE_TOO_LARGE"));
+      });
+      response.on("end",()=>{
+        let body={};
+        try { body=raw?JSON.parse(raw):{}; } catch { body={raw:raw.slice(0,500)}; }
+        const status=Number(response.statusCode||0);
+        resolvePromise({ok:status>=200&&status<300,status,body});
+      });
+    });
+    request.setTimeout(timeoutMs,()=>request.destroy(Object.assign(new Error("HTTPS_TIMEOUT"),{name:"TimeoutError"})));
+    request.on("error",rejectPromise);
+    if(encoded) request.write(encoded);
+    request.end();
+  });
+}
+
+async function reconcileBrevoRecipient({email,approvedAt},requestJson=httpsJson) {
   if(!process.env.BREVO_API_KEY) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_UNAVAILABLE",status:409};
   const url=new URL("https://api.brevo.com/v3/smtp/statistics/events");
   url.searchParams.set("email",email);
   url.searchParams.set("limit","50");
   url.searchParams.set("sort","desc");
-  const response=await fetch(url,{headers:{"api-key":process.env.BREVO_API_KEY,accept:"application/json"},signal:AbortSignal.timeout(15_000)});
-  let body={};
-  try { body=await response.json(); } catch { /* fail closed below */ }
+  const response=await requestJson(url,{headers:{"api-key":process.env.BREVO_API_KEY},timeoutMs:15_000});
+  const body=response.body||{};
   if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502};
   const approvedAtMs=Date.parse(approvedAt||"");
   if(!Number.isFinite(approvedAtMs)) return {ok:false,error:"APPROVAL_TIMESTAMP_INVALID",status:409};
@@ -910,14 +941,14 @@ async function sendEmail({prospect,message,idempotencyKey,approvalId}) {
     idempotencyKey,
     prospect:{rowNumber:prospect.rowNumber,empresa:prospect.empresa}
   };
-  const result=directBrevo?await postJson("https://api.brevo.com/v3/smtp/email",{
+  const result=directBrevo?await httpsJson("https://api.brevo.com/v3/smtp/email",{method:"POST",payload:{
     sender:{name:"Ortu - WIS",email:"ortu@wis-agency.com"},
     to:[{email:prospect.email,name:prospect.empresa}],
     replyTo:{email:"ortu@wis-agency.com",name:"Ortu - WIS"},
     subject,
     htmlContent:`<div style="font-family:Arial,sans-serif;white-space:normal">${body.replace(/[&<>\"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;","'":"&#39;"})[char]).replace(/\r?\n/g,"<br>")}</div>${signatureHtml}`,
     headers:{"X-WIS-Idempotency-Key":idempotencyKey}
-  },{"api-key":process.env.BREVO_API_KEY,accept:"application/json"}):await postJson(process.env.WIS_EMAIL_WEBHOOK_URL,payload,{authorization:`Bearer ${process.env.WIS_EMAIL_WEBHOOK_TOKEN}`});
+  },headers:{"api-key":process.env.BREVO_API_KEY}}):await postJson(process.env.WIS_EMAIL_WEBHOOK_URL,payload,{authorization:`Bearer ${process.env.WIS_EMAIL_WEBHOOK_TOKEN}`});
   if(!result.ok) return {ok:false,error:"PROVIDER_REJECTED",status:502,providerStatus:result.status};
   return {ok:true,providerMessageId:result.body.messageId||result.body.id||"accepted"};
 }
