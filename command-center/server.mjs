@@ -756,6 +756,25 @@ async function dashboardPayload({refresh=true}={}) {
   };
 }
 
+function sendContextFromData(snapshot,localEvents,verification,{sourceSheet,rowNumber}) {
+  const rawProspect=(snapshot.prospects||[]).find(row=>
+    Number(row.rowNumber)===Number(rowNumber)&&String(row.sourceSheet||"Distribuidoras_300")===String(sourceSheet)
+  );
+  return {
+    prospect:rawProspect?normalizeProspect(rawProspect):null,
+    events:[...(localEvents||[]),...(snapshot.events||[])],
+    health:channelHealth(verification)
+  };
+}
+
+async function sendContext(snapshot,selection) {
+  const [localEvents,verification]=await Promise.all([
+    readNdjson(outreachEventsPath,500),
+    readJson(channelVerificationPath,{})
+  ]);
+  return sendContextFromData(snapshot,localEvents,verification,selection);
+}
+
 async function appendEvent(event) {
   const complete={eventId:`EVT-${Date.now()}-${randomUUID().slice(0,8)}`,timestamp:new Date().toISOString(),...event};
   if(sheetsWriteConfigured()) await appendOutreachEvent(complete);
@@ -921,9 +940,9 @@ async function processSend(input) {
   const sendSnapshot=await readJson(sheetSnapshotPath,{});
   const snapshotGate=sendSnapshotGate(sendSnapshot);
   if(!snapshotGate.eligible) return {status:409,body:{ok:false,error:snapshotGate.reason}};
-  const payload=await dashboardPayload({refresh:false});
   const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
-  const prospect=payload.prospects.find(row=>row.rowNumber===Number(input.rowNumber)&&row.sourceSheet===sourceSheet);
+  const context=await sendContext(sendSnapshot,{sourceSheet,rowNumber:Number(input.rowNumber)});
+  const prospect=context.prospect;
   if(!prospect) return {status:404,body:{ok:false,error:"PROSPECT_NOT_FOUND"}};
   if(prospect.phase==="contacts") return {status:409,body:{ok:false,error:"HOTEL_CONTACTS_ONLY"}};
   const recipient=channel==="EMAIL"?prospect.email:prospect.whatsapp;
@@ -936,18 +955,16 @@ async function processSend(input) {
   if(!gate.eligible) return {status:409,body:{ok:false,error:gate.reason}};
   if(channel==="EMAIL"&&!emailApprovalAllowed(gate.approvalId)) return {status:409,body:{ok:false,error:"EMAIL_APPROVAL_NOT_ALLOWED"}};
   if(hash(message)!==gate.approvedMessageHash) return {status:409,body:{ok:false,error:"MESSAGE_CHANGED"}};
-  const verification=await readJson(channelVerificationPath,{});
-  const health=channelHealth(verification);
-  const selectedHealth=channel==="EMAIL"?health.email:health.whatsapp;
+  const selectedHealth=channel==="EMAIL"?context.health.email:context.health.whatsapp;
   if(!selectedHealth.canSend) return {status:409,body:{ok:false,error:selectedHealth.configured?"CHANNEL_BLOCKED":channel==="EMAIL"?"EMAIL_PROVIDER_NOT_CONFIGURED":"WHATSAPP_PROVIDER_NOT_CONFIGURED"}};
-  const stopGate=prospectStopGate(payload.events,prospect,channel);
+  const stopGate=prospectStopGate(context.events,prospect,channel);
   if(!stopGate.eligible) return {status:409,body:{ok:false,error:stopGate.reason}};
-  const limitGate=channelLimitGate(payload.events,channel);
+  const limitGate=channelLimitGate(context.events,channel);
   if(!limitGate.eligible) return {status:409,body:{ok:false,error:limitGate.reason}};
   const optIn=channel==="WHATSAPP"?whatsappOptInGate(snapshot,prospect):null;
   if(optIn&&!optIn.eligible) return {status:409,body:{ok:false,error:optIn.reason}};
   if(channel==="WHATSAPP") {
-    const emailSent=payload.events.some(row=>row.channel==="EMAIL"&&isSuccessfulSend(row)&&
+    const emailSent=context.events.some(row=>row.channel==="EMAIL"&&isSuccessfulSend(row)&&
       ((row.source==="DASHBOARD"&&sameProspect(row,prospect))||(prospect.email&&key(row.recipient)===key(prospect.email))));
     if(!emailSent) return {status:409,body:{ok:false,error:"EMAIL_FIRST_REQUIRED"}};
   }
@@ -958,16 +975,17 @@ async function processSend(input) {
   let queueRowNumber=null;
   let queueRecord=null;
   try {
-    const freshPayload=await dashboardPayload({refresh:false});
     const freshSnapshot=await readJson(sheetSnapshotPath,{});
-    const freshProspect=freshPayload.prospects.find(row=>row.rowNumber===prospect.rowNumber&&row.sourceSheet===prospect.sourceSheet);
+    const freshContext=await sendContext(freshSnapshot,{sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber});
+    const freshProspect=freshContext.prospect;
+    if(!freshProspect) return {status:404,body:{ok:false,error:"PROSPECT_NOT_FOUND"}};
     const freshGate=approvalGate(freshSnapshot,freshProspect,channel);
     if(!freshGate.eligible) return {status:409,body:{ok:false,error:freshGate.reason}};
-    const freshStopGate=prospectStopGate([...freshPayload.events,...(freshSnapshot.outreachQueue||[])],freshProspect,channel);
+    const freshStopGate=prospectStopGate([...freshContext.events,...(freshSnapshot.outreachQueue||[])],freshProspect,channel);
     if(!freshStopGate.eligible) return {status:409,body:{ok:false,error:freshStopGate.reason}};
-    const freshLimitGate=channelLimitGate(freshPayload.events,channel);
+    const freshLimitGate=channelLimitGate(freshContext.events,channel);
     if(!freshLimitGate.eligible) return {status:409,body:{ok:false,error:freshLimitGate.reason}};
-    const previous=freshPayload.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
+    const previous=freshContext.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
     if(channel==="EMAIL") {
       const reconciliation=await reconcileBrevoRecipient({email:freshProspect.email,approvedAt:freshGate.approvedAt});
@@ -1278,4 +1296,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, sendSnapshotGate, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, sendContextFromData, sendSnapshotGate, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
