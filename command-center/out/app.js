@@ -68,7 +68,7 @@ function renderMetrics() {
   const sources={...(s.prospectsBySheet||{})};
   sources.Hoteles_Argentina_300=(sources.Hoteles_Argentina_300||0)+(sources.Hoteles_LATAM_500||0);
   $("#metrics").innerHTML=[
-    metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0}`),
+    metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0} · Logísticas ${sources.Logisticas_LATAM||0}`),
     metric("Con ambos canales",s.bothChannels ?? 0,"Email + WhatsApp","blue"),
     metric("Listos para revisar",s.ready ?? 0,"Cobertura de reseñas completa","amber"),
     metric("Contactados",s.contacted ?? 0,"Historial consolidado","red")

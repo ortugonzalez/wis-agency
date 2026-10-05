@@ -79,6 +79,7 @@ Variables del proceso local:
 - `WIS_EMAIL_WEBHOOK_URL`
 - `WIS_EMAIL_WEBHOOK_TOKEN`
 - `WIS_EMAIL_OUTBOUND_ENABLED=true`
+- `WIS_EMAIL_ALLOWED_APPROVAL_IDS=APR-...` — lista blanca obligatoria de aprobaciones exactas; separar varias con coma.
 
 El webhook recibe un destinatario individual, asunto, cuerpo, identidad WIS y clave idempotente. La configuración permanece bloqueada si falta cualquiera de las tres variables.
 
