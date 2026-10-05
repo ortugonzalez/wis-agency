@@ -853,7 +853,7 @@ async function sendMessage(event) {
     catch { payload={error:"SERVICE_RESPONSE_INVALID",detail:"El servicio se reinició antes de confirmar el resultado. No se reintentó automáticamente."}; }
     if(!response.ok) throw new Error(sendErrors[payload.error]||payload.detail||payload.error||"No se pudo enviar");
     $("#send-dialog").close();
-    toast(`${isWa?"WhatsApp":"Email"} enviado y registrado sin duplicados.`);
+    toast(payload.queued?`${isWa?"WhatsApp":"Email"} quedó en cola. El panel actualizará el resultado.`:`${isWa?"WhatsApp":"Email"} enviado y registrado sin duplicados.`);
     await loadData(true);
   } catch(error) {
     errorNode.textContent=error.message;

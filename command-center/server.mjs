@@ -1011,6 +1011,35 @@ async function sendWhatsapp({prospect,message,idempotencyKey}) {
   return {ok:true,providerMessageId:result.body?.data?.id||result.body?.id||"accepted"};
 }
 
+async function deliverQueuedMessage({queueRecord,queueRowNumber,baseEvent,prospect,message,idempotencyKey,channel,approvalId,gate,messageId,releaseLocks}) {
+  let providerAttempted=false;
+  try {
+    providerAttempted=true;
+    const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey,approvalId}):await sendWhatsapp({prospect,message,idempotencyKey});
+    if(!result.ok) {
+      queueRecord={...queueRecord,status:"BLOQUEADO",lastError:result.error,attempts:1,nextAction:"Corregir configuración; no reintentar automáticamente"};
+      await updateOutreachQueue(queueRowNumber,queueRecord);
+      await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"BLOQUEADO",eventType:"SEND_BLOCKED",detail:result.error,providerStatus:result.providerStatus||null});
+      return;
+    }
+    queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
+    await updateOutreachQueue(queueRowNumber,queueRecord);
+    await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
+    lastLiveSyncAt=0;
+    try {
+      await recordCostUsage({operationId:messageId,idempotencyKey:`COST:${idempotencyKey}`,prospectKey:gate.prospectKey,sourceRow:prospect.rowNumber,empresa:prospect.empresa,stage:"SEND",provider:channel==="EMAIL"?"brevo":"whatsapp",service:channel==="EMAIL"?"transactional-email":"baileys",units:1,unitName:channel==="EMAIL"?"email":"mensaje",metadata:{channel,messageId},recordedBy:"wis-command-center"});
+    } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
+  } catch(error) {
+    console.error("queued outreach delivery failed",{messageId,channel,providerAttempted,error:error?.stack||error?.message||String(error)});
+    queueRecord={...queueRecord,status:"OUTCOME_UNKNOWN",lastError:error?.name||"NETWORK_ERROR",attempts:1,nextAction:"Reconciliar proveedor antes de reintentar"};
+    try { await updateOutreachQueue(queueRowNumber,queueRecord); } catch { /* preserve uncertain provider outcome */ }
+    try { await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"OUTCOME_UNKNOWN",eventType:"OUTCOME_UNKNOWN",detail:error?.name||"NETWORK_ERROR",evidence:"Requiere reconciliación durable antes de reintentar"}); }
+    catch(eventError) { console.error("queued outreach uncertain event persistence failed",{messageId,error:eventError?.message||String(eventError)}); }
+  } finally {
+    releaseLocks();
+  }
+}
+
 async function processSend(input) {
   let stage="VALIDATING_INPUT";
   if(input.confirmed!==true) return {status:400,body:{ok:false,error:"HUMAN_CONFIRMATION_REQUIRED"}};
@@ -1069,6 +1098,7 @@ async function processSend(input) {
   let queueRowNumber=null;
   let queueRecord=null;
   let providerAttempted=false;
+  let lockHandedOff=false;
   try {
     stage="REFRESHING_SEND_CONTEXT";
     let freshSnapshot=await readJson(sheetSnapshotPath,{});
@@ -1106,23 +1136,11 @@ async function processSend(input) {
     const baseEvent={messageId,rowNumber:prospect.rowNumber,sourceSheet:prospect.sourceSheet,empresa:prospect.empresa,channel,recipient,idempotencyKey,messageHash:hash(message),approvalId:gate.approvalId,campaignId:gate.campaignId,batchId:gate.batchId,messageVersion:gate.messageVersion,approval:"HUMAN_DASHBOARD_CLICK",source:"DASHBOARD",actor:"human-dashboard",fromStatus:"APROBADO",toStatus:"EN_COLA",evidence:`approval=${gate.approvalId};message_sha256=${hash(message)}`,optInProviderEventIdHash:channel==="WHATSAPP"?hash(optIn.providerEventId):null,optInRecordedAt:optIn?.recordedAt||null,optInSource:optIn?.source||null,optInScope:optIn?.scope||null};
     stage="ATTEMPT_EVENT_APPEND";
     await appendEvent({...baseEvent,eventType:"SEND_ATTEMPT"});
-    stage="PROVIDER_SEND";
-    providerAttempted=true;
-    const result=channel==="EMAIL"?await sendEmail({prospect,message,idempotencyKey,approvalId:freshGate.approvalId}):await sendWhatsapp({prospect,message,idempotencyKey});
-    if(!result.ok) {
-      queueRecord={...queueRecord,status:"BLOQUEADO",lastError:result.error,attempts:1,nextAction:"Corregir configuración; no reintentar automáticamente"};
-      await updateOutreachQueue(queueRowNumber,queueRecord);
-      await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"BLOQUEADO",eventType:"SEND_BLOCKED",detail:result.error,providerStatus:result.providerStatus||null});
-      return {status:result.status||409,body:{ok:false,error:result.error}};
-    }
-    queueRecord={...queueRecord,status:"ENVIADO",sentAt:new Date().toISOString(),providerRef:hash(result.providerMessageId),outcome:"PENDIENTE_RESPUESTA",attempts:1,nextAction:"Monitorear respuesta"};
-    await updateOutreachQueue(queueRowNumber,queueRecord);
-    const event=await appendEvent({...baseEvent,fromStatus:"EN_COLA",toStatus:"ENVIADO",eventType:"SENT",providerRef:hash(result.providerMessageId),providerMessageIdHash:hash(result.providerMessageId)});
+    stage="PROVIDER_SEND_QUEUED";
+    lockHandedOff=true;
     lastLiveSyncAt=0;
-    try {
-      await recordCostUsage({operationId:messageId,idempotencyKey:`COST:${idempotencyKey}`,prospectKey:gate.prospectKey,sourceRow:prospect.rowNumber,empresa:prospect.empresa,stage:"SEND",provider:channel==="EMAIL"?"brevo":"whatsapp",service:channel==="EMAIL"?"transactional-email":"baileys",units:1,unitName:channel==="EMAIL"?"email":"mensaje",metadata:{channel,messageId},recordedBy:"wis-command-center"});
-    } catch { /* el envío confirmado no cambia por una falla secundaria de telemetría */ }
-    return {status:200,body:{ok:true,eventId:event.eventId,idempotencyKey}};
+    setImmediate(()=>{ void deliverQueuedMessage({queueRecord,queueRowNumber,baseEvent,prospect,message,idempotencyKey,channel,approvalId:freshGate.approvalId,gate,messageId,releaseLocks}); });
+    return {status:202,body:{ok:true,queued:true,messageId,idempotencyKey}};
   } catch(error) {
     console.error("outreach send failed",{
       messageId,
@@ -1158,7 +1176,7 @@ async function processSend(input) {
     }
     return {status:502,body:{ok:false,error:"OUTCOME_UNKNOWN",eventId:event?.eventId||null,detail:"Resultado incierto: no se reintentará hasta reconciliar."}};
   } finally {
-    releaseLocks();
+    if(!lockHandedOff) releaseLocks();
   }
 }
 
