@@ -1,7 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "timezone": "America/Buenos_Aires",
   "schedules": [
+    {"id":"AUTO-PIPELINE-010","name":"Orquestador comercial automático","action":"PROCESS_PIPELINE","mode":"EVERY_N_MINUTES","intervalMinutes":10,"dailyTime":null,"status":"ACTIVE","dryRun":true,"maxSpecialists":3,"batchSize":25},
     {"id":"AUTO-SNAPSHOT-005","name":"Actualizar panel","action":"REFRESH_SNAPSHOT","mode":"EVERY_N_MINUTES","intervalMinutes":5,"dailyTime":null,"status":"PAUSED"},
     {"id":"AUTO-RESEARCH-060","name":"Continuar research","action":"CONTINUE_RESEARCH","mode":"EVERY_N_MINUTES","intervalMinutes":60,"dailyTime":null,"status":"PAUSED"},
     {"id":"AUTO-RESEARCH-DAILY","name":"Research diario","action":"CONTINUE_RESEARCH","mode":"DAILY","intervalMinutes":null,"dailyTime":"09:30","status":"PAUSED"},

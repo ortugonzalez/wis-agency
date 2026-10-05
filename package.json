@@ -5,6 +5,8 @@
   "scripts": {
     "agents:validate": "node scripts/validate-agents.mjs",
     "agents:dry-run": "node scripts/simulate-agent-flow.mjs",
+    "pipeline:plan": "node scripts/run-pipeline-dispatcher.mjs plan",
+    "pipeline:status": "node scripts/run-pipeline-dispatcher.mjs status",
     "outreach:dry-run": "node scripts/simulate-outreach-flow.mjs",
     "dashboard:start": "node ops/reports/web/wis-operations-dashboard/server.mjs",
     "test:agents": "node --test \"test/agents/**/*.test.mjs\"",
