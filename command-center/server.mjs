@@ -938,11 +938,11 @@ async function processSend(input) {
   if(input.confirmed!==true) return {status:400,body:{ok:false,error:"HUMAN_CONFIRMATION_REQUIRED"}};
   const channel=String(input.channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(channel)) return {status:400,body:{ok:false,error:"CHANNEL_INVALID"}};
-  const sendSnapshot=await readJson(sheetSnapshotPath,{});
+  let sendSnapshot=await readJson(sheetSnapshotPath,{});
   const snapshotGate=sendSnapshotGate(sendSnapshot);
   if(!snapshotGate.eligible) return {status:409,body:{ok:false,error:snapshotGate.reason}};
   const sourceSheet=String(input.sourceSheet||"Distribuidoras_300");
-  const context=await sendContext(sendSnapshot,{sourceSheet,rowNumber:Number(input.rowNumber)});
+  let context=await sendContext(sendSnapshot,{sourceSheet,rowNumber:Number(input.rowNumber)});
   const prospect=context.prospect;
   if(!prospect) return {status:404,body:{ok:false,error:"PROSPECT_NOT_FOUND"}};
   if(prospect.phase==="contacts") return {status:409,body:{ok:false,error:"HOTEL_CONTACTS_ONLY"}};
@@ -951,8 +951,7 @@ async function processSend(input) {
   if(channel==="WHATSAPP"&&!prospect.whatsappE164) return {status:400,body:{ok:false,error:"WHATSAPP_PHONE_INVALID"}};
   const message=String(input.message||"").trim();
   if(!message) return {status:400,body:{ok:false,error:"MESSAGE_REQUIRED"}};
-  const snapshot=await readJson(sheetSnapshotPath,{});
-  const gate=approvalGate(snapshot,prospect,channel);
+  const gate=approvalGate(sendSnapshot,prospect,channel);
   if(!gate.eligible) return {status:409,body:{ok:false,error:gate.reason}};
   if(channel==="EMAIL"&&!emailApprovalAllowed(gate.approvalId)) return {status:409,body:{ok:false,error:"EMAIL_APPROVAL_NOT_ALLOWED"}};
   if(hash(message)!==gate.approvedMessageHash) return {status:409,body:{ok:false,error:"MESSAGE_CHANGED"}};
@@ -962,7 +961,7 @@ async function processSend(input) {
   if(!stopGate.eligible) return {status:409,body:{ok:false,error:stopGate.reason}};
   const limitGate=channelLimitGate(context.events,channel);
   if(!limitGate.eligible) return {status:409,body:{ok:false,error:limitGate.reason}};
-  const optIn=channel==="WHATSAPP"?whatsappOptInGate(snapshot,prospect):null;
+  const optIn=channel==="WHATSAPP"?whatsappOptInGate(sendSnapshot,prospect):null;
   if(optIn&&!optIn.eligible) return {status:409,body:{ok:false,error:optIn.reason}};
   if(channel==="WHATSAPP") {
     const emailSent=context.events.some(row=>row.channel==="EMAIL"&&isSuccessfulSend(row)&&
@@ -971,6 +970,8 @@ async function processSend(input) {
   }
   const idempotencyKey=gate.idempotencyKey;
   if(input.dryRun===true) {
+    sendSnapshot=null;
+    context=null;
     stage="PROVIDER_RECONCILIATION";
     if(channel==="EMAIL") {
       const reconciliation=await reconcileBrevoRecipient({email:prospect.email,approvedAt:gate.approvedAt});
@@ -978,6 +979,8 @@ async function processSend(input) {
     }
     return {status:200,body:{ok:true,dryRun:true,stage:"READY_TO_QUEUE",approvalId:gate.approvalId,idempotencyKey}};
   }
+  sendSnapshot=null;
+  context=null;
   const releaseLocks=acquireSendLocks([`message:${idempotencyKey}`,`channel:${channel}`]);
   if(!releaseLocks) return {status:409,body:{ok:false,error:"SEND_IN_PROGRESS"}};
   const messageId=`MSG-${Date.now()}-${hash(idempotencyKey).slice(0,10)}`;
@@ -986,8 +989,8 @@ async function processSend(input) {
   let providerAttempted=false;
   try {
     stage="REFRESHING_SEND_CONTEXT";
-    const freshSnapshot=await readJson(sheetSnapshotPath,{});
-    const freshContext=await sendContext(freshSnapshot,{sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber});
+    let freshSnapshot=await readJson(sheetSnapshotPath,{});
+    let freshContext=await sendContext(freshSnapshot,{sourceSheet:prospect.sourceSheet,rowNumber:prospect.rowNumber});
     const freshProspect=freshContext.prospect;
     if(!freshProspect) return {status:404,body:{ok:false,error:"PROSPECT_NOT_FOUND"}};
     const freshGate=approvalGate(freshSnapshot,freshProspect,channel);
@@ -998,6 +1001,8 @@ async function processSend(input) {
     if(!freshLimitGate.eligible) return {status:409,body:{ok:false,error:freshLimitGate.reason}};
     const previous=freshContext.events.find(row=>row.idempotencyKey===idempotencyKey&&/SEND_ATTEMPT|SENT|OUTCOME_UNKNOWN/i.test(row.eventType||""));
     if(previous) return {status:409,body:{ok:false,error:"DUPLICATE_IDEMPOTENCY_KEY",eventId:previous.eventId}};
+    freshSnapshot=null;
+    freshContext=null;
     if(channel==="EMAIL") {
       stage="PROVIDER_RECONCILIATION";
       const reconciliation=await reconcileBrevoRecipient({email:freshProspect.email,approvedAt:freshGate.approvedAt});
