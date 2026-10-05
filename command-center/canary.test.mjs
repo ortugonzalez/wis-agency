@@ -77,7 +77,9 @@ test("Brevo reconciliation fails closed and detects a provider duplicate",async(
     const duplicateRequest=async()=>({ok:true,status:200,body:{events:[{event:"delivered",date:"2026-10-05T12:30:00.000Z"}]}});
     assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},duplicateRequest)).error,"PROVIDER_DUPLICATE_RECIPIENT");
     const failedRequest=async()=>({ok:false,status:500,body:{}});
-    assert.equal((await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},failedRequest)).error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+    const failed=await reconcileBrevoRecipient({email:"contacto@silo-logistica.cl",approvedAt:"2026-10-05T12:20:06.163Z"},failedRequest);
+    assert.equal(failed.error,"EMAIL_PROVIDER_RECONCILIATION_FAILED");
+    assert.equal(failed.providerStatus,500);
   } finally {
     delete process.env.BREVO_API_KEY;
   }
@@ -95,6 +97,17 @@ test("async email preflight reports READY and keeps at most 50 observable jobs",
   assert.equal(emailPreflightStatus(jobs.at(-1).jobId)?.status,"READY");
   assert.equal(emailPreflightStatus(jobs.at(-1).jobId)?.stage,"READY_TO_QUEUE");
   assert.equal(jobs.filter(job=>emailPreflightStatus(job.jobId)).length,50);
+});
+
+test("async email preflight exposes only a numeric provider status on failure",async()=>{
+  const blocked=startEmailPreflight({email:"private@example.com",approvedAt:"2026-10-05T12:20:06.163Z",approvalId:"APR-TEST",idempotencyKey:"TEST-BLOCKED"},async()=>({ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",providerStatus:400,body:{secret:true}}));
+  await new Promise(resolve=>setImmediate(resolve));
+  await new Promise(resolve=>setImmediate(resolve));
+  const visible=emailPreflightStatus(blocked.jobId);
+  assert.equal(visible.status,"BLOCKED");
+  assert.equal(visible.providerStatus,400);
+  assert.equal(typeof visible.providerStatus,"number");
+  for(const forbidden of ["body","email","apiKey","message"]) assert.equal(Object.hasOwn(visible,forbidden),false);
 });
 
 test("Brevo allowlist is exact",()=>{

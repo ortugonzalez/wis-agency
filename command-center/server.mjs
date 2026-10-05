@@ -911,7 +911,7 @@ async function reconcileBrevoRecipient({email,approvedAt},requestJson=httpsJson)
   url.searchParams.set("sort","desc");
   const response=await requestJson(url,{headers:{"api-key":process.env.BREVO_API_KEY},timeoutMs:15_000});
   const body=response.body||{};
-  if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502};
+  if(!response.ok||!Array.isArray(body.events)) return {ok:false,error:"EMAIL_PROVIDER_RECONCILIATION_FAILED",status:502,providerStatus:response.status||0};
   const approvedAtMs=Date.parse(approvedAt||"");
   if(!Number.isFinite(approvedAtMs)) return {ok:false,error:"APPROVAL_TIMESTAMP_INVALID",status:409};
   const duplicate=body.events.find(event=>{
@@ -944,6 +944,7 @@ function startEmailPreflight({email,approvedAt,approvalId,idempotencyKey},reconc
         status:result.ok?"READY":"BLOCKED",
         stage:result.ok?"READY_TO_QUEUE":"PROVIDER_RECONCILIATION",
         error:result.ok?null:result.error,
+        providerStatus:result.ok?200:result.providerStatus||0,
         finishedAt:new Date().toISOString()
       });
       pruneEmailPreflightJobs();
