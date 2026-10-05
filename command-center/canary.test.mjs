@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, whatsappOptInGate } from "./server.mjs";
+import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, sendSnapshotGate, whatsappOptInGate } from "./server.mjs";
 import { commercialDataRow, qaRecordsFromApprovals } from "./sheets-live.mjs";
 
 const message="Asunto: Prueba\n\nMensaje aprobado";
@@ -89,4 +89,20 @@ test("Brevo allowlist is exact",()=>{
   process.env.WIS_EMAIL_ALLOWED_APPROVAL_IDS="APR-LOG-CHILE-B002-EMAIL-001";
   assert.equal(emailApprovalAllowed("APR-LOG-CHILE-B002-EMAIL-001"),true);
   assert.equal(emailApprovalAllowed("APR-OTHER"),false);
+});
+
+test("send endpoint source avoids a forced full Sheets refresh",async()=>{
+  const source=await (await import("node:fs/promises")).readFile(new URL("./server.mjs",import.meta.url),"utf8");
+  const processSendSource=source.slice(source.indexOf("async function processSend"),source.indexOf("async function syncFromProxy"));
+  assert.doesNotMatch(processSendSource,/refreshLiveSheets\(true\)/);
+  assert.match(processSendSource,/dashboardPayload\(\{refresh:false\}\)/);
+  assert.match(processSendSource,/sendSnapshotGate\(sendSnapshot\)/);
+});
+
+test("send snapshot gate fails closed for stale, future and invalid timestamps",()=>{
+  const now=Date.parse("2026-10-05T15:00:00.000Z");
+  assert.equal(sendSnapshotGate({fetchedAt:"2026-10-05T14:59:00.000Z"},now,120).eligible,true);
+  assert.equal(sendSnapshotGate({fetchedAt:"2026-10-05T14:57:59.000Z"},now,120).reason,"SEND_SNAPSHOT_STALE");
+  assert.equal(sendSnapshotGate({fetchedAt:"2026-10-05T15:00:31.000Z"},now,120).reason,"SEND_SNAPSHOT_STALE");
+  assert.equal(sendSnapshotGate({fetchedAt:"invalid"},now,"invalid").reason,"SEND_SNAPSHOT_STALE");
 });
