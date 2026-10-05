@@ -135,6 +135,20 @@ test("send endpoint source avoids a forced full Sheets refresh",async()=>{
   assert.match(processSendSource,/sendSnapshotGate\(sendSnapshot\)/);
 });
 
+test("send endpoint durably queues before handing provider delivery to the background",async()=>{
+  const source=await (await import("node:fs/promises")).readFile(new URL("./server.mjs",import.meta.url),"utf8");
+  const processSendSource=source.slice(source.indexOf("async function processSend"),source.indexOf("async function syncFromProxy"));
+  const queueIndex=processSendSource.indexOf("await appendOutreachQueue(queueRecord)");
+  const attemptIndex=processSendSource.indexOf('eventType:"SEND_ATTEMPT"');
+  const handoffIndex=processSendSource.indexOf("lockHandedOff=true");
+  const backgroundIndex=processSendSource.indexOf("setImmediate");
+  const acceptedIndex=processSendSource.indexOf("queued:true");
+  assert.ok(queueIndex>=0&&queueIndex<attemptIndex&&attemptIndex<handoffIndex&&handoffIndex<backgroundIndex&&backgroundIndex<acceptedIndex);
+  assert.doesNotMatch(processSendSource,/await sendEmail\(/);
+  assert.match(processSendSource,/if\(!lockHandedOff\) releaseLocks\(\)/);
+  assert.match(source,/async function deliverQueuedMessage[\s\S]*status:"OUTCOME_UNKNOWN"[\s\S]*releaseLocks\(\)/);
+});
+
 test("send context loads only the selected prospect and the event gates",()=>{
   const snapshot={
     prospects:[
