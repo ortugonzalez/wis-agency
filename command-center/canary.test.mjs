@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, sendSnapshotGate, whatsappOptInGate } from "./server.mjs";
+import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, sendContextFromData, sendSnapshotGate, whatsappOptInGate } from "./server.mjs";
 import { commercialDataRow, qaRecordsFromApprovals } from "./sheets-live.mjs";
 
 const message="Asunto: Prueba\n\nMensaje aprobado";
@@ -95,8 +95,22 @@ test("send endpoint source avoids a forced full Sheets refresh",async()=>{
   const source=await (await import("node:fs/promises")).readFile(new URL("./server.mjs",import.meta.url),"utf8");
   const processSendSource=source.slice(source.indexOf("async function processSend"),source.indexOf("async function syncFromProxy"));
   assert.doesNotMatch(processSendSource,/refreshLiveSheets\(true\)/);
-  assert.match(processSendSource,/dashboardPayload\(\{refresh:false\}\)/);
+  assert.doesNotMatch(processSendSource,/dashboardPayload\(/);
+  assert.match(processSendSource,/sendContext\(/);
   assert.match(processSendSource,/sendSnapshotGate\(sendSnapshot\)/);
+});
+
+test("send context loads only the selected prospect and the event gates",()=>{
+  const snapshot={
+    prospects:[
+      {sourceSheet:"Logisticas_LATAM",rowNumber:1,empresa:"SILO Logística",email:"contacto@silo-logistica.cl"},
+      {sourceSheet:"Logisticas_LATAM",rowNumber:2,empresa:"Segucargo",email:"contacto@segucargo.cl"}
+    ],
+    events:[{eventId:"sheet-event"}]
+  };
+  const context=sendContextFromData(snapshot,[{eventId:"local-event"}],{}, {sourceSheet:"Logisticas_LATAM",rowNumber:1});
+  assert.equal(context.prospect.empresa,"SILO Logística");
+  assert.deepEqual(context.events.map(row=>row.eventId),["local-event","sheet-event"]);
 });
 
 test("send snapshot gate fails closed for stale, future and invalid timestamps",()=>{
