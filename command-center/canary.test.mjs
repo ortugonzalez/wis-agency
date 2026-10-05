@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { approvalGate, channelLimitGate, emailApprovalAllowed, reconcileBrevoRecipient, sendContextFromData, sendSnapshotGate, whatsappOptInGate } from "./server.mjs";
+import { approvalGate, channelLimitGate, emailApprovalAllowed, emailPreflightStatus, reconcileBrevoRecipient, sendContextFromData, sendSnapshotGate, startEmailPreflight, whatsappOptInGate } from "./server.mjs";
 import { commercialDataRow, qaRecordsFromApprovals } from "./sheets-live.mjs";
 
 const message="Asunto: Prueba\n\nMensaje aprobado";
@@ -81,6 +81,20 @@ test("Brevo reconciliation fails closed and detects a provider duplicate",async(
   } finally {
     delete process.env.BREVO_API_KEY;
   }
+});
+
+test("async email preflight reports READY and keeps at most 50 observable jobs",async()=>{
+  const reconcileReady=async()=>({ok:true});
+  const jobs=[];
+  for(let index=0;index<55;index+=1) {
+    jobs.push(startEmailPreflight({email:`test-${index}@example.com`,approvedAt:"2026-10-05T12:20:06.163Z",approvalId:"APR-TEST",idempotencyKey:`TEST-${index}`},reconcileReady));
+  }
+  await new Promise(resolve=>setImmediate(resolve));
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(emailPreflightStatus(jobs[0].jobId),null);
+  assert.equal(emailPreflightStatus(jobs.at(-1).jobId)?.status,"READY");
+  assert.equal(emailPreflightStatus(jobs.at(-1).jobId)?.stage,"READY_TO_QUEUE");
+  assert.equal(jobs.filter(job=>emailPreflightStatus(job.jobId)).length,50);
 });
 
 test("Brevo allowlist is exact",()=>{

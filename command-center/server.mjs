@@ -42,6 +42,7 @@ const allowedActions = new Set(["CONTINUE_RESEARCH", "PAUSE_RESEARCH", "RETRY_BL
 const mime = { ".html":"text/html; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml" };
 const activeSendLocks = new Set();
 const activeResearchRuns = new Map();
+const emailPreflightJobs = new Map();
 const pausedResearchCampaigns = new Set();
 let liveSyncPromise=null;
 let lastLiveSyncAt=0;
@@ -921,6 +922,46 @@ async function reconcileBrevoRecipient({email,approvedAt},requestJson=httpsJson)
   return {ok:true};
 }
 
+function pruneEmailPreflightJobs() {
+  while(emailPreflightJobs.size>50) emailPreflightJobs.delete(emailPreflightJobs.keys().next().value);
+}
+
+function emailPreflightStatus(jobId) {
+  return emailPreflightJobs.get(jobId)||null;
+}
+
+function startEmailPreflight({email,approvedAt,approvalId,idempotencyKey},reconcileRecipient=reconcileBrevoRecipient) {
+  const jobId=`PREFLIGHT-${Date.now()}-${randomUUID().slice(0,8)}`;
+  const startedAt=new Date().toISOString();
+  emailPreflightJobs.set(jobId,{jobId,status:"RUNNING",stage:"PROVIDER_RECONCILIATION",startedAt,approvalId,idempotencyKey});
+  pruneEmailPreflightJobs();
+  setImmediate(async()=>{
+    try {
+      const result=await reconcileRecipient({email,approvedAt});
+      if(!emailPreflightJobs.has(jobId)) return;
+      emailPreflightJobs.set(jobId,{
+        ...emailPreflightJobs.get(jobId),
+        status:result.ok?"READY":"BLOCKED",
+        stage:result.ok?"READY_TO_QUEUE":"PROVIDER_RECONCILIATION",
+        error:result.ok?null:result.error,
+        finishedAt:new Date().toISOString()
+      });
+      pruneEmailPreflightJobs();
+    } catch(error) {
+      if(!emailPreflightJobs.has(jobId)) return;
+      emailPreflightJobs.set(jobId,{
+        ...emailPreflightJobs.get(jobId),
+        status:"FAILED",
+        stage:"PROVIDER_RECONCILIATION",
+        error:error?.name==="TimeoutError"?"EMAIL_PROVIDER_RECONCILIATION_TIMEOUT":"EMAIL_PROVIDER_RECONCILIATION_FAILED",
+        finishedAt:new Date().toISOString()
+      });
+      pruneEmailPreflightJobs();
+    }
+  });
+  return emailPreflightJobs.get(jobId);
+}
+
 async function sendEmail({prospect,message,idempotencyKey,approvalId}) {
   const directBrevo=Boolean(process.env.BREVO_API_KEY);
   if(!directBrevo&&(!process.env.WIS_EMAIL_WEBHOOK_URL||!process.env.WIS_EMAIL_WEBHOOK_TOKEN)) return {ok:false,error:"EMAIL_PROVIDER_NOT_CONFIGURED",status:409};
@@ -1003,6 +1044,10 @@ async function processSend(input) {
   if(input.dryRun===true) {
     sendSnapshot=null;
     context=null;
+    if(input.async===true&&channel==="EMAIL") {
+      const job=startEmailPreflight({email:prospect.email,approvedAt:gate.approvedAt,approvalId:gate.approvalId,idempotencyKey});
+      return {status:202,body:{ok:true,dryRun:true,async:true,...job}};
+    }
     stage="PROVIDER_RECONCILIATION";
     if(channel==="EMAIL") {
       const reconciliation=await reconcileBrevoRecipient({email:prospect.email,approvedAt:gate.approvedAt});
@@ -1259,6 +1304,12 @@ const server=createServer(async(req,res)=>{
       await writeJsonAtomic(sheetSnapshotPath,snapshot);
       return json(res,200,{ok:true,rows:snapshot.prospects.length,fetchedAt:snapshot.fetchedAt});
     }
+    if(url.pathname==="/api/outreach/preflight"&&req.method==="GET") {
+      const jobId=cleanText(url.searchParams.get("jobId"),80);
+      const job=emailPreflightStatus(jobId);
+      if(!job) return json(res,404,{ok:false,error:"PREFLIGHT_JOB_NOT_FOUND"});
+      return json(res,200,{ok:true,job});
+    }
     if(url.pathname==="/api/outreach/send"&&req.method==="POST") {
       assertMutationRequest(req);
       const result=await processSend(await requestBody(req));
@@ -1375,4 +1426,4 @@ const server=createServer(async(req,res)=>{
 const isMain=process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]);
 if(isMain) server.listen(port,bindHost,()=>process.stdout.write(`WIS Command Center: http://${bindHost}:${port}/#prospects\n`));
 
-export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, sendContextFromData, sendSnapshotGate, server, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
+export { acquireSendLocks, approvalGate, assertMutationRequest, channelHealth, channelLimitGate, dashboardAuthorized, emailApprovalAllowed, emailPreflightStatus, explicitE164, normalizePipelineConfig, normalizeProspect, normalizeResearchRequest, pipelineAutomationState, prospectStopGate, reconcileBrevoRecipient, refreshLiveSheets, sendContextFromData, sendSnapshotGate, server, startEmailPreflight, whatsappOptInGate, whatsappProviderConfig, whatsappQuery };
