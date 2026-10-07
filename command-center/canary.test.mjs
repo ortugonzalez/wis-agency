@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { approvalGate, channelLimitGate, emailApprovalAllowed, emailPreflightStatus, reconcileBrevoRecipient, sendContextFromData, sendSnapshotGate, startEmailPreflight, whatsappOptInGate } from "./server.mjs";
+import { approvalGate, channelLimitGate, emailApprovalAllowed, emailPreflightStatus, normalizeResearchRequest, reconcileBrevoRecipient, sendContextFromData, sendSnapshotGate, startEmailPreflight, whatsappOptInGate } from "./server.mjs";
 import { commercialDataRow, qaRecordsFromApprovals } from "./sheets-live.mjs";
 
 const message="Asunto: Prueba\n\nMensaje aprobado";
@@ -27,6 +27,18 @@ const approval={
 test("logistics uses logical rows without overwriting the header",()=>{
   assert.equal(commercialDataRow("Logisticas_LATAM",1),2);
   assert.equal(commercialDataRow("Distribuidoras_300",2),2);
+});
+
+test("dashboard normalizes both supplier campaigns with strict contact rules",()=>{
+  const corralones=normalizeResearchRequest({businessType:"corralones",quantity:5000,destination:"Corralones_LATAM_1000"});
+  assert.equal(corralones.quantity,1000);
+  assert.equal(corralones.campaignId,"corralones-latam-1000");
+  assert.equal(corralones.requireBothContacts,true);
+  assert.equal(corralones.reviews,"none");
+  assert.equal(corralones.zeroCostMode,true);
+  const madereras=normalizeResearchRequest({prompt:"buscame 1000 madereras en todo LATAM"});
+  assert.equal(madereras.destination,"Madereras_LATAM_1000");
+  assert.equal(madereras.contact,"both");
 });
 
 test("approved A2 draft becomes independent QA only when its hash matches",()=>{

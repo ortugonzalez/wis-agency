@@ -23,6 +23,15 @@ import {
 import { buildCostAnalytics, estimateScenario, normalizeCostRecord, normalizeCostSettings, PRICING, PRICING_VERSION } from "./costs.mjs";
 import { buildZeroCostGuard, HOTEL_CAMPAIGN, HOTEL_CAMPAIGN_ID, HOTEL_SHEET, HOTEL_LATAM_CAMPAIGN_ID, HOTEL_LATAM_SHEET, hotelCampaignProfile } from "./hotel-research.mjs";
 import { runHotelResearchBatch } from "./hotel-research-worker.mjs";
+import {
+  CORRALONES_CAMPAIGN_ID,
+  CORRALONES_SHEET,
+  MADERERAS_CAMPAIGN_ID,
+  MADERERAS_SHEET,
+  SUPPLIER_CAMPAIGN_IDS,
+  supplierCampaignProfile
+} from "./supplier-research.mjs";
+import { runSupplierResearchBatch } from "./supplier-research-worker.mjs";
 
 const standaloneRoot=process.env.WIS_STANDALONE_ROOT?resolve(process.env.WIS_STANDALONE_ROOT):null;
 const root = standaloneRoot||fileURLToPath(new URL("../../../..", import.meta.url));
@@ -171,6 +180,7 @@ function normalizeProspect(row,index) {
     sourceSheet,
     campaignId:String(row.campaignId||COMMERCIAL_SHEETS[sourceSheet]?.campaignId||"distribuidoras-300"),
     phase:String(row.phase||COMMERCIAL_SHEETS[sourceSheet]?.phase||"outreach"),
+    requireBothContacts:Boolean(COMMERCIAL_SHEETS[sourceSheet]?.requireBothContacts),
     rowNumber:Number(row.rowNumber||index+2),
     rubro:String(row.rubro||"").trim(),
     empresa:String(row.empresa||"").trim(),
@@ -190,7 +200,7 @@ function normalizeProspect(row,index) {
 }
 
 function candidateReady(row) {
-  if(row.phase==="contacts") return Boolean(row.empresa&&(row.email||row.whatsapp));
+  if(row.phase==="contacts") return Boolean(row.empresa&&(row.requireBothContacts?(row.email&&row.whatsapp):(row.email||row.whatsapp)));
   return /^\s*\d+\s*\/\s*\d+/.test(row.reviewsAnalyzed)&&Boolean(row.analysis&&row.problems&&(row.emailMessage||row.whatsappMessage));
 }
 
@@ -281,27 +291,30 @@ function titleCase(value) {
 
 function normalizeResearchRequest(input={}) {
   const prompt=cleanText(input.prompt,1000);
-  const inferredQuantity=prompt.match(/\b(\d{1,3})\b/)?.[1];
+  const inferredQuantity=prompt.match(/\b(\d{1,5})\b/)?.[1];
   const promptKey=key(prompt);
   let businessType=cleanText(input.businessType,40).toLowerCase();
-  if(!businessType) businessType=promptKey.includes("hotel")?"hoteles":promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
-  if(!["distribuidoras","logisticas","hoteles","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
+  if(!businessType) businessType=promptKey.includes("corralon")||promptKey.includes("materiales para la construccion")?"corralones":promptKey.includes("maderer")||promptKey.includes("aserrader")?"madereras":promptKey.includes("hotel")?"hoteles":promptKey.includes("logistic")?"logisticas":promptKey.includes("distribuidor")?"distribuidoras":promptKey.includes("proveedor")?"proveedores":"empresas";
+  if(!["distribuidoras","logisticas","hoteles","corralones","madereras","proveedores","empresas","otro"].includes(businessType)) businessType="otro";
   const hotelCampaign=businessType==="hoteles"||[HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID].includes(input.campaignId)||[HOTEL_SHEET,HOTEL_LATAM_SHEET].includes(input.destination);
   const hotelProfile=hotelCampaignProfile(input);
-  const quantityLimit=hotelProfile.campaignId===HOTEL_LATAM_CAMPAIGN_ID?500:300;
+  const supplierProfile=supplierCampaignProfile({...input,businessType});
+  const supplierCampaign=Boolean(supplierProfile);
+  const quantityLimit=supplierCampaign?1000:hotelProfile.campaignId===HOTEL_LATAM_CAMPAIGN_ID?500:300;
   const quantity=Math.max(1,Math.min(quantityLimit,Number(input.quantity||inferredQuantity||25)));
   const knownCountries=["Argentina","Chile","Uruguay","Paraguay","Bolivia","Perú","Colombia","México","Brasil","Ecuador"];
   const promptCountry=knownCountries.find(country=>promptKey.includes(key(country)))||"";
   let industry=cleanText(input.industry,90);
   if(!industry&&prompt) {
-    const match=prompt.match(/(?:hoteles?|hoster[ií]as?|apart\s+hoteles?|distribuidoras?|log[ií]sticas?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
+    const match=prompt.match(/(?:hoteles?|hoster[ií]as?|apart\s+hoteles?|distribuidoras?|log[ií]sticas?|corralones?|madereras?|aserraderos?|proveedores?|empresas?)\s+(?:de|del\s+rubro\s+)?([^,.]+?)(?=\s+(?:en|con|incluyendo|junto)\b|$)/iu);
     industry=cleanText(match?.[1],90);
   }
   if(hotelCampaign) industry="Hotelería y alojamiento";
+  if(supplierCampaign) industry=supplierProfile.industry;
   if(industry&&(promptCountry&&key(industry).includes(key(promptCountry))||/\bempleados?\b/i.test(industry))) {
     industry=businessType==="hoteles"?"Hotelería y alojamiento":businessType==="logisticas"?"Logística y transporte":businessType==="distribuidoras"?"Distribución general":"Servicios B2B";
   }
-  const country=hotelCampaign?hotelProfile.country:cleanText(input.country,60)||promptCountry;
+  const country=supplierCampaign?"Latinoamérica":hotelCampaign?hotelProfile.country:cleanText(input.country,60)||promptCountry;
   const region=cleanText(input.region,80);
   let location=cleanText(input.location,90);
   if(!location&&prompt) {
@@ -309,14 +322,15 @@ function normalizeResearchRequest(input={}) {
     location=cleanText(match?.[1],90);
   }
   location=region&&country?`${region}, ${country}`:region||country||location||"Argentina";
-  const reviews=hotelCampaign?"none":input.reviews==="none"?"none":"1-3";
-  const contact=hotelCampaign?"both":["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
+  const contactsOnly=hotelCampaign||supplierCampaign;
+  const reviews=contactsOnly?"none":input.reviews==="none"?"none":"1-3";
+  const contact=contactsOnly?"both":["email","whatsapp","both"].includes(input.contact)?input.contact:"both";
   const inferredEmployeeSize=prompt.match(/\b(1-10|11-20|11-50|20-50|51-200|201-500)\s+empleados?\b/i)?.[1];
-  const employeeSize=hotelCampaign?"professional":["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:(inferredEmployeeSize||"11-50");
+  const employeeSize=hotelCampaign?"professional":supplierCampaign?"any":["any","1-10","11-20","11-50","20-50","51-200","201-500"].includes(input.employeeSize)?input.employeeSize:(inferredEmployeeSize||"11-50");
   const minimumReviews=hotelCampaign?20:[0,5,10,20,50,100].includes(Number(input.minimumReviews))?Number(input.minimumReviews):10;
-  const destination=hotelCampaign?hotelProfile.destination:["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
+  const destination=supplierCampaign?supplierProfile.destination:hotelCampaign?hotelProfile.destination:["Distribuidoras_300","Logisticas_LATAM","Prospectos_Custom"].includes(input.destination)?input.destination:(businessType==="logisticas"?"Logisticas_LATAM":"Distribuidoras_300");
   const priority=["NORMAL","HIGH","URGENT"].includes(input.priority)?input.priority:"NORMAL";
-  const businessLabel={distribuidoras:"distribuidoras",logisticas:"logísticas",hoteles:"hoteles independientes",proveedores:"proveedores B2B",empresas:"empresas de servicios",otro:"empresas"}[businessType];
+  const businessLabel={distribuidoras:"distribuidoras",logisticas:"logísticas",hoteles:"hoteles independientes",corralones:"corralones",madereras:"madereras",proveedores:"proveedores B2B",empresas:"empresas de servicios",otro:"empresas"}[businessType];
   const batchName=cleanText(input.batchName,80)||`${quantity} ${businessLabel} · ${industry||"General"} · ${country||location}`;
   const objective=cleanText(input.objective,400)||"Detectar problemas recurrentes y oportunidades concretas para WIS";
   if(!industry) throw Object.assign(new Error("RESEARCH_INDUSTRY_REQUIRED"),{status:400});
@@ -333,16 +347,17 @@ function normalizeResearchRequest(input={}) {
     destination,
     priority,
     batchName,
-    campaignId:hotelCampaign?hotelProfile.campaignId:cleanText(input.campaignId,80),
-    phase:hotelCampaign?"contacts":cleanText(input.phase||"full",30),
+    campaignId:supplierCampaign?supplierProfile.campaignId:hotelCampaign?hotelProfile.campaignId:cleanText(input.campaignId,80),
+    phase:contactsOnly?"contacts":cleanText(input.phase||"full",30),
     professionalOperation:hotelCampaign||input.professionalOperation===true,
-    zeroCostMode:hotelCampaign||input.zeroCostMode===true,
+    requireBothContacts:supplierCampaign||input.requireBothContacts===true,
+    zeroCostMode:contactsOnly||input.zeroCostMode===true,
     reviews,
     contact,
     objective,
     prompt,
     reviewRule:reviews==="1-3"?"Analizar sólo reseñas de 1, 2 y 3 estrellas e informar analizadas/total accesible":"Sin análisis de reseñas",
-    outreachRule:hotelCampaign?"Fase de contactos: no redactar ni enviar mensajes":"Preparar borradores; no enviar sin QA y aprobación"
+    outreachRule:contactsOnly?"Fase de contactos: no redactar ni enviar mensajes":"Preparar borradores; no enviar sin QA y aprobación"
   };
 }
 
@@ -864,6 +879,92 @@ async function startHotelResearch(command,request) {
   return run;
 }
 
+async function startSupplierResearch(command,request) {
+  const profile=supplierCampaignProfile(request);
+  if(!profile) return {status:"BLOCKED",reason:"SUPPLIER_CAMPAIGN_REQUIRED",rows:[]};
+  const researchLockKey=profile.campaignId;
+  if(activeResearchRuns.has(researchLockKey)) return activeResearchRuns.get(researchLockKey);
+  const run=(async()=>{
+    const cleanRequest={...request,requireBothContacts:true,zeroCostMode:true,phase:"contacts"};
+    try {
+      while(true) {
+        const snapshot=await refreshLiveSheets(true)||await readJson(sheetSnapshotPath,{});
+        const existingProspects=(snapshot?.prospects||[]).filter(row=>row.sourceSheet===profile.destination);
+        const total=Number(cleanRequest.quantity||profile.target);
+        const progress={completed:existingProspects.length,total};
+        const zeroCost={status:"CONFIRMED_ZERO",reason:"PUBLIC_REGISTRIES_AND_OFFICIAL_WEBSITES_ONLY",providerCostUsd:0};
+        if(progress.completed>=total) {
+          await updateTaskCommandStatus(command.commandId,"DONE",{schemaVersion:3,...cleanRequest,progress,lastBatch:{rows:0,status:"DONE",reason:"CAMPAIGN_TARGET_REACHED"},costGuard:zeroCost});
+          return {status:"DONE",reason:"CAMPAIGN_TARGET_REACHED",rows:[]};
+        }
+        if(pausedResearchCampaigns.has(profile.campaignId)) {
+          await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,progress,lastBatch:{rows:0,status:"BLOCKED",reason:"PAUSED_BY_USER"},costGuard:zeroCost});
+          return {status:"BLOCKED",reason:"PAUSED_BY_USER",rows:[]};
+        }
+        const batchId=`${command.commandId}-LOT-${Math.floor(progress.completed/25)+1}`;
+        await updateTaskCommandStatus(command.commandId,"IN_PROGRESS",{schemaVersion:3,...cleanRequest,progress,costGuard:zeroCost,activeBatch:batchId});
+        const result=await runSupplierResearchBatch({
+          commandId:command.commandId,
+          request:{...cleanRequest,batchSize:Math.min(25,total-progress.completed),batchId},
+          existingProspects,
+          shouldStop:()=>pausedResearchCampaigns.has(profile.campaignId),
+          appendRows:appendCommercialProspects,
+          appendEvidence:appendResearchEvidence
+        });
+        const refreshed=await refreshLiveSheets(true)||snapshot;
+        const completed=(refreshed?.prospects||[]).filter(row=>row.sourceSheet===profile.destination).length;
+        const rows=result.rows||[];
+        const qaPassed=rows.every(row=>Array.isArray(row)&&row.length===12&&row.slice(7).every(value=>!String(value||"").trim())&&[1,2,3,4,5].every(index=>Boolean(String(row[index]||"").trim())));
+        if(rows.length) await appendResearchEvidence({
+          evidenceId:`EVD-${Date.now()}-${randomUUID().slice(0,8)}`,
+          timestamp:new Date().toISOString(),
+          commandId:command.commandId,
+          campaignId:profile.campaignId,
+          batchId,
+          prospectKey:"",
+          sourceUrl:`https://docs.google.com/spreadsheets/d/${process.env.WIS_COMMERCIAL_SHEET_ID||"1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8"}/edit`,
+          evidenceType:"BATCH_QA",
+          decision:qaPassed?"VALIDATED":"REJECTED",
+          detail:JSON.stringify({rows:rows.length,completed,total,destination:profile.destination,columnsWritten:"A:G",requiredContacts:"EMAIL_AND_EXPLICIT_WHATSAPP",providerCostUsd:0,result:qaPassed?"PASS":"FAIL"}),
+          score:qaPassed?100:0,
+          recordedBy:"qa-ops"
+        });
+        if(!qaPassed||result.status==="BLOCKED"||!rows.length) {
+          const reason=!qaPassed?"BATCH_QA_FAILED":result.reason||"NO_VERIFIED_ROWS";
+          await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:result.status,reason},costGuard:zeroCost});
+          return {...result,status:"BLOCKED",reason};
+        }
+        if(completed>=total) {
+          await updateTaskCommandStatus(command.commandId,"DONE",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:"VALIDATED",reason:"CAMPAIGN_TARGET_REACHED"},costGuard:zeroCost});
+          return {...result,status:"DONE",reason:"CAMPAIGN_TARGET_REACHED"};
+        }
+        await updateTaskCommandStatus(command.commandId,"IN_PROGRESS",{schemaVersion:3,...cleanRequest,progress:{completed,total},lastBatch:{batchId,rows:rows.length,status:"VALIDATED",reason:result.reason},costGuard:zeroCost});
+        await new Promise(resolve=>setTimeout(resolve,60_000));
+      }
+    } catch(error) {
+      console.error("supplier research failed",{commandId:command.commandId,error:error?.stack||error?.message||String(error)});
+      try { await updateTaskCommandStatus(command.commandId,"BLOCKED",{schemaVersion:3,...cleanRequest,error:error.message||"SUPPLIER_RESEARCH_FAILED"}); } catch { /* preserve root failure */ }
+      return {status:"BLOCKED",reason:error.message||"SUPPLIER_RESEARCH_FAILED",rows:[]};
+    } finally { activeResearchRuns.delete(researchLockKey); }
+  })();
+  activeResearchRuns.set(researchLockKey,run);
+  return run;
+}
+
+function researchCampaignIdForScope(scope="") {
+  const normalized=String(scope||"").toUpperCase();
+  if(normalized.includes("CORRALON")) return CORRALONES_CAMPAIGN_ID;
+  if(normalized.includes("MADERERA")) return MADERERAS_CAMPAIGN_ID;
+  if(normalized.includes("HOTELS_LATAM")||normalized.includes("HOTELES_LATAM")) return HOTEL_LATAM_CAMPAIGN_ID;
+  return HOTEL_CAMPAIGN_ID;
+}
+
+function startConfiguredResearch(command,request) {
+  if(SUPPLIER_CAMPAIGN_IDS.has(request?.campaignId)) return startSupplierResearch(command,request);
+  if([HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID].includes(request?.campaignId)) return startHotelResearch(command,request);
+  return null;
+}
+
 async function postJson(url,payload,headers={}) {
   const response=await fetch(url,{method:"POST",headers:{"content-type":"application/json",...headers},body:JSON.stringify(payload),signal:AbortSignal.timeout(25_000)});
   const text=await response.text();
@@ -1381,7 +1482,7 @@ const server=createServer(async(req,res)=>{
       const existingLocal=(await readNdjson(commandsPath,100)).find(item=>item.idempotencyKey===idempotencyKey);
       const existing=existingSheet||existingLocal;
       if(existing) return json(res,200,{ok:true,command:existing,request,deduplicated:true});
-      const sizeLabel=request.businessType==="hoteles"?"operación profesional":`${request.employeeSize} empleados`;
+      const sizeLabel=request.businessType==="hoteles"?"operación profesional":request.requireBothContacts?"email + WhatsApp verificados":`${request.employeeSize} empleados`;
       const scope=`${request.quantity} ${request.businessType} · ${request.industry} · ${request.location} · ${sizeLabel}`.slice(0,120);
       const command={
         commandId:`CMD-${Date.now()}-${randomUUID().slice(0,8)}`,
@@ -1392,22 +1493,22 @@ const server=createServer(async(req,res)=>{
         requestedBy:"human-dashboard",
         status:"NEW",
         idempotencyKey,
-        evidence:JSON.stringify({schemaVersion:3,...request,progress:{completed:0,total:request.quantity},costPolicy:request.zeroCostMode?{mode:"ZERO_COST",textSearchLimit:240,placeDetailsLimit:450,safetyMarginPct:20}:null})
+        evidence:JSON.stringify({schemaVersion:3,...request,progress:{completed:0,total:request.quantity},costPolicy:request.zeroCostMode?(SUPPLIER_CAMPAIGN_IDS.has(request.campaignId)?{mode:"ZERO_COST",providers:"PUBLIC_REGISTRIES_AND_OFFICIAL_WEBSITES",paidCallsAllowed:false}:{mode:"ZERO_COST",textSearchLimit:240,placeDetailsLimit:450,safetyMarginPct:20}):null})
       };
       if(sheetsWriteConfigured()) await appendTaskCommand(command);
       else if(!isLocalRequest(req)) return json(res,409,{ok:false,error:"GOOGLE_SHEETS_WRITES_DISABLED"});
       try { await appendFile(commandsPath,`${JSON.stringify(command)}\n`,"utf8"); }
       catch(error) { if(!sheetsWriteConfigured()) throw error; }
       try { await recordCostUsage({operationId:command.commandId,idempotencyKey:`COST:${command.idempotencyKey}`,runId:command.commandId,stage:"RESEARCH_REQUEST",provider:"google",service:"sheets-api",units:1,unitName:"operación",metadata:{quantity:request.quantity,businessType:request.businessType,industry:request.industry},recordedBy:"human-dashboard"}); } catch { /* el pedido queda válido aunque falle la telemetría */ }
-      const hotelExecutor=[HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID].includes(request.campaignId)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true";
-      if(hotelExecutor) void startHotelResearch(command,request);
-      return json(res,202,{ok:true,command,request,deduplicated:false,executorStarted:hotelExecutor});
+      const executableResearch=[HOTEL_CAMPAIGN_ID,HOTEL_LATAM_CAMPAIGN_ID,CORRALONES_CAMPAIGN_ID,MADERERAS_CAMPAIGN_ID].includes(request.campaignId)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true";
+      if(executableResearch) void startConfiguredResearch(command,request);
+      return json(res,202,{ok:true,command,request,deduplicated:false,executorStarted:executableResearch});
     }
     if(url.pathname==="/api/actions"&&req.method==="POST") {
       assertMutationRequest(req);
       const input=await requestBody(req);
       if(!allowedActions.has(input.action)) return json(res,400,{ok:false,error:"ACTION_NOT_ALLOWED"});
-      const actionCampaignId=String(input.scope||"").includes("LATAM")?HOTEL_LATAM_CAMPAIGN_ID:HOTEL_CAMPAIGN_ID;
+      const actionCampaignId=researchCampaignIdForScope(input.scope);
       if(input.action==="PAUSE_RESEARCH") pausedResearchCampaigns.add(actionCampaignId);
       if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)) pausedResearchCampaigns.delete(actionCampaignId);
       const idempotencyKey=String(input.idempotencyKey||`${input.action}:${new Date().toISOString().slice(0,16)}`).slice(0,180);
@@ -1418,8 +1519,8 @@ const server=createServer(async(req,res)=>{
       if(existing) {
         if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true") {
           const candidates=[...(liveSnapshot?.commands||[]),...(await readNdjson(commandsPath,200))].map(researchCommand);
-          const hotel=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
-          if(hotel) void startHotelResearch(hotel,hotel.request);
+          const research=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
+          if(research) void startConfiguredResearch(research,research.request);
         }
         return json(res,200,{ok:true,command:existing,deduplicated:true});
       }
@@ -1430,8 +1531,8 @@ const server=createServer(async(req,res)=>{
       catch(error) { if(!sheetsWriteConfigured()) throw error; }
       if(["CONTINUE_RESEARCH","RETRY_BLOCKED_RESEARCH"].includes(input.action)&&process.env.WIS_RESEARCH_EXECUTOR_ENABLED==="true") {
         const candidates=[...(liveSnapshot?.commands||[]),...(await readNdjson(commandsPath,200))].map(researchCommand);
-        const hotel=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
-        if(hotel) void startHotelResearch(hotel,hotel.request);
+        const research=candidates.find(row=>row.request?.campaignId===actionCampaignId&&["NEW","READY","IN_PROGRESS","REVIEW","BLOCKED"].includes(row.status));
+        if(research) void startConfiguredResearch(research,research.request);
       }
       return json(res,202,{ok:true,command});
     }
