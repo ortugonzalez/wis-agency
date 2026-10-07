@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test canary.test.mjs",
-    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check costs.mjs && node --check hotel-research.mjs && node --check hotel-research-worker.mjs && node --check out/app.js"
+    "test": "node --test canary.test.mjs supplier-research.test.mjs",
+    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check costs.mjs && node --check hotel-research.mjs && node --check hotel-research-worker.mjs && node --check supplier-research.mjs && node --check supplier-research-worker.mjs && node --check out/app.js"
   }
 }

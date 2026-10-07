@@ -9,7 +9,9 @@ export const COMMERCIAL_SHEETS={
   Distribuidoras_300:{campaignId:"distribuidoras-300",phase:"outreach",range:"A1:L350"},
   Hoteles_Argentina_300:{campaignId:"hoteles-argentina-300",phase:"contacts",range:"A1:L350",target:300},
   Hoteles_LATAM_500:{campaignId:"hoteles-latam-500",phase:"contacts",range:"A1:L600",target:500},
-  Logisticas_LATAM:{campaignId:"logisticas-latam-chile",phase:"outreach",range:"A1:L600",logicalRows:true}
+  Logisticas_LATAM:{campaignId:"logisticas-latam-chile",phase:"outreach",range:"A1:L600",logicalRows:true},
+  Corralones_LATAM_1000:{campaignId:"corralones-latam-1000",phase:"contacts",range:"A1:L1100",target:1000,requireBothContacts:true},
+  Madereras_LATAM_1000:{campaignId:"madereras-latam-1000",phase:"contacts",range:"A1:L1100",target:1000,requireBothContacts:true}
 };
 const DRAFTS_SHEET="Message_Drafts";
 const DRAFT_HEADERS=["draft_key","source_sheet","source_row","channel","message","updated_at","updated_by"];
@@ -284,18 +286,20 @@ export async function appendCommercialProspects(sourceSheet,rows=[]) {
   const normalizedSheet=allowedCommercialSheet(sourceSheet);
   if(!Array.isArray(rows)||!rows.length) return {rows:0,updatedRange:""};
   if(rows.some(row=>!Array.isArray(row)||row.length!==12)) throw new Error("COMMERCIAL_ROW_WIDTH_INVALID");
-  if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts"&&rows.some(row=>row.slice(7).some(value=>String(value||"").trim()))) throw new Error("HOTEL_PHASE_ONE_COLUMNS_ONLY");
+  if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts"&&rows.some(row=>row.slice(7).some(value=>String(value||"").trim()))) throw new Error("CONTACT_PHASE_COLUMNS_A_G_ONLY");
+  if(COMMERCIAL_SHEETS[normalizedSheet].requireBothContacts&&rows.some(row=>!String(row[3]||"").trim()||!String(row[5]||"").trim())) throw new Error("EMAIL_AND_WHATSAPP_REQUIRED");
   const spreadsheetId=process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID;
   const token=await accessToken();
   const existing=(await batchGet(spreadsheetId,[`${normalizedSheet}!${COMMERCIAL_SHEETS[normalizedSheet].range.split("!").pop()}`],token))[0]?.values||[];
   const normalized=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
   const domain=value=>{ try { return new URL(/^https?:\/\//i.test(String(value||""))?String(value):`https://${value}`).hostname.replace(/^www\./i,"").toLowerCase(); } catch { return ""; } };
+  const splitContacts=value=>String(value||"").split(/[\n;,]+/).map(item=>item.trim()).filter(Boolean);
   const phone=value=>String(value||"").replace(/\D/g,"");
   const rowKeys=row=>[
     normalized(row[1])&&normalized(row[2])?`name:${normalized(row[1])}|${normalized(row[2])}`:"",
     domain(row[4])?`domain:${domain(row[4])}`:"",
-    normalized(row[5])?`email:${normalized(row[5])}`:"",
-    phone(row[3])?`phone:${phone(row[3])}`:""
+    ...splitContacts(row[5]).map(value=>normalized(value)).filter(Boolean).map(value=>`email:${value}`),
+    ...splitContacts(row[3]).map(value=>phone(value)).filter(Boolean).map(value=>`phone:${value}`)
   ].filter(Boolean);
   const keys=new Set(existing.slice(1).flatMap(rowKeys));
   const unique=[];
