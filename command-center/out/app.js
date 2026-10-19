@@ -68,9 +68,9 @@ function renderMetrics() {
   const sources={...(s.prospectsBySheet||{})};
   sources.Hoteles_Argentina_300=(sources.Hoteles_Argentina_300||0)+(sources.Hoteles_LATAM_500||0);
   $("#metrics").innerHTML=[
-    metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0} · Logísticas ${sources.Logisticas_LATAM||0}`),
+    metric("Prospectos",s.prospects ?? store.data.prospects.length,`Distribuidoras ${sources.Distribuidoras_300||0} · Hoteles ${sources.Hoteles_Argentina_300||0} · Logísticas ${sources.Logisticas_LATAM||0} · Corralones ${sources.Corralones_LATAM_1000||0} · Madereras ${sources.Madereras_LATAM_1000||0}`),
     metric("Con ambos canales",s.bothChannels ?? 0,"Email + WhatsApp","blue"),
-    metric("Listos para revisar",s.ready ?? 0,"Cobertura de reseñas completa","amber"),
+    metric("Listos para revisar",s.ready ?? 0,"Datos mínimos completos","amber"),
     metric("Contactados",s.contacted ?? 0,"Historial consolidado","red")
   ].join("");
   $("#activity-metrics").innerHTML=[
@@ -110,6 +110,17 @@ function waCopyValue(prospect) {
   return prospect.whatsappE164 || String(prospect.whatsapp||"").split("(")[0].trim();
 }
 
+function campaignName(row) {
+  return {
+    "hoteles-latam-500":"Hoteles LATAM",
+    "hoteles-argentina-300":"Hoteles Argentina",
+    "corralones-latam-1000":"Corralones LATAM",
+    "madereras-latam-1000":"Madereras LATAM",
+    "logisticas-latam-chile":"Logísticas LATAM",
+    "distribuidoras-300":"Distribuidoras"
+  }[row.campaignId]||`Fila ${row.rowNumber}`;
+}
+
 function sendBlocker(prospect,channelName) {
   if(prospect.phase==="contacts") return "HOTEL_CONTACTS_ONLY";
   const isWa=channelName==="WHATSAPP";
@@ -141,7 +152,7 @@ function renderTable() {
   $("#page-next").disabled=store.page>=pages;
   $("#prospect-body").innerHTML=rows.length ? rows.map(row=>`
     <tr data-open-row="${esc(row.prospectId)}">
-      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>${row.campaignId==="hoteles-latam-500"?"Hoteles LATAM":row.phase==="contacts"?"Hoteles Argentina":`Fila ${esc(row.rowNumber)}`}</small></div></div></td>
+      <td><div class="company-cell"><span class="company-avatar">${esc((row.empresa||"?").slice(0,1).toUpperCase())}</span><div><strong>${esc(row.empresa||"Sin nombre")}</strong><small>${esc(campaignName(row))}</small></div></div></td>
       <td><div class="rubric-cell"><strong>${esc(row.rubro||"Sin rubro")}</strong><span>${esc(row.ubicacion||"Sin ubicación")}</span></div></td>
       <td><div class="contact-stack">${contactChip("email",row.email,row.rowNumber)}${contactChip("whatsapp",row.whatsapp,row.rowNumber,waCopyValue(row))}${!row.email&&!row.whatsapp?'<span>Sin contacto verificable</span>':""}</div></td>
       <td><div class="problem-cell"><p>${esc(row.phase==="contacts"?"Contacto validado · análisis reservado para la fase 2":row.problems||row.analysis||"Análisis pendiente")}</p></div></td>
@@ -804,7 +815,7 @@ const sendErrors={
   MESSAGE_REQUIRED:"escribí un mensaje antes de guardarlo."
   ,PRE_SEND_FAILED:"El proveedor no fue contactado y el email no salió. Revisá el detalle técnico antes de reintentar."
   ,SERVICE_RESPONSE_INVALID:"El servicio se reinició antes de confirmar el resultado. No se reintentó automáticamente."
-  ,HOTEL_CONTACTS_ONLY:"la campaña de hoteles está limitada a contactos hasta autorizar la fase 2."
+  ,HOTEL_CONTACTS_ONLY:"esta campaña está limitada a investigación de contactos; los envíos están deshabilitados."
 };
 
 async function saveDraft() {
@@ -924,12 +935,15 @@ async function createResearchRequest(input,button) {
 
 async function submitResearchForm(event) {
   event.preventDefault();
-  const hotelLatam=$("#research-business-type").value==="hoteles"&&$("#research-destination").value==="Hoteles_LATAM_500";
+  const businessType=$("#research-business-type").value;
+  const destination=$("#research-destination").value;
+  const contactOnly=["hoteles","corralones","madereras"].includes(businessType);
+  const campaignId=businessType==="hoteles"?(destination==="Hoteles_LATAM_500"?"hoteles-latam-500":"hoteles-argentina-300"):businessType==="corralones"?"corralones-latam-1000":businessType==="madereras"?"madereras-latam-1000":"";
   await createResearchRequest({
     batchName:$("#research-batch-name").value,
     quantity:Number($("#research-quantity").value),
     priority:$("#research-priority").value,
-    businessType:$("#research-business-type").value,
+    businessType,
     industry:$("#research-industry").value,
     employeeSize:$("#research-employee-size").value,
     country:$("#research-country").value,
@@ -938,12 +952,13 @@ async function submitResearchForm(event) {
     reviews:$("#research-reviews").value,
     minimumReviews:Number($("#research-minimum-reviews").value),
     contact:$("#research-contact").value,
-    destination:$("#research-destination").value,
+    destination,
     objective:$("#research-objective").value,
-    campaignId:$("#research-business-type").value==="hoteles"?(hotelLatam?"hoteles-latam-500":"hoteles-argentina-300"):"",
-    phase:$("#research-business-type").value==="hoteles"?"contacts":"full",
-    professionalOperation:$("#research-business-type").value==="hoteles",
-    zeroCostMode:$("#research-business-type").value==="hoteles"
+    campaignId,
+    phase:contactOnly?"contacts":"full",
+    professionalOperation:businessType==="hoteles",
+    requireBothContacts:["corralones","madereras"].includes(businessType),
+    zeroCostMode:contactOnly
   },$("#research-form-submit"));
 }
 
@@ -980,6 +995,22 @@ function alignResearchDefaults() {
     $("#research-minimum-reviews").value="20";
     $("#research-contact").value="both";
     $("#research-destination").value="Hoteles_LATAM_500";
+  } else if(type==="corralones") {
+    $("#research-quantity").value="1000";
+    $("#research-industry").value="Materiales para la construcción";
+    $("#research-employee-size").value="any";
+    $("#research-country").value="Latinoamérica";
+    $("#research-reviews").value="none";
+    $("#research-contact").value="both";
+    $("#research-destination").value="Corralones_LATAM_1000";
+  } else if(type==="madereras") {
+    $("#research-quantity").value="1000";
+    $("#research-industry").value="Maderas y derivados";
+    $("#research-employee-size").value="any";
+    $("#research-country").value="Latinoamérica";
+    $("#research-reviews").value="none";
+    $("#research-contact").value="both";
+    $("#research-destination").value="Madereras_LATAM_1000";
   } else if(type==="logisticas") {
     $("#research-industry").value="Logística y transporte";
     $("#research-destination").value="Logisticas_LATAM";
@@ -992,8 +1023,21 @@ function alignResearchDefaults() {
   updateResearchPreview();
 }
 
-function alignHotelDestination() {
-  if($("#research-business-type").value!=="hoteles") return updateResearchPreview();
+function alignResearchDestination() {
+  const type=$("#research-business-type").value;
+  if(type==="corralones") {
+    $("#research-destination").value="Corralones_LATAM_1000";
+    $("#research-country").value="Latinoamérica";
+    $("#research-quantity").value="1000";
+    return updateResearchPreview();
+  }
+  if(type==="madereras") {
+    $("#research-destination").value="Madereras_LATAM_1000";
+    $("#research-country").value="Latinoamérica";
+    $("#research-quantity").value="1000";
+    return updateResearchPreview();
+  }
+  if(type!=="hoteles") return updateResearchPreview();
   const latam=$("#research-destination").value==="Hoteles_LATAM_500"||$("#research-country").value==="Latinoamérica";
   if(latam) {
     $("#research-destination").value="Hoteles_LATAM_500";
@@ -1008,8 +1052,8 @@ function alignHotelDestination() {
 
 async function researchControl(action,label) {
   try {
-    const latam=$("#research-destination").value==="Hoteles_LATAM_500";
-    const scope=latam?"HOTELS_LATAM_500":"HOTELS_ARGENTINA_300";
+    const destination=$("#research-destination").value;
+    const scope=destination==="Corralones_LATAM_1000"?"CORRALONES_LATAM_1000":destination==="Madereras_LATAM_1000"?"MADERERAS_LATAM_1000":destination==="Hoteles_LATAM_500"?"HOTELS_LATAM_500":"HOTELS_ARGENTINA_300";
     const response=await fetch("/api/actions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,scope,idempotencyKey:`${action}:${scope}:${new Date().toISOString().slice(0,16)}`})});
     const payload=await response.json();
     if(!response.ok) throw new Error(payload.error);
@@ -1063,8 +1107,8 @@ $("#automation-config-form").addEventListener("submit",event=>{event.preventDefa
 $("#research-pause").addEventListener("click",()=>researchControl("PAUSE_RESEARCH","Pausa"));
 $("#research-retry").addEventListener("click",()=>researchControl("RETRY_BLOCKED_RESEARCH","Reintento seguro"));
 $("#research-business-type").addEventListener("change",alignResearchDefaults);
-$("#research-destination").addEventListener("change",alignHotelDestination);
-$("#research-country").addEventListener("change",alignHotelDestination);
+$("#research-destination").addEventListener("change",alignResearchDestination);
+$("#research-country").addEventListener("change",alignResearchDestination);
 $$('#research-form input, #research-form select').forEach(node=>node.addEventListener(node.matches('input[type="text"], input[type="number"]')?"input":"change",updateResearchPreview));
 $("#apollo-pilot").addEventListener("click",prepareApolloPilot);
 $("#cost-settings-form").addEventListener("submit",saveCostSettings);
