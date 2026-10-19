@@ -324,7 +324,7 @@ function renderWhatsappStatus() {
   card.classList.toggle("is-online",status.connected===true&&status.identityVerified===true);
   card.classList.toggle("is-offline",status.configured===false||status.error);
   $("#wa-connection-label").textContent=status.connected&&status.identityVerified?`Línea ${status.account||"•••• 5679"} conectada`:status.configured?"Conexión temporalmente no disponible":"Falta conectar Baileys";
-  $("#wa-connection-detail").textContent=status.connected?(status.outboundEnabled?"Recepción y salida habilitadas":"Recepción en vivo · salida protegida"):status.error?"No se pudo consultar el servicio":"Esperando credencial del servicio";
+  $("#wa-connection-detail").textContent=status.connected?(status.outboundEnabled?"Recepción habilitada · salida comercial disponible":"Recepción habilitada · salida comercial pausada"):status.error?"No se pudo consultar el servicio":"Esperando credencial del servicio";
 }
 
 function renderWhatsappConversations() {
