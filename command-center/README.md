@@ -4,14 +4,14 @@ Consola comercial local para trabajar sin volver a la planilla: lectura de prosp
 
 ## Experiencia
 
-- `Distribuidoras_300` y `Hoteles_Argentina_300` se presentan como directorios filtrables por campaña.
+- `PROSPECTOS` se presenta como directorio filtrable y conserva las 12 columnas comerciales; el ID técnico permanece oculto en M.
 - La ficha lateral reúne contacto, reseñas 1–3 estrellas, análisis y los dos mensajes.
 - Email y teléfono se copian con un clic.
 - Cada envío requiere un segundo clic humano, se valida del lado del servidor y usa una clave idempotente.
 - El clic no reemplaza la gobernanza: también exige QA independiente, aprobación de lote vigente y snapshots durables de cola/proveedor.
 - WhatsApp exige teléfono internacional explícito, email inicial previo y evidencia de opt-in.
 - Los resultados inciertos se registran como `OUTCOME_UNKNOWN`; no se reintentan automáticamente.
-- El navegador refresca el estado local cada 30 segundos.
+- El navegador mantiene un canal SSE con el servidor y conserva un refresco de respaldo cada 30 segundos.
 
 ## Inicio
 
@@ -23,6 +23,16 @@ rtk npm run dashboard:start
 
 Abrir `http://127.0.0.1:4174/#prospects`.
 
+Antes de desplegar o habilitar canales, ejecutar:
+
+```powershell
+rtk node ops/reports/web/wis-operations-dashboard/check-production-readiness.mjs
+```
+
+El reporte enumera faltantes sin mostrar valores de secretos. La plantilla completa para EasyPanel está en `.env.production.example`; todos los flags de salida y escritura permanecen desactivados por defecto.
+
+Los flags `*_PASSED` no ejecutan una prueba ni autorizan una acción: registran que existe evidencia durable revisada. Sólo deben pasar a `true` después de completar el control correspondiente. Readiness exige, además de credenciales y endpoints, QA del release, sincronización Sheets E2E, texto/audio/QA de Telegram, buzón Microsoft 365, aplicación Entra, consentimiento Graph, DNS/semillas/QA de email y webhook/rollback/QA de WhatsApp. Activar flags de salida sin esos controles mantiene el sistema en `ready=false`.
+
 ## Google Sheets en vivo
 
 El servicio puede leer directamente las planillas comercial y operativa con una cuenta de servicio. La planilla comercial se comparte como lectora y la operativa como editora. Los comandos del panel, la cola y los eventos se escriben únicamente en la planilla operativa.
@@ -32,36 +42,17 @@ Variables:
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
 - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64`
 - `WIS_COMMERCIAL_SHEET_ID`
+- `WIS_COMMERCIAL_SHEET_NAME=PROSPECTOS`
 - `WIS_OPERATIONS_SHEET_ID`
 - `WIS_SHEETS_REFRESH_SECONDS=30`
 - `WIS_SHEETS_WRITES_ENABLED=true`
+- `WIS_SHEETS_CHANGE_TOKEN` — secreto compartido para la notificación de cambios desde Apps Script.
 
 La clave privada nunca se guarda en Git ni se entrega al navegador. Sin escritura habilitada, el panel continúa en modo lectura y los envíos siguen bloqueados.
 
-## Campaña Hoteles de Argentina
+El archivo comercial unificado aporta `PROSPECTOS`, `SEGUIMIENTO`, `BAJAS` y `MÉTRICAS`. El estado técnico durable (QA, aprobaciones, cola, eventos y evidencia de reseñas) sigue en `WIS · Operaciones de Agentes`: no se mezcla con las 12 columnas comerciales.
 
-La campaña `hoteles-argentina-300` trabaja en fase `contacts`: conserva las 12 columnas comerciales, pero sólo puede escribir `Rubro`, `Empresa`, `Ubicación`, `WhatsApp`, `Web`, `Email` y `Rating`. Las columnas H:L quedan vacías y el servidor rechaza cualquier intento de redactar o enviar desde esta campaña.
-
-El ejecutor procesa como máximo 25 hoteles por lote, nunca supera 300 filas y deduplica por Place ID, dominio, email, teléfono y nombre/ubicación. Sólo admite email publicado y WhatsApp explícito (`wa.me`, `api.whatsapp.com` o etiqueta equivalente). Las cadenas excluidas y los candidatos sin operación profesional, sin 20 reseñas o sin contacto verificable quedan en `Research_Evidence`.
-
-Variables exclusivas del ejecutor:
-
-- `WIS_RESEARCH_EXECUTOR_ENABLED=true`
-- `GOOGLE_MAPS_API_KEY`
-- `WIS_GOOGLE_USAGE_OBSERVED_AT` — ISO 8601; debe tener menos de seis horas.
-- `WIS_GOOGLE_USAGE_TEXT_SEARCH_PRO` — consumo mensual total observado en Google Cloud.
-- `WIS_GOOGLE_USAGE_PLACE_DETAILS_ENTERPRISE` — consumo mensual total observado en Google Cloud.
-
-El proceso debe desplegarse con una sola réplica. El bloqueo en memoria evita dos lotes simultáneos de la campaña y el ledger durable reserva cada unidad antes de llamar a Google. Si falta la clave, la observación está vencida o el margen gratuito no alcanza, el lote queda `BLOCKED` antes de la llamada. No se interpreta una alerta presupuestaria como corte de gasto.
-
-Para activar un lote real:
-
-1. Confirmar en Google Cloud el consumo mensual de ambos SKU y cargar el snapshot fechado.
-2. Mantener `zeroCostMode=true`; no existe control de interfaz para desactivarlo.
-3. Iniciar la campaña desde Research. El primer lote queda en `REVIEW` después de un máximo de 25 altas.
-4. QA verifica independencia, contacto, duplicados y costo antes de continuar.
-
-La búsqueda gratuita por navegador o registros públicos queda indicada como fallback cuando Google no puede usarse, pero no se convierte silenciosamente en una llamada paga.
+Para cambios hechos directamente en Google Sheets, el trigger instalable de `integrations/google-sheets/dashboard-sync.gs` notifica al endpoint firmado `/api/sheets/notify`; el servidor relee la planilla y avisa al navegador por SSE. Si el trigger todavía no fue instalado, el refresco de 30 segundos actúa como respaldo. Instalar el trigger, configurar el secreto o desplegar el servicio requiere aprobación humana.
 
 ## Centro de costos
 
@@ -76,14 +67,26 @@ La búsqueda gratuita por navegador o registros públicos queda indicada como fa
 
 Variables del proceso local:
 
-- `WIS_EMAIL_WEBHOOK_URL`
-- `WIS_EMAIL_WEBHOOK_TOKEN`
+- `WIS_EMAIL_PROVIDER=wis_mailer`
+- `WIS_EMAIL_SENDER=ortu@wis-ia.com`
+- `WIS_EMAIL_ENQUEUE_URL`
+- `WIS_EMAIL_API_TOKEN`
+- `WIS_EMAIL_MAILBOX_VERIFIED=true`
+- `WIS_EMAIL_ENTRA_APP_VERIFIED=true`
+- `WIS_EMAIL_GRAPH_ADMIN_CONSENTED=true`
+- `WIS_EMAIL_DNS_VERIFIED=true`
+- `WIS_EMAIL_SEED_TESTS_PASSED=true`
+- `WIS_EMAIL_QA_PASSED=true`
+- `WIS_MAILER_OUTBOUND_ENABLED=true`
 - `WIS_EMAIL_OUTBOUND_ENABLED=true`
-- `WIS_EMAIL_ALLOWED_APPROVAL_IDS=APR-...` — lista blanca obligatoria de aprobaciones exactas; separar varias con coma.
 
-El webhook recibe un destinatario individual, asunto, cuerpo, identidad WIS y clave idempotente. La configuración permanece bloqueada si falta cualquiera de las tres variables.
+El adaptador recibe un destinatario individual, asunto, cuerpo, identidad WIS y clave idempotente. La configuración permanece bloqueada si falta cualquiera de las variables o si el proveedor/remitente no coincide exactamente.
 
-El alias `Ortu - WIS <ortu@wis-agency.com>` fue revalidado como remitente predeterminado en Gmail y usa el relay TLS de Brevo. Esto verifica identidad, no habilita automáticamente el transporte del dashboard.
+La única ruta activa prevista es `Dashboard → WIS Mailer → Microsoft Graph / Microsoft 365`, con `Ortu - WIS <ortu@wis-ia.com>`. Instantly, Brevo, Gmail manual y n8n quedan fuera de la ruta activa. El buzón, la aplicación Entra, el consentimiento administrativo, el worker y el tracking propio continúan pendientes de alta y aprobación humana. Los secretos de Entra viven sólo en el WIS Mailer; el dashboard recibe únicamente attestations booleanas y el token de su endpoint.
+
+## Evidencia de reseñas
+
+`Review_Evidence` exige URL exacta de Maps, ficha verificada, Reseñas/Opiniones abiertas, orden de peor valoración, cantidades, fecha y hash. Un fallo de acceso queda pendiente. Un recorrido directo sin reseñas 1–3★ puede registrarse operativamente como `VERIFIED_NO_LOW_REVIEWS`, pero no escribe `0/0` en `PROSPECTOS` ni habilita copy o envío basado en problemas.
 
 ## Envío de WhatsApp
 
@@ -91,11 +94,15 @@ Variables del proceso local:
 
 - `WIS_WHATSAPP_WEBHOOK_URL` — workflow WIS exclusivo para la línea 5679
 - `WIS_WHATSAPP_WEBHOOK_TOKEN`
+- `WIS_WHATSAPP_TRANSPORT=unofficial-baileys-local`
+- `WIS_WHATSAPP_TRANSPORT_APPROVED=true` — aceptación humana separada del riesgo del transporte
+- `WIS_WHATSAPP_WEBHOOK_QA_PASSED=true`
+- `WIS_WHATSAPP_ROLLBACK_VERIFIED=true`
 - `WIS_WHATSAPP_OUTBOUND_ENABLED=true`
 
-El adaptador sólo acepta el workflow WIS de la conexión terminada en 5679. No toca DUGAS, QH ni otros sectores.
+Las cinco condiciones son acumulativas. Identificar el transporte no lo aprueba y aprobar el transporte no habilita envíos ni sustituye la aprobación exacta del lote. El adaptador sólo acepta el workflow WIS de la conexión terminada en 5679. No toca DUGAS, QH ni otros sectores.
 
-La identidad `5491130035679` y su sesión persistente fueron verificadas como conectadas. Los envíos continúan pausados hasta disponer de token mínimo, QA, aprobación, email previo y opt-in.
+La identidad de la línea terminada en 5679 fue verificada nuevamente y la sesión está conectada. Los envíos continúan pausados hasta registrar y activar, con aprobación específica, el webhook exclusivo hacia `/api/providers/whatsapp/events`, cargar su secreto fuera de Git y disponer de QA independiente, aprobación exacta del lote, email previo y opt-in verificable.
 
 ## Contrato de aprobación
 
