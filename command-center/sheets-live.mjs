@@ -220,9 +220,9 @@ export async function appendDeliveryTest(row) {
 }
 
 export async function appendReviewEvidence(input) {
-  await ensureOperationalSheet(REVIEW_EVIDENCE_SHEET,REVIEW_EVIDENCE_HEADERS);
   const row=reviewEvidenceRecord(input);
   if(!row.evidenceId||!row.prospectKey||!row.rowNumber||!row.empresa) throw new Error("REVIEW_EVIDENCE_IDENTITY_REQUIRED");
+  await ensureOperationalSheet(REVIEW_EVIDENCE_SHEET,REVIEW_EVIDENCE_HEADERS);
   return appendValues(operationsId(),`${REVIEW_EVIDENCE_SHEET}!A:O`,[
     row.evidenceId,row.prospectKey,row.rowNumber,row.empresa,row.mapsUrl,
     row.exactListingVerified?"TRUE":"FALSE",row.opinionsOpened?"TRUE":"FALSE",row.sortedLowest?"TRUE":"FALSE",
@@ -405,7 +405,12 @@ export async function buildLiveSnapshot() {
     const identity=row.prospectKey||String(row.rowNumber||"");
     if(!identity) continue;
     const previous=reviewEvidenceByProspect.get(identity);
-    if(!previous||String(row.checkedAt||"")>String(previous.checkedAt||"")) reviewEvidenceByProspect.set(identity,row);
+    const timestamp=Date.parse(String(row.checkedAt||""));
+    const previousTimestamp=Date.parse(String(previous?.checkedAt||""));
+    // Unknown chronology must block rather than revive an older VERIFIED record.
+    // Sheet order breaks equal-time ties: the later append supersedes the earlier one.
+    if(!previous||!Number.isFinite(timestamp)||
+      (Number.isFinite(previousTimestamp)&&timestamp>=previousTimestamp)) reviewEvidenceByProspect.set(identity,row);
   }
   const contactEvidence=objects(researchEvidenceRanges[0]?.values).map(row=>({
     evidenceId:row.evidence_id,
