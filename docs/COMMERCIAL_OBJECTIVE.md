@@ -34,9 +34,11 @@ La automatización administrativa no sustituye controles contables, laborales o 
 
 ## Gates de salida
 
-- Email individual, primero, con QA independiente y aprobación exacta por lote.
+- Email individual, primero, con QA independiente y aprobación exacta por lote: máximo 25 por día, intervalo mínimo de 15 minutos y ventana 09:30–17:30 `America/Buenos_Aires`. Los seguimientos de días 3 y 7 requieren aprobación.
 - Prueba semilla separada al buzón propio antes del canario externo.
-- WhatsApp sólo con opt-in verificable y aprobación independiente.
+- WhatsApp sólo con opt-in verificable y aprobación independiente: máximo 10 por día, intervalo mínimo de 15 minutos y un único seguimiento aprobado. Fuera de la ventana de 24 horas desde el último mensaje entrante, sólo se usa una plantilla aprobada.
+- Publicar un número en Maps o en una web no constituye consentimiento.
+- Email y WhatsApp nunca se ejecutan simultáneamente para el mismo prospecto.
 - Un timeout se registra como `OUTCOME_UNKNOWN` y no se reintenta hasta reconciliarlo.
 - No tocar DUGAS ni QH.
 
