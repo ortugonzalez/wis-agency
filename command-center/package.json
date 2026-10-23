@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check costs.mjs && node --check production-readiness.mjs && node --check out/app.js",
+    "check": "node --check server.mjs && node --check sheets-live.mjs && node --check review-evidence.mjs && node --check costs.mjs && node --check production-readiness.mjs && node --check out/app.js",
     "readiness": "node check-production-readiness.mjs"
   }
 }
