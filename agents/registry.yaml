@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "orchestrator": "wis-orchestrator",
+  "max_concurrent_codex_specialists": 3,
+  "active_role_count": 4,
+  "roles": [
+    {
+      "id": "wis-orchestrator",
+      "mission": "Asignar lotes, registrar aprobaciones, coordinar dependencias y mantener separados datos, QA y canales.",
+      "forbidden_actions": ["send_email", "send_whatsapp", "approve_own_external_action", "bypass_qa"]
+    },
+    {
+      "id": "prospect-intelligence",
+      "mission": "Validar contactos, extraer reseñas Google Maps 1–3★ con evidencia, definir soluciones WIS desarrollables y redactar copy.",
+      "forbidden_actions": ["invent_contact", "invent_review", "analyze_4_or_5_star_reviews", "promise_undevelopable_solution", "send_outreach"]
+    },
+    {
+      "id": "outreach-ops",
+      "mission": "Preparar y monitorear email y WhatsApp aprobados con idempotencia, límites y gates por canal.",
+      "forbidden_actions": ["send_without_batch_approval", "send_cc_or_bcc", "cold_whatsapp_without_opt_in", "touch_dugas_or_qh", "blind_retry"]
+    },
+    {
+      "id": "qa-ops",
+      "mission": "Revisar independientemente evidencia, copy, elegibilidad, aprobación, salud de canal e idempotencia.",
+      "forbidden_actions": ["approve_own_work", "silently_patch_reviewed_work", "send_email", "send_whatsapp"]
+    }
+  ]
+}
