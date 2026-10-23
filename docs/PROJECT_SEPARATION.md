@@ -10,9 +10,9 @@
 4. envío y seguimiento de WhatsApp elegible;
 5. orquestación, aprobación humana y QA.
 
-Los únicos roles activos son `wis-orchestrator`, `prospect-research`, `outreach-copy`, `email-sender`, `whatsapp-sender` y `qa-ops`.
+Los únicos roles activos son `wis-orchestrator`, `prospect-intelligence`, `outreach-ops` y `qa-ops`.
 
-El flujo prioritario es completar 300 distribuidoras argentinas medianas o chicas y, después, 300 empresas logísticas de Latinoamérica. Se opera en lotes de 25, con email como primer canal y WhatsApp únicamente después de un opt-in verificable. Los envíos reales y las activaciones externas requieren aprobación humana por lote.
+El flujo prioritario es completar `PROSPECTOS` por lotes de 25: contactos verificables, reseñas 1–3★, problema, solución realizable y copy. Email es el primer canal; WhatsApp se usa únicamente después de un opt-in verificable. Los envíos reales y las activaciones externas requieren aprobación humana por lote.
 
 ## Sistemas retirados del alcance activo
 
@@ -24,16 +24,18 @@ Los siguientes roles y activos dejan de formar parte del registro, dashboard y c
 - `web-brand`;
 - `automation-integrations` como rol generalista;
 - `growth-research` y `commercial-activation`, reemplazados por roles comerciales más específicos.
+- `prospect-research` y `outreach-copy`, consolidados en `prospect-intelligence`.
+- `email-sender` y `whatsapp-sender`, consolidados en `outreach-ops` sin mezclar sus gates.
 
 Sus directorios, scripts, workflows, documentación e historial se conservan sin modificaciones para una migración posterior a proyectos independientes. No se eliminan, reorganizan, activan ni ejecutan desde el pipeline comercial.
 
 ## Conversaciones históricas
 
-Las conversaciones sobre LinkedIn, X, contenido y web se conservan abiertas como referencia histórica, pero no se asignan a los seis roles activos ni aparecen en la cola comercial. Las conversaciones de prospección, email, WhatsApp, orquestación y QA pueden seguir utilizándose como fuentes de contexto sin duplicarlas ni archivarlas.
+Las conversaciones sobre LinkedIn, X, contenido y web se conservan abiertas como referencia histórica, pero no se asignan a los cuatro roles activos ni aparecen en la cola comercial. Las conversaciones de prospección, email, WhatsApp, orquestación y QA pueden seguir utilizándose como fuentes de contexto sin duplicarlas ni archivarlas.
 
 ## Límites de integración
 
-- Gmail/Brevo y los workflows WIS de n8n/Kapso-MundoVera son las integraciones objetivo del proyecto comercial.
+- Email usa una sola ruta WIS verificada. WhatsApp usa únicamente la sesión WIS 5679 y requiere opt-in durable.
 - DUGAS y QH quedan expresamente fuera de alcance.
 - Los sistemas retirados mantienen sus controles de seguridad actuales, pero no reciben nuevas tareas desde este proyecto.
 - Ninguna credencial, cookie, token, QR o estado de sesión se copia entre proyectos, Git, Sheets o handoffs.

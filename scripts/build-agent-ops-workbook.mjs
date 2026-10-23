@@ -8,10 +8,8 @@ await fs.mkdir(outputDir, { recursive: true });
 const workbook = Workbook.create();
 const roles = [
   "wis-orchestrator",
-  "prospect-research",
-  "outreach-copy",
-  "email-sender",
-  "whatsapp-sender",
+  "prospect-intelligence",
+  "outreach-ops",
   "qa-ops",
 ];
 const statuses = ["BACKLOG", "READY", "IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"];
@@ -38,12 +36,11 @@ const backlog = workbook.worksheets.add("Backlog");
 const backlogRows = [
   ["task_id", "stream", "título", "prioridad", "owner", "status", "dependencies", "source_thread_ids", "deliverable", "write_scope", "approval_required", "next_action", "updated_at"],
   ["WIS-SYS-001", "Foundation", "Implementar la base multiagente", "P0", "wis-orchestrator", "IN_PROGRESS", "", "01a011c8-321c-7ea1-a899-9997cf861579", "Contratos, baseline, tablero y dry-run", "Repositorio raíz y tablero operativo", "NO", "Completar baseline y QA", new Date("2026-09-26T12:00:00Z")],
-  ["WIS-REV-001", "Revenue", "Auditar distribuidoras provisionales", "P0", "prospect-research", "READY", "WIS-SYS-001", "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "Primer lote validado de 25 filas", "Columnas comerciales existentes", "NO", "Preparar lote 1/25", new Date("2026-09-27T12:00:00Z")],
-  ["WIS-COPY-001", "Revenue", "Redactar lote canario", "P0", "outreach-copy", "BACKLOG", "WIS-REV-001", "01a0654f-a185-7a43-a068-fcd39852b304", "Variantes A/B para lote validado", "Mensaje WhatsApp y Mensaje Email", "NO", "Esperar research validado", new Date("2026-09-27T12:00:00Z")],
-  ["WIS-EMAIL-001", "Outreach", "Preparar canario de 5 emails", "P0", "email-sender", "WAITING_APPROVAL", "WIS-COPY-001", "01a0654f-a185-7a43-a068-fcd39852b304", "Canario validado y sin envíos hasta aprobación", "Outreach_Queue y Outreach_Events", "SI", "Cerrar bloqueos de integración y solicitar aprobación", new Date("2026-09-27T12:00:00Z")],
-  ["WIS-WA-001", "Outreach", "Preparar canario de hasta 2 WhatsApp con opt-in", "P0", "whatsapp-sender", "WAITING_APPROVAL", "WIS-COPY-001", "01a011c8-647b-71c1-8da8-d56f3d6412ae", "Canario elegible sólo con opt-in", "Outreach_Queue y Outreach_Events", "SI", "Validar plantilla, 24h e idempotencia", new Date("2026-09-27T12:00:00Z")],
-  ["WIS-REV-002", "Revenue", "Completar 300 distribuidoras argentinas", "P0", "prospect-research", "BACKLOG", "WIS-REV-001", "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "300 empresas únicas con QA", "Columnas comerciales existentes", "NO", "Procesar lotes de 25", new Date("2026-09-27T12:00:00Z")],
-  ["WIS-LOG-001", "Revenue", "Completar 300 logísticas de Latinoamérica", "P1", "prospect-research", "BACKLOG", "WIS-REV-002", "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "300 logísticas únicas con QA", "Planilla comercial autorizada", "NO", "Comenzar después de distribuidoras", new Date("2026-09-27T12:00:00Z")],
+  ["WIS-REV-001", "Revenue", "Validar inteligencia comercial", "P0", "prospect-intelligence", "READY", "WIS-SYS-001", "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "Primer lote validado de 25 filas", "Columnas comerciales existentes", "NO", "Preparar lote 1/25", new Date("2026-09-27T12:00:00Z")],
+  ["WIS-COPY-001", "Revenue", "Redactar lote canario", "P0", "prospect-intelligence", "BACKLOG", "WIS-REV-001", "01a0654f-a185-7a43-a068-fcd39852b304", "Variantes A/B para lote validado", "Mensaje WhatsApp y Mensaje Email", "NO", "Esperar research validado", new Date("2026-09-27T12:00:00Z")],
+  ["WIS-EMAIL-001", "Outreach", "Preparar canario de 5 emails", "P0", "outreach-ops", "WAITING_APPROVAL", "WIS-COPY-001", "01a0654f-a185-7a43-a068-fcd39852b304", "Canario validado y sin envíos hasta aprobación", "Outreach_Queue y Outreach_Events", "SI", "Cerrar bloqueos de integración y solicitar aprobación", new Date("2026-09-27T12:00:00Z")],
+  ["WIS-WA-001", "Outreach", "Preparar canario de hasta 2 WhatsApp con opt-in", "P0", "outreach-ops", "WAITING_APPROVAL", "WIS-COPY-001", "01a011c8-647b-71c1-8da8-d56f3d6412ae", "Canario elegible sólo con opt-in", "Outreach_Queue y Outreach_Events", "SI", "Validar opt-in, ventana e idempotencia", new Date("2026-09-27T12:00:00Z")],
+  ["WIS-REV-002", "Revenue", "Completar PROSPECTOS", "P0", "prospect-intelligence", "BACKLOG", "WIS-REV-001", "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "Prospectos únicos con QA", "Columnas comerciales existentes", "NO", "Procesar lotes de 25", new Date("2026-09-27T12:00:00Z")],
 ];
 backlog.getRange(`A1:M${backlogRows.length}`).values = backlogRows;
 backlog.getRange("M2:M2000").format.numberFormat = "yyyy-mm-dd hh:mm";

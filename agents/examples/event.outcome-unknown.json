@@ -9,6 +9,6 @@
   "provider_ref": null,
   "reason": "Timeout antes de recibir confirmación del proveedor",
   "reconciled": false,
-  "actor": "email-sender",
+  "actor": "outreach-ops",
   "evidence": ["No se ejecutó reintento automático"]
 }

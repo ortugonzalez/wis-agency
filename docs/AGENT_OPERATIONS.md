@@ -2,20 +2,18 @@
 
 ## Objetivo
 
-Mantener cuatro carriles comerciales ocupados sin superponer filas ni canales:
+Mantener dos carriles operativos simples, con QA independiente y sin superponer filas ni canales:
 
-1. `prospect-research` prepara el lote N.
-2. `outreach-copy` redacta el lote N-1 ya validado.
-3. `email-sender` procesa el lote N-2 aprobado.
-4. `whatsapp-sender` procesa únicamente contactos con opt-in del lote N-2 o anterior.
+1. `prospect-intelligence` valida contactos y reseñas, define una solución desarrollable y redacta el lote N.
+2. `outreach-ops` prepara email y WhatsApp del lote N-1 aprobado, conservando gates separados por canal.
 
-`qa-ops` controla transiciones; no investiga, redacta ni envía. `wis-orchestrator` asigna lotes y registra aprobaciones.
+`qa-ops` controla transiciones; no investiga, redacta ni envía. `wis-orchestrator` asigna lotes y registra aprobaciones. Las carpetas de los cuatro roles anteriores se conservan como referencia y no son roles activos.
 
 ## Fuentes de verdad
 
 - Repositorio: roles, política, contratos, pruebas y runbooks.
 - `WIS · Operaciones de Agentes`: `Backlog`, `Runs`, `Approvals`, `Handoffs_Incidents`, `Outreach_Queue` y `Outreach_Events`.
-- Planilla comercial: sólo las 12 columnas existentes de `Distribuidoras_300`.
+- Planilla comercial: sólo las 12 columnas visibles existentes de `PROSPECTOS`; el ID técnico puede permanecer oculto en M.
 - Proveedores de canal: estado de entrega y respuesta, reconciliado en eventos.
 
 ## Lotes y propiedad
@@ -25,6 +23,12 @@ Mantener cuatro carriles comerciales ocupados sin superponer filas ni canales:
 - Cada mensaje tiene `prospect_key`, `campaign_id`, `batch_id`, canal, secuencia y versión.
 - La clave `prospect_key|campaign_id|channel|sequence` debe ser inédita en la cola y en el proveedor. El sender reconstruye ese índice durable antes de cada lote.
 - El sender no cambia el copy aprobado; sólo agrega firma y metadatos de canal.
+
+## Soluciones ofrecibles
+
+- Con problema verificable: proponer un prototipo acotado que WIS pueda construir y demostrar.
+- Sin problema suficientemente específico: ofrecer tres pilares sin inventar dolor: Atención y ventas; Administración; Operaciones y control.
+- La automatización administrativa puede preparar novedades, validar datos y ordenar documentos; no promete sustituir controles contables, laborales o legales no integrados.
 
 ## Aprobación por lote
 
@@ -38,10 +42,11 @@ Canario inicial:
 
 ## Email
 
-- Gmail/Brevo con alias verificado `Ortu - WIS <ortu@wis-agency.com>`.
+- Ruta única de email WIS con remitente `Ortu - WIS <ortu@wis-ia.com>`, bloqueada hasta que el proveedor, DNS y OAuth estén verificados.
 - 25 por día, uno cada 15 minutos, 09:30–17:30 Buenos Aires.
 - Follow-ups en días 3 y 7 sólo si la aprobación los incluye.
 - Sin CC/BCC. Firma HTML WIS sin Gravatar.
+- Las pruebas de llegada usan mensajes semilla separados a buzones propios y guardan proveedor, carpeta y autenticación en `Delivery_Tests`.
 - Respuesta, baja, reunión, hard bounce u outcome incierto detienen la secuencia.
 
 ## WhatsApp
@@ -64,7 +69,7 @@ Canario inicial:
 ## Secuencia de habilitación
 
 1. Validar contratos y simulación local de 25 fixtures.
-2. Auditar Gmail/Brevo y workflows WIS en lectura.
+2. Auditar proveedor de email, DNS, OAuth y sesión WIS de WhatsApp en lectura.
 3. Reemplazar proveedores por stubs en el dry-run.
 4. Ejecutar QA independiente.
 5. Solicitar aprobación humana del canario.

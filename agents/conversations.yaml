@@ -3,11 +3,11 @@
   "project_id": "2723732a-1011-4812-a25e-afc392b3bac0",
   "policy": "reference_only_keep_open",
   "conversations": [
-    {"title": "BUSQUEDA PROSPECTOS WIS", "thread_id": "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "agents": ["prospect-research", "outreach-copy", "qa-ops"]},
-    {"title": "Analiza sheet y plan de mails", "thread_id": "01a0654f-a185-7a43-a068-fcd39852b304", "agents": ["outreach-copy", "email-sender", "qa-ops"]},
-    {"title": "BOT PROSPECCION WIS WSP", "thread_id": "01a011c8-647b-71c1-8da8-d56f3d6412ae", "agents": ["whatsapp-sender", "qa-ops"]},
-    {"title": "Investiga bots de WhatsApp en GitHub", "thread_id": "01a03995-4c1c-7c31-b288-14370d6e62da", "agents": ["whatsapp-sender", "qa-ops"]},
-    {"title": "Diseñar agente prospección B2B", "thread_id": "01a011c7-2686-7f32-8c25-b47ce2fba687", "agents": ["prospect-research", "outreach-copy"]},
+    {"title": "BUSQUEDA PROSPECTOS WIS", "thread_id": "01a011c6-ec79-7d32-b706-b4b73f9abdcb", "agents": ["prospect-intelligence", "qa-ops"]},
+    {"title": "Analiza sheet y plan de mails", "thread_id": "01a0654f-a185-7a43-a068-fcd39852b304", "agents": ["prospect-intelligence", "outreach-ops", "qa-ops"]},
+    {"title": "BOT PROSPECCION WIS WSP", "thread_id": "01a011c8-647b-71c1-8da8-d56f3d6412ae", "agents": ["outreach-ops", "qa-ops"]},
+    {"title": "Investiga bots de WhatsApp en GitHub", "thread_id": "01a03995-4c1c-7c31-b288-14370d6e62da", "agents": ["outreach-ops", "qa-ops"]},
+    {"title": "Diseñar agente prospección B2B", "thread_id": "01a011c7-2686-7f32-8c25-b47ce2fba687", "agents": ["prospect-intelligence"]},
     {"title": "ORQUESTADOR BOT WIS", "thread_id": "01a011c8-321c-7ea1-a899-9997cf861579", "agents": ["wis-orchestrator", "qa-ops"]}
   ]
 }

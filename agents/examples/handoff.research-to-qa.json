@@ -1,6 +1,6 @@
 {
   "task_id": "WIS-REV-001",
-  "from_agent": "prospect-research",
+  "from_agent": "prospect-intelligence",
   "to_agent": "qa-ops",
   "artifacts": ["Lote comercial de 25 filas"],
   "evidence": ["Contactos corporativos", "Reseñas negativas accesibles", "Señales de tamaño"],

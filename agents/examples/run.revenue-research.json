@@ -1,7 +1,7 @@
 {
   "run_id": "RUN-WIS-REV-001-001",
   "task_id": "WIS-REV-001",
-  "agent": "prospect-research",
+  "agent": "prospect-intelligence",
   "status": "REVIEW",
   "branch": null,
   "worktree": null,

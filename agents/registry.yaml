@@ -2,7 +2,7 @@
   "version": 2,
   "orchestrator": "wis-orchestrator",
   "max_concurrent_codex_specialists": 3,
-  "parallel_pipeline_workers": 4,
+  "parallel_pipeline_workers": 2,
   "states": ["BACKLOG", "READY", "IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"],
   "outreach_states": ["NUEVO", "RESEARCH_EN_CURSO", "RESEARCH_VALIDADO", "BORRADOR", "QA", "ESPERANDO_APROBACION", "APROBADO", "EN_COLA", "ENVIADO", "RESPONDIDO", "CERRADO", "BLOQUEADO", "REBOTADO", "OPTOUT", "OUTCOME_UNKNOWN", "DESCARTADO"],
   "human_approval_actions": [
@@ -26,44 +26,24 @@
       "tests": ["rtk npm test", "revisión independiente de qa-ops"]
     },
     {
-      "id": "prospect-research",
-      "mission": "Encontrar y validar distribuidoras argentinas y luego logísticas LATAM con contactos y evidencia pública verificable.",
+      "id": "prospect-intelligence",
+      "mission": "Validar prospectos y contactos, extraer reseñas 1–3★ con evidencia, definir una solución WIS desarrollable y redactar copy sin inventar.",
       "read_paths": ["agents/**", "docs/**"],
-      "write_paths": ["agents/artifacts/research/**", "ops/reports/research/**"],
-      "external_scopes": ["Distribuidoras_300: columnas existentes", "fuentes públicas", "Google Maps"],
+      "write_paths": ["agents/artifacts/research/**", "agents/artifacts/copy/**", "ops/reports/research/**", "ops/reports/copy/**"],
+      "external_scopes": ["PROSPECTOS: 12 columnas visibles existentes", "fuentes públicas", "Google Maps", "Message_Drafts"],
       "allowed_tools": ["web", "chrome", "google_sheets"],
-      "forbidden_actions": ["guess_contact_data", "analyze_4_or_5_star_reviews", "send_outreach", "add_commercial_sheet_columns", "select_large_corporations"],
-      "tests": ["unicidad", "contacto verificable", "reseñas 1-3 con analizadas/total accesible", "empresa mediana o chica"]
+      "forbidden_actions": ["guess_contact_data", "analyze_4_or_5_star_reviews", "send_outreach", "add_commercial_sheet_columns", "select_large_corporations", "invent_evidence", "promise_undevelopable_solution"],
+      "tests": ["unicidad", "contacto verificable", "reseñas 1-3 con analizadas/total accesible", "solución implementable o cartera de tres pilares", "copy A/B", "sin acusaciones"]
     },
     {
-      "id": "outreach-copy",
-      "mission": "Redactar las variantes A y B de email y WhatsApp a partir de research validado y de un único problema verificable.",
-      "read_paths": ["agents/**", "docs/**", "agents/artifacts/research/**"],
-      "write_paths": ["agents/artifacts/copy/**", "ops/reports/copy/**"],
-      "external_scopes": ["Mensaje WhatsApp y Mensaje Email en planillas comerciales autorizadas"],
-      "allowed_tools": ["google_sheets", "web_read_only"],
-      "forbidden_actions": ["send_email", "send_whatsapp", "add_signature", "invent_evidence", "use_unvalidated_prospect"],
-      "tests": ["variantes A/B", "un problema concreto", "dos horarios", "prototipo entregable", "sin acusaciones"]
-    },
-    {
-      "id": "email-sender",
-      "mission": "Encolar, enviar y monitorear emails individuales aprobados mediante Gmail/Brevo con firma WIS e idempotencia.",
+      "id": "outreach-ops",
+      "mission": "Preparar, encolar y monitorear email y WhatsApp aprobados, manteniendo separados ambos canales, idempotencia y todos los gates de consentimiento.",
       "read_paths": ["agents/**", "docs/**", "agents/artifacts/copy/**"],
-      "write_paths": ["agents/artifacts/email/**", "ops/reports/email/**", "integrations/email/**"],
-      "external_scopes": ["Gmail/Brevo", "Outreach_Queue", "Outreach_Events"],
-      "allowed_tools": ["google_sheets", "gmail", "brevo", "n8n_read_only"],
-      "forbidden_actions": ["send_without_batch_approval", "send_cc_or_bcc", "exceed_daily_cap", "blind_retry", "rewrite_approved_copy"],
-      "tests": ["alias verificado", "firma HTML sin Gravatar", "25/día", "intervalo 15 minutos", "09:30-17:30 Buenos Aires"]
-    },
-    {
-      "id": "whatsapp-sender",
-      "mission": "Encolar, enviar y monitorear WhatsApp aprobados sólo con opt-in verificable mediante la sesión no oficial WIS 5679 aislada.",
-      "read_paths": ["agents/**", "docs/**", "agents/artifacts/copy/**"],
-      "write_paths": ["agents/artifacts/whatsapp/**", "ops/reports/whatsapp/**", "integrations/whatsapp/**"],
-      "external_scopes": ["sesión WIS 5679", "Outreach_Queue", "Outreach_Events"],
-      "allowed_tools": ["google_sheets", "n8n_read_only", "baileys_session_read_only"],
-      "forbidden_actions": ["send_without_batch_approval", "send_without_verified_opt_in", "cold_whatsapp", "touch_dugas_or_qh", "activate_workflow_without_approval", "blind_retry"],
-      "tests": ["binding línea 5679", "opt-in verificable", "bloqueo fuera de ventana de 24 horas", "10/día", "intervalo 15 minutos", "máximo un follow-up"]
+      "write_paths": ["agents/artifacts/email/**", "agents/artifacts/whatsapp/**", "ops/reports/email/**", "ops/reports/whatsapp/**", "integrations/email/**", "integrations/whatsapp/**"],
+      "external_scopes": ["WIS Mailer", "sesión WIS 5679", "Outreach_Queue", "Outreach_Events", "Delivery_Tests"],
+      "allowed_tools": ["google_sheets", "wis_mailer", "email_provider_read_only", "baileys_session_read_only"],
+      "forbidden_actions": ["send_without_batch_approval", "send_cc_or_bcc", "send_without_verified_opt_in", "cold_whatsapp", "touch_dugas_or_qh", "activate_workflow_without_approval", "blind_retry", "rewrite_approved_copy"],
+      "tests": ["email primero", "semillas separadas sin CC/BCC", "25 emails/día", "10 WhatsApp/día", "intervalo 15 minutos", "opt-in verificable", "idempotencia durable"]
     },
     {
       "id": "qa-ops",

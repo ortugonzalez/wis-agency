@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { validateConfiguration } from "../../scripts/validate-agents.mjs";
 
-test("registry defines six commercial roles and seven contracts", async () => {
+test("registry defines four consolidated commercial roles and seven contracts", async () => {
   const result = await validateConfiguration();
-  assert.equal(result.roleCount, 6);
+  assert.equal(result.roleCount, 4);
   assert.equal(result.contractCount, 7);
   assert.equal(result.conversationCount, 6);
 });
@@ -22,7 +22,7 @@ test("only commercial external effects remain behind human approval", async () =
     "live_side_effect_test"
   ]);
   const active = new Set(registry.roles.map(role => role.id));
-  for (const retired of ["content-strategy", "linkedin-operator", "x-operator", "web-brand", "automation-integrations"]) {
+  for (const retired of ["content-strategy", "linkedin-operator", "x-operator", "web-brand", "automation-integrations", "prospect-research", "outreach-copy", "email-sender", "whatsapp-sender"]) {
     assert.equal(active.has(retired), false);
   }
 });

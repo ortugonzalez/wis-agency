@@ -5,10 +5,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const expectedRoles = [
   "wis-orchestrator",
-  "prospect-research",
-  "outreach-copy",
-  "email-sender",
-  "whatsapp-sender",
+  "prospect-intelligence",
+  "outreach-ops",
   "qa-ops"
 ];
 const retiredRoles = [
@@ -18,7 +16,11 @@ const retiredRoles = [
   "linkedin-operator",
   "x-operator",
   "web-brand",
-  "automation-integrations"
+  "automation-integrations",
+  "prospect-research",
+  "outreach-copy",
+  "email-sender",
+  "whatsapp-sender"
 ];
 const expectedStates = ["BACKLOG", "READY", "IN_PROGRESS", "REVIEW", "WAITING_APPROVAL", "DONE", "BLOCKED", "CANCELLED"];
 
@@ -50,10 +52,10 @@ export async function validateConfiguration() {
   assert(registry.version === 2, "registry.version debe ser 2");
   assert(registry.orchestrator === "wis-orchestrator", "orquestador inválido");
   assert(registry.max_concurrent_codex_specialists === 3, "máximo Codex inválido");
-  assert(registry.parallel_pipeline_workers === 4, "deben existir cuatro carriles comerciales");
+  assert(registry.parallel_pipeline_workers === 2, "deben existir dos carriles operativos consolidados");
   assert(JSON.stringify(registry.states) === JSON.stringify(expectedStates), "estados de tareas no canónicos");
   assert(JSON.stringify(registry.outreach_states) === JSON.stringify(policy.outreach_states), "estados outreach inconsistentes");
-  assert(registry.roles.length === expectedRoles.length, "deben existir exactamente seis roles activos");
+  assert(registry.roles.length === expectedRoles.length, "deben existir exactamente cuatro roles activos");
 
   const roleIds = registry.roles.map(role => role.id);
   assert(new Set(roleIds).size === roleIds.length, "hay roles duplicados");
