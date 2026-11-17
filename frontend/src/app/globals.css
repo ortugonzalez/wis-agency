@@ -80,6 +80,20 @@ button { cursor: pointer; }
 .service-foot b { color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: 0; }
 .service-foot b:not(:last-child)::after { content: '·'; margin-left: 15px; color: var(--gold); }
 
+.ecosystem-section { padding: 135px 0; background: var(--black-soft); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ecosystem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14%; align-items: end; }
+.ecosystem-copy h2 { max-width: 650px; margin: 26px 0 0; color: var(--white); font: 500 clamp(48px, 6vw, 84px)/.86 var(--font-wis), Arial, sans-serif; letter-spacing: -.08em; }
+.ecosystem-copy h2 span { color: var(--gold); }
+.ecosystem-detail > p { max-width: 330px; margin: 0 0 42px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.ecosystem-list { border-top: 1px solid var(--line); }
+.ecosystem-list > div { display: grid; grid-template-columns: 46px 1fr auto; gap: 14px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); transition: padding .3s ease, background .3s ease; }
+.ecosystem-list > div:hover { padding: 20px 14px; background: var(--gold); color: var(--black); }
+.ecosystem-list span { color: var(--gold); font-size: 10px; letter-spacing: .14em; }
+.ecosystem-list > div:hover span { color: var(--black); }
+.ecosystem-list strong { font-size: 23px; font-weight: 500; letter-spacing: -.05em; }
+.ecosystem-list small { color: var(--muted); font-size: 11px; }
+.ecosystem-list > div:hover small { color: rgba(8,9,8,.72); }
+
 .cases-section { overflow: hidden; padding: 150px 0 145px; background: var(--black-soft); }
 .cases-intro { margin-bottom: 66px; }
 .cases-intro p { margin: 27px 0 0; color: var(--muted); font-size: 14px; }
@@ -176,6 +190,8 @@ button { cursor: pointer; }
   .method-section { padding-top: 100px; padding-bottom: 110px; }
   .contact-grid { gap: 60px; }
   .service-row { grid-template-columns: 45px 1fr 25px; }
+  .ecosystem-section { padding: 100px 0; }
+  .ecosystem-grid { grid-template-columns: 1fr; gap: 48px; }
 }
 
 @media (max-width: 620px) {
@@ -205,6 +221,10 @@ button { cursor: pointer; }
   .service-foot { grid-template-columns: 1fr; gap: 18px; padding-top: 34px; }
   .service-foot div { gap: 10px; }
   .service-foot b:not(:last-child)::after { margin-left: 10px; }
+  .ecosystem-copy h2 { font-size: 53px; }
+  .ecosystem-detail > p { margin-bottom: 36px; font-size: 13px; }
+  .ecosystem-list > div { grid-template-columns: 34px 1fr; gap: 10px; }
+  .ecosystem-list small { grid-column: 2; }
   .cases-section { padding: 95px 0 90px; }
   .cases-intro { margin-bottom: 44px; }
   .cases-intro p { font-size: 13px; }
