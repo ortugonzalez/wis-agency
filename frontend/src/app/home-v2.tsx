@@ -20,6 +20,7 @@ function BrandMark() {
 
 export default function HomeV2() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
   const [demo, setDemo] = useState<(typeof demos)[number]['key']>('atencion');
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [dragging, setDragging] = useState(false);
@@ -51,6 +52,13 @@ export default function HomeV2() {
   }, []);
 
   useEffect(() => {
+    const update = () => setNavScrolled(window.scrollY > 28);
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
+  useEffect(() => {
     const reel = reelRef.current;
     if (!reel) return;
     let startX = 0;
@@ -71,7 +79,7 @@ export default function HomeV2() {
   return <main className="v3-site">
     <div className="v3-progress" />
     <div className="v3-topline"><span className="v3-dot" /> WIS / Sistemas inteligentes para empresas <span>·</span> Argentina + LATAM</div>
-    <nav className="v3-nav" aria-label="Navegación principal">
+    <nav className={`v3-nav ${navScrolled ? 'is-scrolled' : ''}`} aria-label="Navegación principal">
       <a href="#inicio" className="v3-brand" aria-label="WIS Agency, inicio"><BrandMark /><span>Work in silence</span></a>
       <div className={`v3-nav-links ${menuOpen ? 'v3-open' : ''}`}><a href="#sistema" onClick={() => setMenuOpen(false)}>Sistema</a><a href="#servicios" onClick={() => setMenuOpen(false)}>Qué hacemos</a><a href="#casos" onClick={() => setMenuOpen(false)}>Casos</a><a href="#contacto" onClick={() => setMenuOpen(false)}>Diagnóstico</a></div>
       <a className="v3-nav-cta" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Hablemos <ArrowUpRight size={15} /></a><button className="v3-menu" aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={21} /> : <Menu size={21} />}</button>
