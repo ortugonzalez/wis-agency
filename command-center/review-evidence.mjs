@@ -1,5 +1,45 @@
+import { createHash } from "node:crypto";
+
+const REVIEW_EVIDENCE_SCHEMA="wis.review-evidence.v1";
 const GOOGLE_MAPS_HOSTS=new Set(["google.com","www.google.com","maps.google.com","maps.app.goo.gl"]);
 const TERMINAL_STATUSES=new Set(["VERIFIED","VERIFIED_NO_LOW_REVIEWS"]);
+
+function requiredString(value,field) {
+  const normalized=String(value??"").trim();
+  if(!normalized) throw new TypeError(`${field} is required`);
+  return normalized;
+}
+
+function requiredBoolean(value,field) {
+  if(value===true||value==="TRUE") return true;
+  if(value===false||value==="FALSE") return false;
+  throw new TypeError(`${field} must be boolean`);
+}
+
+function requiredCount(value,field) {
+  const normalized=Number(value);
+  if(!Number.isInteger(normalized)||normalized<0) throw new TypeError(`${field} must be a non-negative integer`);
+  return normalized;
+}
+
+export function canonicalReviewEvidencePreimage(input={}) {
+  return JSON.stringify([
+    REVIEW_EVIDENCE_SCHEMA,
+    requiredString(input.prospectKey??input.prospect_key,"prospect_key"),
+    requiredString(input.mapsUrl??input.maps_url,"maps_url"),
+    requiredBoolean(input.exactListingVerified??input.exact_listing_verified,"exact_listing_verified"),
+    requiredBoolean(input.opinionsOpened??input.opinions_opened,"opinions_opened"),
+    requiredBoolean(input.sortedLowest??input.sorted_lowest,"sorted_lowest"),
+    requiredCount(input.lowReviewCount??input.low_review_count,"low_review_count"),
+    requiredCount(input.analyzedCount??input.analyzed_count,"analyzed_count"),
+    requiredString(input.checkedAt??input.checked_at,"checked_at"),
+    requiredString(input.reviewer,"reviewer")
+  ]);
+}
+
+export function reviewEvidenceHash(input) {
+  return createHash("sha256").update(canonicalReviewEvidencePreimage(input),"utf8").digest("hex");
+}
 
 function bool(value) {
   return value===true||["TRUE","SI","SÍ","YES","1"].includes(String(value||"").trim().toUpperCase());
@@ -26,7 +66,7 @@ function validTimestamp(value) {
 }
 
 function validEvidenceHash(value) {
-  return /^[a-f0-9]{64}$/i.test(String(value||"").trim())||/^[A-Za-z0-9_-]{43,86}$/.test(String(value||"").trim());
+  return /^[a-f0-9]{64}$/i.test(String(value||"").trim());
 }
 
 export function evaluateReviewEvidence(input={}) {
@@ -45,7 +85,16 @@ export function evaluateReviewEvidence(input={}) {
   if(!directSteps.sortedLowest) failures.push("LOWEST_SORT_NOT_VERIFIED");
   if(lowReviewCount===null||analyzedCount===null||analyzedCount>lowReviewCount) failures.push("REVIEW_COUNTS_INVALID");
   if(!validTimestamp(input.checkedAt??input.checked_at)) failures.push("CHECKED_AT_INVALID");
-  if(!validEvidenceHash(input.evidenceHash??input.evidence_hash)) failures.push("EVIDENCE_HASH_INVALID");
+  const storedHash=String(input.evidenceHash??input.evidence_hash??"").trim();
+  if(!validEvidenceHash(storedHash)) failures.push("EVIDENCE_HASH_INVALID");
+  let hashVerified=false;
+  try {
+    const expectedHash=reviewEvidenceHash(input);
+    hashVerified=validEvidenceHash(storedHash)&&storedHash.toLowerCase()===expectedHash;
+    if(validEvidenceHash(storedHash)&&!hashVerified) failures.push("EVIDENCE_HASH_MISMATCH");
+  } catch {
+    failures.push("EVIDENCE_HASH_INPUT_INVALID");
+  }
 
   const directReviewAudit=failures.length===0;
   const zeroLowReviewsVerified=directReviewAudit&&status==="VERIFIED_NO_LOW_REVIEWS"&&lowReviewCount===0&&analyzedCount===0;
@@ -55,6 +104,8 @@ export function evaluateReviewEvidence(input={}) {
 
   return {
     status,
+    hashSchema:REVIEW_EVIDENCE_SCHEMA,
+    hashVerified,
     ...directSteps,
     lowReviewCount,
     analyzedCount,
