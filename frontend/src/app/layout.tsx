@@ -1,19 +1,19 @@
 import type { Metadata } from 'next';
-import { Nunito_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import Script from 'next/script';
 import './globals.css';
 
-const wisFont = Nunito_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-wis' });
+const wisFont = localFont({ src: './fonts/GeistVF.woff', variable: '--font-wis', weight: '100 900', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://wis-agency.com'),
-  title: { default: 'WIS Agency | Automatización con IA para empresas', template: '%s | WIS Agency' },
-  description: 'WIS diseña sistemas con inteligencia artificial para ordenar la atención, el seguimiento y los procesos de tu empresa.',
+  title: { default: 'WIS Agency | Sistemas inteligentes para empresas', template: '%s | WIS Agency' },
+  description: 'WIS diseña e implementa sistemas con IA para ordenar la atención, el seguimiento y la operación de empresas en Argentina y LATAM.',
   keywords: ['automatización con IA', 'agencia de IA Argentina', 'agentes de IA para empresas', 'automatización WhatsApp', 'n8n', 'integración de sistemas', 'automatización de procesos', 'IA para PyMEs', 'automatización comercial', 'casos de éxito IA'],
   alternates: { canonical: 'https://wis-agency.com' },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
-  openGraph: { type: 'website', locale: 'es_AR', url: 'https://wis-agency.com', siteName: 'WIS Agency', title: 'La tecnología que trabaja por vos | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y los procesos de tu empresa.', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'WIS Agency — Work In Silence' }] },
-  twitter: { card: 'summary_large_image', title: 'La tecnología que trabaja por vos | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y los procesos de tu empresa.', images: ['/og-image.png'] },
+  openGraph: { type: 'website', locale: 'es_AR', url: 'https://wis-agency.com', siteName: 'WIS Agency', title: 'Menos tareas que perseguir. Más operación que avanza. | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y la operación de empresas.', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'WIS Agency — Sistemas inteligentes para empresas' }] },
+  twitter: { card: 'summary_large_image', title: 'Menos tareas que perseguir. Más operación que avanza. | WIS Agency', description: 'Sistemas con IA para ordenar la atención, el seguimiento y la operación de empresas.', images: ['/og-image.png'] },
   icons: { icon: '/favicon.png', apple: '/icon-512.png' },
 };
 
@@ -22,7 +22,8 @@ const jsonLd = {
   '@graph': [
     { '@type': 'Organization', '@id': 'https://wis-agency.com/#organization', name: 'WIS Agency', url: 'https://wis-agency.com', logo: 'https://wis-agency.com/og-image.png', email: 'ortu@wis-agency.com', areaServed: ['AR', 'LATAM'], sameAs: ['https://instagram.com/wis.agency'] },
     { '@type': 'WebSite', '@id': 'https://wis-agency.com/#website', url: 'https://wis-agency.com', name: 'WIS Agency', publisher: { '@id': 'https://wis-agency.com/#organization' }, inLanguage: 'es-AR' },
-    { '@type': 'Service', serviceType: 'Automatización con inteligencia artificial', provider: { '@id': 'https://wis-agency.com/#organization' }, areaServed: ['AR', 'LATAM'], description: 'Agentes de IA, automatización de procesos e integración de sistemas para empresas.' },
+    { '@type': 'WebPage', '@id': 'https://wis-agency.com/#webpage', url: 'https://wis-agency.com', name: 'WIS Agency | Sistemas inteligentes para empresas', isPartOf: { '@id': 'https://wis-agency.com/#website' }, about: { '@id': 'https://wis-agency.com/#organization' }, inLanguage: 'es-AR' },
+    { '@type': 'Service', serviceType: 'Sistemas inteligentes y automatización con IA', provider: { '@id': 'https://wis-agency.com/#organization' }, areaServed: ['AR', 'LATAM'], description: 'Agentes de IA, automatización comercial, automatización de procesos e integración de sistemas para empresas.' },
   ],
 };
 
