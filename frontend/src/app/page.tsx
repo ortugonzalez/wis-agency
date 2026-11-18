@@ -19,7 +19,7 @@ function BrandMark() {
   return <span className="brand-mark" aria-hidden="true"><Image src="/logo-transparent.png" alt="" fill sizes="76px" priority /></span>;
 }
 
-export default function Home() {
+export function LegacyHome() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const marqueeRef = useRef<HTMLDivElement>(null);
@@ -136,3 +136,5 @@ export default function Home() {
     <footer className="footer section-shell reveal"><div className="footer-brand"><BrandMark /><span>Work In Silence.</span></div><div className="footer-links"><a href="#que-hacemos">Qué hacemos</a><a href="#casos">Clientes</a><a href="#contacto">Contacto</a><a href={WHATSAPP_URL} target="_blank" rel="noreferrer"><span className="whatsapp-mark"><MessageCircle size={14} /></span> WhatsApp <ArrowUpRight size={14} /></a><a href="https://www.linkedin.com/company/wis-agency/" target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a></div><div className="footer-copy">© 2026 WIS Agency<br />Sistemas inteligentes · Argentina + LATAM</div></footer>
   </main>;
 }
+
+export { default } from './home-v2';
