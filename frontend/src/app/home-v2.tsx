@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowRight, ArrowUpRight, Check, Mail, Menu, MessageCircle, Send, X } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, Mail, Menu, MessageCircle, Pause, Play, Send, X } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { cases, services } from './site-content';
@@ -23,6 +23,9 @@ export default function HomeV2() {
   const [demo, setDemo] = useState<(typeof demos)[number]['key']>('atencion');
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [dragging, setDragging] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(true);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
   const reelRef = useRef<HTMLDivElement>(null);
   const demoItem = demos.find((item) => item.key === demo) || demos[0];
 
@@ -75,9 +78,9 @@ export default function HomeV2() {
     </nav>
 
     <section id="inicio" className="v3-hero">
-      <video autoPlay loop muted playsInline preload="auto" poster="/og-image.png" aria-hidden="true"><source src="/wis-loop.mp4" type="video/mp4" /></video><div className="v3-hero-shade" />
+      <video ref={heroVideoRef} autoPlay loop muted playsInline preload="auto" poster="/og-image.png" onTimeUpdate={(event) => { const video = event.currentTarget; setVideoProgress(video.duration ? video.currentTime / video.duration * 100 : 0); }} onPlay={() => setVideoPlaying(true)} onPause={() => setVideoPlaying(false)} aria-hidden="true"><source src="/wis-loop.mp4" type="video/mp4" /></video><div className="v3-hero-shade" />
       <div className="v3-hero-content"><span className="v3-kicker">WIS / 2026 <i /> Work in silence</span><h1>Hay cosas que<br /><span>tu equipo no debería</span><br />seguir haciendo<br /><span>a mano.</span></h1><p>WIS diseña sistemas para ordenar la atención, el seguimiento y los procesos que hoy dependen demasiado de una persona.</p><div className="v3-actions"><a className="v3-button v3-primary" href="#contacto">Diagnóstico operativo <ArrowRight size={17} /></a><a className="v3-button v3-ghost" href="#demo">Verlo en acción <ArrowDown size={15} /></a></div></div>
-      <div className="v3-hero-note"><span>PRIMERA CONVERSACIÓN</span><b>30 min · sin compromiso</b></div><div className="v3-hero-meta"><span>MOTION LOOP / 01</span><span>IA · INTEGRACIONES · PROCESOS</span></div>
+      <div className="v3-hero-note"><span>PRIMERA CONVERSACIÓN</span><b>30 min · sin compromiso</b></div><div className="v3-hero-meta"><span>MOTION LOOP / 01</span><span>IA · INTEGRACIONES · PROCESOS</span></div><div className="v3-film-ui" aria-label="Controles del video principal"><div className="v3-film-ui-label"><span>MOTION LOOP</span><b>8 SEC · SILENT</b></div><div className="v3-film-ui-progress"><i style={{ width: `${videoProgress}%` }} /></div><button type="button" onClick={() => { const video = heroVideoRef.current; if (!video) return; if (video.paused) { void video.play(); } else { video.pause(); } }} aria-label={videoPlaying ? 'Pausar video' : 'Reproducir video'}>{videoPlaying ? <Pause size={14} /> : <Play size={14} />}</button></div>
     </section>
 
     <section id="sistema" className="v3-intro v3-reveal"><div className="v3-shell v3-intro-grid"><div><span className="v3-section-kicker">01 / El problema</span><h2>La operación no se rompe por falta de esfuerzo.<br /><span>Se rompe cuando todo depende de alguien.</span></h2></div><div><p>Cuando una consulta queda sin respuesta, un presupuesto no tiene seguimiento o un dato se copia de una planilla a otra, el problema no es la voluntad del equipo. Es que falta un sistema.</p><a className="v3-text-link" href="#demo">Ver un proceso WIS <ArrowUpRight size={15} /></a></div></div></section>
