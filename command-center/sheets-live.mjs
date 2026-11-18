@@ -1,25 +1,29 @@
-import { createHash, createSign } from "node:crypto";
+import { createSign } from "node:crypto";
+import { evaluateReviewEvidence, reviewEvidenceRecord } from "./review-evidence.mjs";
+import { summarizeContactEvidence } from "./contact-evidence.mjs";
 
 const SHEETS_READ_SCOPE="https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEETS_WRITE_SCOPE="https://www.googleapis.com/auth/spreadsheets";
 const TOKEN_URL="https://oauth2.googleapis.com/token";
 const DEFAULT_COMMERCIAL_ID="1HoVbDf_In8urKkiUnfkE-j3TPq0vrI4pjfPoAYKJYl8";
 const DEFAULT_OPERATIONS_ID="1oJxHk_FeDiZ3FUi3ugd2xheiJSrA9OgdRQn5EJgpN_w";
-export const COMMERCIAL_SHEETS={
-  Distribuidoras_300:{campaignId:"distribuidoras-300",phase:"outreach",range:"A1:L350"},
-  Hoteles_Argentina_300:{campaignId:"hoteles-argentina-300",phase:"contacts",range:"A1:L350",target:300},
-  Hoteles_LATAM_500:{campaignId:"hoteles-latam-500",phase:"contacts",range:"A1:L600",target:500},
-  Logisticas_LATAM:{campaignId:"logisticas-latam-chile",phase:"outreach",range:"A1:L600",logicalRows:true}
-};
+const DEFAULT_COMMERCIAL_SHEET="PROSPECTOS";
 const DRAFTS_SHEET="Message_Drafts";
 const DRAFT_HEADERS=["draft_key","source_sheet","source_row","channel","message","updated_at","updated_by"];
 const COST_LEDGER_SHEET="Cost_Ledger";
 const COST_LEDGER_HEADERS=["usage_id","timestamp","operation_id","idempotency_key","run_id","prospect_key","source_row","empresa","stage","provider","service","model","pricing_tier","input_tokens","cached_input_tokens","cache_write_tokens","output_tokens","reasoning_tokens","tool_calls","units","unit_name","provider_cost_usd","calculated_cost_usd","cost_source","metadata","recorded_by"];
 const COST_SETTINGS_SHEET="Cost_Settings";
 const COST_SETTINGS_HEADERS=["key","value","updated_at","updated_by","note"];
+const REVIEW_EVIDENCE_SHEET="Review_Evidence";
+const REVIEW_EVIDENCE_HEADERS=["evidence_id","prospect_key","source_row","empresa","maps_url","exact_listing_verified","opinions_opened","sorted_lowest","low_review_count","analyzed_count","checked_at","reviewer","evidence_hash","status","blocker"];
 const RESEARCH_EVIDENCE_SHEET="Research_Evidence";
-const RESEARCH_EVIDENCE_HEADERS=["evidence_id","timestamp","command_id","campaign_id","batch_id","prospect_key","source_url","evidence_type","decision","detail","score","recorded_by"];
-const ensuredOperationalSheets=new Set();
+const OPERATIONAL_SCHEMAS=Object.freeze({
+  Campaigns:["campaign_id","name","hypothesis","single_variable","variant_a","variant_b","channel","status","created_at","approved_by"],
+  Experiment_Assignments:["assignment_id","campaign_id","prospect_key","variant","assigned_at","immutable","assignment_hash"],
+  Delivery_Tests:["test_id","timestamp","provider","mailbox","seed_provider","folder","spf","dkim","dmarc","tracking_mode","result","evidence"],
+  Suppressions:["suppression_id","prospect_key","channel","recipient_hash","reason","source_event_id","created_at","active","evidence"],
+  Channel_Health:["channel","integration","account","mode","health","last_check","can_enqueue","can_send","blocker","evidence"]
+});
 
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
@@ -37,17 +41,6 @@ export function sheetsLiveConfigured() {
 }
 
 let tokenCache={token:"",scope:"",expiresAt:0};
-const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-
-async function sheetsFetch(url,options={}) {
-  const waits=[5_000,10_000,20_000,30_000];
-  for(let attempt=0;;attempt++) {
-    const response=await fetch(url,options);
-    if(![429,503].includes(response.status)||attempt>=waits.length) return response;
-    try { await response.text(); } catch { /* release response before retry */ }
-    await sleep(waits[attempt]);
-  }
-}
 
 async function accessToken() {
   if(!sheetsLiveConfigured()) throw new Error("GOOGLE_SHEETS_CREDENTIALS_NOT_CONFIGURED");
@@ -90,7 +83,7 @@ async function appendValues(spreadsheetId,range,values) {
   url.searchParams.set("valueInputOption","RAW");
   url.searchParams.set("insertDataOption","INSERT_ROWS");
   url.searchParams.set("includeValuesInResponse","false");
-  const response=await sheetsFetch(url,{
+  const response=await fetch(url,{
     method:"POST",
     headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
     body:JSON.stringify({majorDimension:"ROWS",values:[values]}),
@@ -106,7 +99,7 @@ async function updateValues(spreadsheetId,range,values) {
   const token=await accessToken();
   const url=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`);
   url.searchParams.set("valueInputOption","RAW");
-  const response=await sheetsFetch(url,{
+  const response=await fetch(url,{
     method:"PUT",
     headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
     body:JSON.stringify({majorDimension:"ROWS",values:[values]}),
@@ -120,18 +113,17 @@ async function ensureDraftsSheet() {
 }
 
 async function ensureOperationalSheet(sheetName,headers) {
-  if(ensuredOperationalSheets.has(sheetName)) return;
   const spreadsheetId=operationsId();
   const token=await accessToken();
   const metadataUrl=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`);
   metadataUrl.searchParams.set("fields","sheets.properties(sheetId,title)");
-  const metadataResponse=await sheetsFetch(metadataUrl,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
+  const metadataResponse=await fetch(metadataUrl,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
   const metadata=await metadataResponse.json();
   if(!metadataResponse.ok) throw new Error(`GOOGLE_SHEETS_METADATA_FAILED_${metadataResponse.status}`);
   let sheet=(metadata.sheets||[]).find(item=>item?.properties?.title===sheetName);
   const exists=Boolean(sheet);
   if(!exists) {
-    const response=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
+    const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
       method:"POST",
       headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
       body:JSON.stringify({requests:[{addSheet:{properties:{title:sheetName}}}]}),
@@ -145,11 +137,16 @@ async function ensureOperationalSheet(sheetName,headers) {
   const current=await batchGet(spreadsheetId,[`${sheetName}!A1:${lastColumn}1`],token);
   if(!(current[0]?.values?.[0]||[]).length) await updateValues(spreadsheetId,`${sheetName}!A1:${lastColumn}1`,headers);
   if(Number.isInteger(sheet?.properties?.sheetId)) await formatOperationalSheet(spreadsheetId,sheet.properties.sheetId,headers.length,token);
-  ensuredOperationalSheets.add(sheetName);
+}
+
+export async function ensureWisOperationalSheets() {
+  if(!sheetsWriteConfigured()) throw new Error("GOOGLE_SHEETS_WRITES_DISABLED");
+  for(const [sheetName,headers] of Object.entries(OPERATIONAL_SCHEMAS)) await ensureOperationalSheet(sheetName,headers);
+  return {spreadsheetId:operationsId(),sheets:Object.keys(OPERATIONAL_SCHEMAS)};
 }
 
 async function formatOperationalSheet(spreadsheetId,sheetId,columnCount,token) {
-  const response=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
+  const response=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`,{
     method:"POST",
     headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
     body:JSON.stringify({requests:[
@@ -168,29 +165,16 @@ function columnName(number) {
   return result;
 }
 
-function allowedCommercialSheet(sourceSheet) {
-  const value=String(sourceSheet||"Distribuidoras_300").trim();
-  if(!COMMERCIAL_SHEETS[value]) throw new Error("COMMERCIAL_SHEET_NOT_ALLOWED");
-  return value;
-}
-
-export function commercialDataRow(sourceSheet,rowNumber) {
-  const normalizedSheet=allowedCommercialSheet(sourceSheet);
-  const logical=Number(rowNumber);
-  if(!Number.isInteger(logical)||logical<1) throw new Error("PROSPECT_ROW_INVALID");
-  return COMMERCIAL_SHEETS[normalizedSheet].logicalRows?logical+1:logical;
-}
-
-async function upsertMessageDraft(rowNumber,channel,message,sourceSheet="Distribuidoras_300") {
+async function upsertMessageDraft(rowNumber,channel,message) {
   await ensureDraftsSheet();
   const spreadsheetId=operationsId();
   const token=await accessToken();
   const range=await batchGet(spreadsheetId,[`${DRAFTS_SHEET}!A1:G2000`],token);
   const values=range[0]?.values||[];
-  const normalizedSheet=allowedCommercialSheet(sourceSheet);
-  const draftKey=`${normalizedSheet}:${rowNumber}:${channel}`;
+  const sourceSheet=commercialSheetName();
+  const draftKey=`${sourceSheet}:${rowNumber}:${channel}`;
   const sheetRow=values.findIndex((row,index)=>index>0&&row[0]===draftKey)+1;
-  const record=[draftKey,normalizedSheet,rowNumber,channel,message,new Date().toISOString(),"human-dashboard"];
+  const record=[draftKey,sourceSheet,rowNumber,channel,message,new Date().toISOString(),"human-dashboard"];
   if(sheetRow>0) await updateValues(spreadsheetId,`${DRAFTS_SHEET}!A${sheetRow}:G${sheetRow}`,record);
   else await appendValues(spreadsheetId,`${DRAFTS_SHEET}!A:G`,record);
   return draftKey;
@@ -198,6 +182,10 @@ async function upsertMessageDraft(rowNumber,channel,message,sourceSheet="Distrib
 
 function operationsId() {
   return process.env.WIS_OPERATIONS_SHEET_ID||DEFAULT_OPERATIONS_ID;
+}
+
+function commercialSheetName() {
+  return process.env.WIS_COMMERCIAL_SHEET_NAME||DEFAULT_COMMERCIAL_SHEET;
 }
 
 export async function appendTaskCommand(command) {
@@ -212,6 +200,33 @@ export async function appendOutreachEvent(event) {
     event.eventId,event.messageId||"",event.timestamp,event.channel||"",event.fromStatus||"",
     event.toStatus||event.status||"",event.eventType,event.providerRef||"",event.detail||"",
     event.reconciled===true?"TRUE":"FALSE",event.actor||"wis-command-center",event.evidence||""
+  ]);
+}
+
+export async function appendSuppression(row) {
+  await ensureOperationalSheet("Suppressions",OPERATIONAL_SCHEMAS.Suppressions);
+  return appendValues(operationsId(),"Suppressions!A:I",[
+    row.suppressionId,row.prospectKey,row.channel,row.recipientHash,row.reason,row.sourceEventId,
+    row.createdAt,row.active===false?"FALSE":"TRUE",row.evidence||""
+  ]);
+}
+
+export async function appendDeliveryTest(row) {
+  await ensureOperationalSheet("Delivery_Tests",OPERATIONAL_SCHEMAS.Delivery_Tests);
+  return appendValues(operationsId(),"Delivery_Tests!A:L",[
+    row.testId,row.timestamp,row.provider,row.mailbox,row.seedProvider,row.folder,row.spf,row.dkim,row.dmarc,
+    row.trackingMode,row.result,row.evidence||""
+  ]);
+}
+
+export async function appendReviewEvidence(input) {
+  await ensureOperationalSheet(REVIEW_EVIDENCE_SHEET,REVIEW_EVIDENCE_HEADERS);
+  const row=reviewEvidenceRecord(input);
+  if(!row.evidenceId||!row.prospectKey||!row.rowNumber||!row.empresa) throw new Error("REVIEW_EVIDENCE_IDENTITY_REQUIRED");
+  return appendValues(operationsId(),`${REVIEW_EVIDENCE_SHEET}!A:O`,[
+    row.evidenceId,row.prospectKey,row.rowNumber,row.empresa,row.mapsUrl,
+    row.exactListingVerified?"TRUE":"FALSE",row.opinionsOpened?"TRUE":"FALSE",row.sortedLowest?"TRUE":"FALSE",
+    row.lowReviewCount??"",row.analyzedCount??"",row.checkedAt,row.reviewer,row.evidenceHash,row.status,row.blocker
   ]);
 }
 
@@ -238,83 +253,21 @@ export async function updateOutreachQueue(rowNumber,row) {
   ]);
 }
 
-export async function updateProspectMessage(rowNumber,channel,message,sourceSheet="Distribuidoras_300") {
-  if(!Number.isInteger(rowNumber)) throw new Error("PROSPECT_ROW_INVALID");
+export async function updateProspectMessage(rowNumber,channel,message) {
+  if(!Number.isInteger(rowNumber)||rowNumber<2) throw new Error("PROSPECT_ROW_INVALID");
   const normalizedChannel=String(channel||"").toUpperCase();
   if(!["EMAIL","WHATSAPP"].includes(normalizedChannel)) throw new Error("CHANNEL_INVALID");
-  const normalizedSheet=allowedCommercialSheet(sourceSheet);
-  const minimumLogicalRow=COMMERCIAL_SHEETS[normalizedSheet].logicalRows?1:2;
-  if(rowNumber<minimumLogicalRow) throw new Error("PROSPECT_ROW_INVALID");
-  if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts") throw new Error("HOTEL_CONTACTS_ONLY");
   const column=normalizedChannel==="EMAIL"?"L":"K";
   const normalizedMessage=String(message||"").trim();
-  const draftKey=await upsertMessageDraft(rowNumber,normalizedChannel,normalizedMessage,normalizedSheet);
-  const sheetRowNumber=commercialDataRow(normalizedSheet,rowNumber);
+  const draftKey=await upsertMessageDraft(rowNumber,normalizedChannel,normalizedMessage);
   let commercialSheetUpdated=true;
   try {
-    await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`${normalizedSheet}!${column}${sheetRowNumber}`,[normalizedMessage]);
+    await updateValues(process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID,`${commercialSheetName()}!${column}${rowNumber}`,[normalizedMessage]);
   } catch(error) {
     if(!String(error?.message||"").endsWith("_403")) throw error;
     commercialSheetUpdated=false;
   }
-  return {rowNumber,column,channel:normalizedChannel,sourceSheet:normalizedSheet,draftKey,commercialSheetUpdated};
-}
-
-export async function updateTaskCommandStatus(commandId,status,evidence) {
-  if(!String(commandId||"").trim()) throw new Error("COMMAND_ID_REQUIRED");
-  const spreadsheetId=operationsId();
-  const token=await accessToken();
-  const values=(await batchGet(spreadsheetId,["Task_Commands!A1:L1000"],token))[0]?.values||[];
-  const rowNumber=values.findIndex((row,index)=>index>0&&row[0]===commandId)+1;
-  if(rowNumber<2) throw new Error("TASK_COMMAND_NOT_FOUND");
-  await updateValues(spreadsheetId,`Task_Commands!G${rowNumber}`,[String(status||"")]);
-  await updateValues(spreadsheetId,`Task_Commands!L${rowNumber}`,[typeof evidence==="string"?evidence:JSON.stringify(evidence||{})]);
-  return {commandId,rowNumber,status};
-}
-
-export async function appendResearchEvidence(row) {
-  await ensureOperationalSheet(RESEARCH_EVIDENCE_SHEET,RESEARCH_EVIDENCE_HEADERS);
-  return appendValues(operationsId(),`${RESEARCH_EVIDENCE_SHEET}!A:L`,[
-    row.evidenceId,row.timestamp,row.commandId,row.campaignId,row.batchId,row.prospectKey,row.sourceUrl,
-    row.evidenceType,row.decision,row.detail,row.score??"",row.recordedBy||"prospect-research"
-  ]);
-}
-
-export async function appendCommercialProspects(sourceSheet,rows=[]) {
-  const normalizedSheet=allowedCommercialSheet(sourceSheet);
-  if(!Array.isArray(rows)||!rows.length) return {rows:0,updatedRange:""};
-  if(rows.some(row=>!Array.isArray(row)||row.length!==12)) throw new Error("COMMERCIAL_ROW_WIDTH_INVALID");
-  if(COMMERCIAL_SHEETS[normalizedSheet].phase==="contacts"&&rows.some(row=>row.slice(7).some(value=>String(value||"").trim()))) throw new Error("HOTEL_PHASE_ONE_COLUMNS_ONLY");
-  const spreadsheetId=process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID;
-  const token=await accessToken();
-  const existing=(await batchGet(spreadsheetId,[`${normalizedSheet}!${COMMERCIAL_SHEETS[normalizedSheet].range.split("!").pop()}`],token))[0]?.values||[];
-  const normalized=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
-  const domain=value=>{ try { return new URL(/^https?:\/\//i.test(String(value||""))?String(value):`https://${value}`).hostname.replace(/^www\./i,"").toLowerCase(); } catch { return ""; } };
-  const phone=value=>String(value||"").replace(/\D/g,"");
-  const rowKeys=row=>[
-    normalized(row[1])&&normalized(row[2])?`name:${normalized(row[1])}|${normalized(row[2])}`:"",
-    domain(row[4])?`domain:${domain(row[4])}`:"",
-    normalized(row[5])?`email:${normalized(row[5])}`:"",
-    phone(row[3])?`phone:${phone(row[3])}`:""
-  ].filter(Boolean);
-  const keys=new Set(existing.slice(1).flatMap(rowKeys));
-  const unique=[];
-  for(const row of rows) {
-    const candidateKeys=rowKeys(row);
-    if(candidateKeys.some(key=>keys.has(key))) continue;
-    candidateKeys.forEach(key=>keys.add(key));
-    unique.push(row);
-  }
-  const target=Number(COMMERCIAL_SHEETS[normalizedSheet].target||0);
-  if(target) unique.splice(Math.max(0,target-Math.max(0,existing.length-1)));
-  if(!unique.length) return {rows:0,updatedRange:"",deduplicated:true};
-  const url=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(`${normalizedSheet}!A:L`)}:append`);
-  url.searchParams.set("valueInputOption","RAW");
-  url.searchParams.set("insertDataOption","INSERT_ROWS");
-  const response=await sheetsFetch(url,{method:"POST",headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},body:JSON.stringify({majorDimension:"ROWS",values:unique}),signal:AbortSignal.timeout(30_000)});
-  const body=await response.json();
-  if(!response.ok) throw new Error(`GOOGLE_SHEETS_APPEND_FAILED_${response.status}`);
-  return {rows:unique.length,updatedRange:body.updates?.updatedRange||"",deduplicated:unique.length!==rows.length};
+  return {rowNumber,column,channel:normalizedChannel,draftKey,commercialSheetUpdated};
 }
 
 export async function appendCostUsage(row) {
@@ -345,7 +298,7 @@ async function batchGet(spreadsheetId,ranges,token) {
   const url=new URL(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet`);
   ranges.forEach(range=>url.searchParams.append("ranges",range));
   url.searchParams.set("valueRenderOption","FORMATTED_VALUE");
-  const response=await sheetsFetch(url,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
+  const response=await fetch(url,{headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30_000)});
   const body=await response.json();
   if(!response.ok) throw new Error(`GOOGLE_SHEETS_READ_FAILED_${response.status}`);
   return body.valueRanges||[];
@@ -368,14 +321,12 @@ function number(value,fallback=0) {
 }
 
 function parseApproval(row) {
-  if(row.decision!=="APPROVED"||row.decided_by!=="human-user"||!/^OUTREACH_BATCH/i.test(row.action||"")) return null;
+  if(row.decision!=="APPROVED"||!/^OUTREACH_BATCH/i.test(row.action||"")) return null;
   try {
     const evidence=JSON.parse(row.evidence||"{}");
     return {
       approvalId:row.approval_id,
-      taskId:row.task_id,
       decision:row.decision,
-      decidedAt:row.decided_at,
       expiresAt:evidence.expiresAt,
       campaignId:evidence.campaignId,
       batchId:evidence.batchId,
@@ -383,67 +334,32 @@ function parseApproval(row) {
       messageVersions:evidence.messageVersions,
       sequences:evidence.sequences,
       prospectRows:evidence.prospectRows,
-      prospectKeys:evidence.prospectKeys,
-      recipients:evidence.recipients,
-      recipientEmails:evidence.recipientEmails,
-      recipientLimit:evidence.recipientLimit,
-      sourceSheet:evidence.sourceSheet||Object.entries(COMMERCIAL_SHEETS).find(([,profile])=>profile.campaignId===evidence.campaignId)?.[0]||"",
-      qa:evidence.qa||null
+      recipientLimit:evidence.recipientLimit
     };
   } catch { return null; }
-}
-
-function sha256(value) {
-  return createHash("sha256").update(String(value??""),"utf8").digest("hex");
-}
-
-export function qaRecordsFromApprovals(approvals,drafts) {
-  const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
-  return approvals.flatMap(approval=>{
-    if(approval.qa?.status!=="PASSED"||approval.qa?.independent!==true||!approval.qa?.reviewer) return [];
-    return (approval.prospectRows||[]).map((rowNumber,index)=>{
-      const prospectKey=approval.prospectKeys?.[index];
-      if(!prospectKey) return null;
-      const messageHashes={};
-      let author="";
-      let hashesMatch=true;
-      for(const channel of approval.channels||[]) {
-        const draft=draftsByKey.get(`${prospectKey}:${channel}`)||draftsByKey.get(`${approval.sourceSheet}:${rowNumber}:${channel}`);
-        const expected=approval.qa?.messageHashes?.[channel]?.[prospectKey];
-        if(!draft||!/^[a-f0-9]{64}$/.test(expected||"")||sha256(draft.message)!==expected) hashesMatch=false;
-        else {
-          messageHashes[channel]=expected;
-          author=author||draft.updated_by;
-        }
-      }
-      return {
-        sourceSheet:approval.sourceSheet,
-        rowNumber:Number(rowNumber),
-        prospectKey,
-        batchId:approval.batchId,
-        messageVersion:approval.messageVersions?.[0]||"",
-        messageHashes,
-        status:hashesMatch?"PASSED":"FAILED",
-        reviewer:approval.qa.reviewer,
-        author
-      };
-    }).filter(Boolean);
-  });
 }
 
 export async function buildLiveSnapshot() {
   const token=await accessToken();
   const commercialId=process.env.WIS_COMMERCIAL_SHEET_ID||DEFAULT_COMMERCIAL_ID;
   const operationsId=process.env.WIS_OPERATIONS_SHEET_ID||DEFAULT_OPERATIONS_ID;
+  const sourceSheet=commercialSheetName();
   const [commercial,operations]=await Promise.all([
-    batchGet(commercialId,Object.entries(COMMERCIAL_SHEETS).map(([sheet,profile])=>`${sheet}!${profile.range}`),token),
+    batchGet(commercialId,[
+      `${sourceSheet}!A1:M7000`,
+      "SEGUIMIENTO!A1:Z5000",
+      "BAJAS!A1:J5000",
+      "MÉTRICAS!A1:C100"
+    ],token),
     batchGet(operationsId,[
       "Outreach_Queue!A1:AA2000",
       "Outreach_Events!A1:L2000",
       "Approvals!A1:Z1000",
       "Runs!A1:Z1000",
       "Task_Commands!A1:L500",
-      "Channel_Health!A1:J100"
+      "Channel_Health!A1:J100",
+      "Delivery_Tests!A1:L2000",
+      "Suppressions!A1:I5000"
     ],token)
   ]);
   let draftRanges=[];
@@ -452,25 +368,81 @@ export async function buildLiveSnapshot() {
   let costRanges=[];
   try { costRanges=await batchGet(operationsId,[`${COST_LEDGER_SHEET}!A1:Z5000`,`${COST_SETTINGS_SHEET}!A1:E500`],token); }
   catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
+  let reviewEvidenceRanges=[];
+  try { reviewEvidenceRanges=await batchGet(operationsId,[`${REVIEW_EVIDENCE_SHEET}!A1:O10000`],token); }
+  catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
+  let researchEvidenceRanges=[];
+  try { researchEvidenceRanges=await batchGet(operationsId,[`${RESEARCH_EVIDENCE_SHEET}!A1:L10000`],token); }
+  catch(error) { if(!String(error?.message||"").endsWith("_400")) throw error; }
   const drafts=objects(draftRanges[0]?.values);
   const draftsByKey=new Map(drafts.map(row=>[row.draft_key,row]));
-  const approvals=objects(operations[2]?.values).map(parseApproval).filter(Boolean);
-  const prospects=[];
-  Object.entries(COMMERCIAL_SHEETS).forEach(([sourceSheet,profile],sheetIndex)=>{
-    objects(commercial[sheetIndex]?.values).forEach((row,index)=>{
-      const rowNumber=profile.logicalRows?index+1:index+2;
-      const approval=approvals.find(item=>item.campaignId===profile.campaignId&&item.prospectRows?.includes(rowNumber));
-      const approvalIndex=approval?.prospectRows?.indexOf(rowNumber)??-1;
-      const prospectKey=approvalIndex>=0?approval.prospectKeys?.[approvalIndex]||"":"";
-      const emailDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:EMAIL`)||(prospectKey?draftsByKey.get(`${prospectKey}:EMAIL`):null);
-      const whatsappDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:WHATSAPP`)||(prospectKey?draftsByKey.get(`${prospectKey}:WHATSAPP`):null);
-      prospects.push({
-    prospectId:`${sourceSheet}:${rowNumber}`,
-    prospectKey,
-    sourceSheet,
-    campaignId:profile.campaignId,
-    phase:profile.phase,
+  const followups=objects(commercial[1]?.values);
+  const followupByProspect=new Map();
+  for(const row of followups) {
+    const prospectKey=String(row["ID Prospecto"]||"").trim();
+    if(prospectKey&&!followupByProspect.has(prospectKey)) followupByProspect.set(prospectKey,row);
+  }
+  const reviewEvidence=objects(reviewEvidenceRanges[0]?.values).map(row=>({
+    evidenceId:row.evidence_id,
+    prospectKey:row.prospect_key,
+    rowNumber:number(row.source_row,null),
+    empresa:row.empresa,
+    mapsUrl:row.maps_url,
+    exactListingVerified:bool(row.exact_listing_verified),
+    opinionsOpened:bool(row.opinions_opened),
+    sortedLowest:bool(row.sorted_lowest),
+    lowReviewCount:number(row.low_review_count,0),
+    analyzedCount:number(row.analyzed_count,0),
+    checkedAt:row.checked_at,
+    reviewer:row.reviewer,
+    evidenceHash:row.evidence_hash,
+    status:row.status,
+    blocker:row.blocker,
+    evaluation:evaluateReviewEvidence(row)
+  }));
+  const reviewEvidenceByProspect=new Map();
+  for(const row of reviewEvidence) {
+    const identity=row.prospectKey||String(row.rowNumber||"");
+    if(!identity) continue;
+    const previous=reviewEvidenceByProspect.get(identity);
+    if(!previous||String(row.checkedAt||"")>String(previous.checkedAt||"")) reviewEvidenceByProspect.set(identity,row);
+  }
+  const contactEvidence=objects(researchEvidenceRanges[0]?.values).map(row=>({
+    evidenceId:row.evidence_id,
+    timestamp:row.timestamp,
+    prospectKey:row.prospect_key,
+    sourceUrl:row.source_url,
+    evidenceType:row.evidence_type,
+    decision:row.decision,
+    detail:row.detail,
+    recordedBy:row.recorded_by
+  }));
+  const contactEvidenceByProspect=new Map();
+  for(const row of contactEvidence) {
+    const identity=String(row.prospectKey||"").trim();
+    if(!identity) continue;
+    if(!contactEvidenceByProspect.has(identity)) contactEvidenceByProspect.set(identity,[]);
+    contactEvidenceByProspect.get(identity).push(row);
+  }
+  const prospects=objects(commercial[0]?.values).map((row,index)=>{
+    const rowNumber=index+2;
+    const prospectKey=String(row["ID Prospecto"]||`WIS-P-${String(rowNumber-1).padStart(6,"0")}`).trim();
+    const emailDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:EMAIL`);
+    const whatsappDraft=draftsByKey.get(`${sourceSheet}:${rowNumber}:WHATSAPP`);
+    const latestReview=reviewEvidenceByProspect.get(prospectKey)||reviewEvidenceByProspect.get(String(rowNumber));
+    const reviewVerification=latestReview?{
+      ...latestReview,
+      ...latestReview.evaluation
+    }:{verified:false,supportsProblemAnalysis:false,status:"PENDING"};
+    const followup=followupByProspect.get(prospectKey)||{};
+    const contactVerification=summarizeContactEvidence(contactEvidenceByProspect.get(prospectKey)||[],{
+      email:row.Email,
+      whatsapp:row.WhatsApp,
+      web:row.Web
+    });
+    return ({
     rowNumber,
+    prospectKey,
     rubro:row.Rubro,
     empresa:row.Empresa,
     ubicacion:row["Ubicación"],
@@ -482,9 +454,11 @@ export async function buildLiveSnapshot() {
     problems:row.Problemas,
     analysis:row["ANALISIS NEGOCIO"],
     whatsappMessage:whatsappDraft?.message||row["Mensaje WhatsApp"],
-    emailMessage:emailDraft?.message||row["Mensaje Email"]
-      });
-    });
+    emailMessage:emailDraft?.message||row["Mensaje Email"],
+    lastStatus:followup.Estado||"",
+    reviewVerification,
+    contactVerification
+  });
   });
   const queue=objects(operations[0]?.values).map(row=>({
     messageId:row.message_id,
@@ -538,26 +512,32 @@ export async function buildLiveSnapshot() {
       source:"GOOGLE_SHEETS"
     };
   });
-  const qa=qaRecordsFromApprovals(approvals,drafts);
+  const approvals=objects(operations[2]?.values).map(parseApproval).filter(Boolean);
   return {
-    schemaVersion:2,
+    schemaVersion:3,
     fetchedAt:new Date().toISOString(),
     source:"GOOGLE_SHEETS_LIVE",
     spreadsheetId:commercialId,
-    sheetName:"MULTI_CAMPAIGN",
-    sheetNames:Object.keys(COMMERCIAL_SHEETS),
+    sheetName:sourceSheet,
     operationsSpreadsheetId:operationsId,
     prospects,
-    qa,
+    followups,
+    bajas:objects(commercial[2]?.values),
+    metrics:objects(commercial[3]?.values),
+    reviewEvidence,
+    contactEvidence,
+    qa:[],
     approvals,
     outreachQueue:queue,
     events,
     runs:objects(operations[3]?.values),
     commands:objects(operations[4]?.values),
     channelHealth:objects(operations[5]?.values),
+    deliveryTests:objects(operations[6]?.values),
+    suppressions:objects(operations[7]?.values),
     costLedger:objects(costRanges[0]?.values),
     costSettings:objects(costRanges[1]?.values),
     optIns:[],
-    providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"&&Array.isArray(queue)
+    providerReconciliationLoaded:process.env.WIS_PROVIDER_RECONCILIATION_TRUSTED==="true"
   };
 }

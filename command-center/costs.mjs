@@ -18,7 +18,7 @@ export const PRICING={
   "google:place-details-pro:standard":{kind:"units",unitPrice:.017,unitName:"consulta",label:"Google Place Details Pro",freeMonthly:5000,sku:"4ED6-464A-2AFC"},
   "google:place-details-enterprise:standard":{kind:"units",unitPrice:.02,unitName:"consulta",label:"Google Place Details Enterprise",freeMonthly:1000,sku:"2D9A-3DE0-3766"},
   "google:place-details-enterprise-atmosphere:standard":{kind:"units",unitPrice:.025,unitName:"consulta",label:"Google Place Details Enterprise + Atmosphere",freeMonthly:1000,sku:"EB23-5ECC-F753"},
-  "brevo:transactional-email:standard":{kind:"units",unitPrice:.0018,unitName:"email",label:"Brevo Starter estimado"},
+  "microsoft:graph-mail-send:standard":{kind:"units",unitPrice:0,unitName:"email",label:"Microsoft Graph Mail.Send · incluido en Microsoft 365"},
   "whatsapp:baileys:standard":{kind:"units",unitPrice:0,unitName:"mensaje",label:"WhatsApp por Baileys"},
   "google:sheets-api:standard":{kind:"units",unitPrice:0,unitName:"operación",label:"Google Sheets API"}
 };
@@ -175,7 +175,7 @@ export function estimateScenario(input={}) {
   const placeDetailsCalls=input.placeDetailsCalls!==undefined?finite(input.placeDetailsCalls):Math.max(0,finite(input.placeDetailsPerProspect,0))*prospects;
   const placesText=estimateMeteredSku(input.placesTextService||"places-text-search-pro",placesTextCalls);
   const placeDetails=estimateMeteredSku(input.placeDetailsService||"place-details-enterprise-atmosphere",placeDetailsCalls);
-  const emails=Math.max(0,finite(input.emailsPerProspect,1))*prospects*.0018;
+  const emails=calculateUsageCost({provider:"microsoft",service:"graph-mail-send",pricingTier:"standard",units:Math.max(0,finite(input.emailsPerProspect,1))*prospects});
   const fixed=Math.max(0,finite(input.fixedMonthlyUsd,0));
   const places=money(placesText.costUsd+placeDetails.costUsd);
   const total=money(ai+web+places+emails+fixed);

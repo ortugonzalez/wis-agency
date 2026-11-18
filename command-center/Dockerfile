@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json server.mjs sheets-live.mjs costs.mjs hotel-research.mjs hotel-research-worker.mjs ./
+COPY package.json server.mjs sheets-live.mjs costs.mjs telegram-runtime.mjs outreach-events.mjs provider-webhooks.mjs review-evidence.mjs contact-evidence.mjs delivery-metrics.mjs production-readiness.mjs check-production-readiness.mjs ./
 COPY out ./out
 
 RUN mkdir -p /app/config /app/runtime && chown -R node:node /app
