@@ -1,11 +1,23 @@
 import type { Metadata } from 'next';
-import { ArrowRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import { caseProfiles, siteUrl } from '../site-content';
-import '../casos/cases-page.css';
+import './cases-page.css';
 
-export const metadata: Metadata = { title: 'Casos y clientes', description: 'Empresas que trabajan con WIS para ordenar su atención, seguimiento y operación.', alternates: { canonical: `${siteUrl}/casos` }, robots: { index: true, follow: true } };
+export const metadata: Metadata = { title: 'Casos y clientes | WIS Agency', description: 'Casos de WIS: asistentes, automatizaciones, sistemas a medida y operaciones digitales para empresas.', alternates: { canonical: `${siteUrl}/casos` }, robots: { index: true, follow: true } };
 
 export default function CasesPage() {
-  return <main className="cases-page"><header><a href="/" className="cases-brand">WIS <small>Work in silence</small></a><a href="/#contacto">Hablemos <ArrowRight size={15} /></a></header><section className="cases-hero"><span>WIS / Portfolio</span><h1>Soluciones reales para operaciones que necesitaban orden.</h1><p>Reunimos los proyectos, ejemplos y líneas de trabajo de WIS. Cada historia se publica con el alcance y los resultados que podemos hacer públicos.</p></section><section className="cases-list" aria-label="Portfolio de WIS">{caseProfiles.map((item, index) => <article key={`${item.name}-${index}`}><small>0{index + 1}</small><div className="case-profile-title">{item.logo && <Image src={item.logo} alt={`Logo de ${item.name}`} width={110} height={52} />}<h2>{item.name}</h2><span>{item.label}</span></div><div className="case-profile-copy"><p>{item.summary}</p>{item.solutionSlug ? <a href={`/soluciones/${item.solutionSlug}`}>Ver solución <ArrowRight size={14} /></a> : <small>Información pública en preparación</small>}</div></article>)}</section><section className="cases-note"><span>¿Tenés una operación parecida?</span><p>Contanos qué proceso querés mejorar. Podemos mostrarte el contexto de un caso relacionado o pensar una solución nueva con vos.</p><a href="/#contacto">Conversar con WIS <ArrowRight size={15} /></a></section></main>;
+  return <main className="case-portfolio-page">
+    <header className="case-portfolio-nav"><a href="/" className="case-portfolio-brand">WIS <small>Work in silence</small></a><a href="/#inicio">Conversemos <ArrowUpRight size={15} /></a></header>
+    <section className="case-portfolio-hero"><span>WIS / Casos</span><h1>Casos que muestran cómo una operación puede trabajar mejor.</h1><p>Presentamos el punto de partida, la solución construida y las referencias públicas disponibles de cada proyecto.</p></section>
+    <section className="case-portfolio-list" aria-label="Casos de WIS">
+      {caseProfiles.map((item, index) => <article className="case-portfolio-card" key={`${item.name}-${index}`}>
+        <div className="case-portfolio-card-head"><span className="case-portfolio-index">0{index + 1}</span><div className="case-portfolio-identity">{item.logo ? <Image src={item.logo} alt={`Logo de ${item.name}`} width={150} height={48} /> : <strong>{item.name}</strong>}<div><h2>{item.name}</h2><span>{item.label}</span></div></div>{item.websiteUrl ? <a className="case-portfolio-reference" href={item.websiteUrl} target="_blank" rel="noreferrer">{item.websiteLabel} <ArrowUpRight size={15} /></a> : <span className="case-portfolio-reference is-muted">Referencia privada</span>}</div>
+        <p className="case-portfolio-summary">{item.summary}</p>
+        <div className="case-portfolio-compare"><div><span>Antes</span><p>{item.before}</p></div><div><span>Después</span><p>{item.after}</p></div></div>
+        <div className="case-portfolio-card-footer">{item.solutionSlug ? <a href={`/soluciones/${item.solutionSlug}`}>Ver solución <ArrowUpRight size={15} /></a> : <span>Información pública en preparación</span>}</div>
+      </article>)}
+    </section>
+    <section className="case-portfolio-cta"><span>¿Existe una operación parecida?</span><h2>Conversemos sobre tu situación.</h2><p>Podemos revisar el proceso, evaluar alternativas y definir un próximo paso concreto.</p><a href="/#inicio">Conversemos con WIS <ArrowUpRight size={15} /></a></section>
+  </main>;
 }
