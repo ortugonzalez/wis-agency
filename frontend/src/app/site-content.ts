@@ -37,7 +37,7 @@ export const services = [
   },
 ] as const;
 
-export const cases = ['Quality Hard', 'IMEPHO', 'Movimientos Indumec', 'Metzeler Joyas', 'Dugas'] as const;
+export const cases = ['QUALITYHARD', 'IMEPHO', 'Movimientos Indumec', 'Metzeler Joyas', 'DUGAS'] as const;
 
 export type SolutionCategory = 'Asistentes' | 'Operación' | 'Sistemas a medida';
 
@@ -51,8 +51,8 @@ export const solutions = [
     title: 'Asistente virtual para tomar y recibir pedidos',
     short: 'Un canal público que recibe pedidos, responde consultas y deja la información lista para operar.',
     detail: 'Diseñamos asistentes que entienden el pedido, hacen las preguntas necesarias y derivan al equipo cuando hace falta una decisión humana.',
-    examples: ['DuGas'],
-    exampleNote: 'DuGas: asistente virtual para la toma y recepción de pedidos.',
+    examples: ['DUGAS'],
+    exampleNote: 'DUGAS: asistente virtual para la toma y recepción de pedidos.',
     tags: ['WhatsApp', 'Pedidos', 'Derivación'],
     demoUrl: null,
   },
@@ -63,8 +63,8 @@ export const solutions = [
     title: 'Asistentes internos para equipos y grupos de WhatsApp',
     short: 'Consultas internas, comunicación operativa y respuestas con contexto dentro de los canales que el equipo ya usa.',
     detail: 'El asistente trabaja dentro de la operación: consulta información, ordena pedidos internos y ayuda a que el conocimiento no quede perdido en un grupo.',
-    examples: ['Quality Hard'],
-    exampleNote: 'Quality Hard: asistente orientado a comunicación y consultas internas.',
+    examples: ['QUALITYHARD'],
+    exampleNote: 'QUALITYHARD: asistente orientado a comunicación y consultas internas.',
     tags: ['Grupos', 'Consultas internas', 'Contexto'],
     demoUrl: null,
   },
@@ -75,8 +75,8 @@ export const solutions = [
     title: 'Digitalización y lectura de documentos',
     short: 'Convertimos documentos que hoy se revisan a mano en información usable por el equipo y por otros sistemas.',
     detail: 'Extraemos datos, validamos campos y conectamos la información con el circuito que tiene que seguir, sin obligar a cargar todo dos veces.',
-    examples: ['IMEPHO / Mepo'],
-    exampleNote: 'IMEPHO / Mepo: digitalización y orden de documentación operativa.',
+    examples: ['IMEPHO'],
+    exampleNote: 'IMEPHO: digitalización y orden de documentación operativa.',
     tags: ['Documentos', 'OCR', 'Validación'],
     demoUrl: null,
   },
@@ -166,9 +166,9 @@ export const solutions = [
 }>;
 
 export const caseProfiles = [
-  { name: 'DuGas', label: 'Asistente virtual', summary: 'Toma y recepción de pedidos por un canal público.', solutionSlug: 'asistente-virtual-para-pedidos', logo: null },
-  { name: 'Quality Hard', label: 'Asistente interno', summary: 'Comunicación y consultas internas en grupos de WhatsApp.', solutionSlug: 'asistentes-internos-whatsapp', logo: '/cases/qh-transparent.png' },
-  { name: 'IMEPHO / Mepo', label: 'Documentos', summary: 'Digitalización y orden de documentación operativa.', solutionSlug: 'digitalizacion-de-documentos', logo: '/cases/imepho.webp' },
+  { name: 'DUGAS', label: 'Asistente virtual', summary: 'Toma y recepción de pedidos por un canal público.', solutionSlug: 'asistente-virtual-para-pedidos', logo: null },
+  { name: 'QUALITYHARD', label: 'Asistente interno', summary: 'Comunicación y consultas internas en grupos de WhatsApp.', solutionSlug: 'asistentes-internos-whatsapp', logo: '/cases/qh-transparent.png' },
+  { name: 'IMEPHO', label: 'Documentos', summary: 'Digitalización y orden de documentación operativa.', solutionSlug: 'digitalizacion-de-documentos', logo: '/cases/imepho.webp' },
   { name: 'Administración Pacífico', label: 'CRM interno', summary: 'Plataforma de orden vinculada a WhatsApp.', solutionSlug: 'crm-interno-y-orden-operativo', logo: null },
   { name: 'Administración Pacífico / Bruno', label: 'Administración', summary: 'Automatización de extractos bancarios.', solutionSlug: 'automatizacion-de-extractos-bancarios', logo: null },
   { name: 'Doña Francisca', label: 'Liquidación', summary: 'Circuito de información para liquidación de sueldos.', solutionSlug: 'liquidacion-de-sueldos', logo: null },
