@@ -173,7 +173,7 @@ export const caseProfiles = [
   { name: 'Administración Pacífico / Bruno', label: 'Administración', summary: 'Automatización de extractos bancarios.', solutionSlug: 'automatizacion-de-extractos-bancarios', logo: null },
   { name: 'Doña Francisca', label: 'Liquidación', summary: 'Circuito de información para liquidación de sueldos.', solutionSlug: 'liquidacion-de-sueldos', logo: null },
   { name: 'Movimientos Indumec', label: 'Sistema a medida', summary: 'Landing y sistema de gestión en desarrollo.', solutionSlug: 'landing-pages-y-sistemas-a-medida', logo: '/cases/indumec.svg' },
-  { name: 'Metzeler Joyas', label: 'Proyecto WIS', summary: 'Caso disponible para ampliar con información aprobada.', solutionSlug: null, logo: null },
+  { name: 'Metzeler Joyas', label: 'E-commerce y gestión interna', summary: 'Centralización de pedidos de Mercado Libre y Tienda Nube, con una visión ordenada de gastos, ingresos y la operación diaria.', solutionSlug: null, logo: null },
 ] as const;
 
 export const resources = [
