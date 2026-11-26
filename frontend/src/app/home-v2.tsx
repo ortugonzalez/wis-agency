@@ -31,6 +31,10 @@ function caseId(name: string) {
   return `caso-${name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 }
 
+function Brand() {
+  return <span className="wis-home-brand"><Image src="/logo-transparent.png" alt="WIS" width={74} height={56} priority /></span>;
+}
+
 export default function HomeV2() {
   const [activeOfferNumber, setActiveOfferNumber] = useState(offers[0].number);
   const activeOffer = offers.find((offer) => offer.number === activeOfferNumber) ?? offers[0];
@@ -39,7 +43,7 @@ export default function HomeV2() {
     <div className="wis-home-progress" aria-hidden="true" />
 
     <nav className="wis-home-nav" aria-label="Navegación principal">
-      <div className="wis-home-nav-links"><a href="#soluciones">Qué hacemos</a><a href="#proceso">Cómo trabajamos</a><a href="#casos">Casos</a></div>
+      <a href="#inicio" aria-label="WIS, volver al inicio"><Brand /></a><div className="wis-home-nav-links"><a href="#soluciones">Qué hacemos</a><a href="#proceso">Cómo trabajamos</a><a href="#casos">Casos</a></div>
       <a className="wis-home-nav-cta" href={WHATSAPP_URL} target="_blank" rel="noreferrer">Contacto <ArrowUpRight size={15} /></a>
     </nav>
 
@@ -57,7 +61,7 @@ export default function HomeV2() {
 
     <section className="wis-home-final-cta"><div className="wis-home-container wis-home-final-inner"><div><span className="wis-home-eyebrow">04 / Próximo paso</span><h2>¿Existe un desafío distinto para tu empresa?</h2><p>Conversemos sobre la operación, el objetivo y la solución que puede hacer la diferencia.</p></div><a className="wis-home-button wis-home-button-primary" href={WHATSAPP_URL} target="_blank" rel="noreferrer"><MessageCircle size={17} /> Conversemos sobre tu situación</a></div></section>
 
-    <footer className="wis-home-footer"><div className="wis-home-container wis-home-footer-inner"><div><a href="mailto:ortu@wis-agency.com">ortu@wis-agency.com</a><a href={WHATSAPP_URL} target="_blank" rel="noreferrer">WhatsApp</a><a href="https://www.linkedin.com/in/octavio-ortu-gonzalez-pereyra-011819200/" target="_blank" rel="noreferrer">LinkedIn</a></div><small>© 2026 WIS Agency · Argentina + LATAM</small></div></footer>
+    <footer className="wis-home-footer"><div className="wis-home-container wis-home-footer-inner"><Brand /><div><a href="mailto:ortu@wis-agency.com">ortu@wis-agency.com</a><a href={WHATSAPP_URL} target="_blank" rel="noreferrer">WhatsApp</a><a href="https://www.linkedin.com/in/octavio-ortu-gonzalez-pereyra-011819200/" target="_blank" rel="noreferrer">LinkedIn</a></div><small>© 2026 WIS Agency · Argentina + LATAM</small></div></footer>
     <a className="wis-home-floating-wa" href={WHATSAPP_URL} target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp"><MessageCircle size={20} /></a>
   </main>;
 }
