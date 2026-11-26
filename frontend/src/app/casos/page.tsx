@@ -12,9 +12,9 @@ export default function CasesPage() {
     <section className="case-portfolio-hero"><span>WIS / Casos</span><h1>Casos que muestran cómo una operación puede trabajar mejor.</h1><p>Presentamos el punto de partida, la solución construida y las referencias públicas disponibles de cada proyecto.</p></section>
     <section className="case-portfolio-list" aria-label="Casos de WIS">
       {caseProfiles.map((item, index) => <article className="case-portfolio-card" key={`${item.name}-${index}`}>
-        <div className="case-portfolio-card-head"><span className="case-portfolio-index">{String(index + 1).padStart(2, '0')}</span><div className="case-portfolio-identity">{item.logo ? <Image src={item.logo} alt={`Logo de ${item.name}`} width={170} height={54} /> : <strong>{item.name}</strong>}<span className="case-portfolio-role">{item.label}</span></div></div>
+        <div className="case-portfolio-card-head"><span className="case-portfolio-index">{String(index + 1).padStart(2, '0')}</span><div className="case-portfolio-identity"><div className="case-portfolio-brand">{item.logo ? <Image src={item.logo} alt={`Logo de ${item.name}`} width={170} height={54} /> : <strong>{item.name}</strong>}</div><span className="case-portfolio-role">{item.label}</span></div></div>
         <p className="case-portfolio-summary">{item.summary}</p>
-        <div className="case-portfolio-compare"><div><span>Antes</span><p>{item.before}</p></div><div><span>Después</span><p>{item.after}</p></div></div>
+        <div className="case-portfolio-comparisons"><div className="case-portfolio-comparison-head"><span>Qué cambió</span><span>Antes</span><span>Después</span></div>{item.comparisons.map((comparison) => <div className="case-portfolio-comparison-row" key={`${item.name}-${comparison.label}`}><strong>{comparison.label}</strong><p>{comparison.before}</p><p>{comparison.after}</p></div>)}</div>
         <div className="case-portfolio-card-footer">{item.solutionSlug ? <a href={`/soluciones/${item.solutionSlug}`}>Ver solución <ArrowUpRight size={15} /></a> : <span>Información pública en preparación</span>}</div>
       </article>)}
     </section>
