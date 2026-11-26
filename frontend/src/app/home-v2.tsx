@@ -12,7 +12,7 @@ const WHATSAPP_URL = 'https://wa.me/5491130035679';
 
 const offers: ReadonlyArray<{ number: string; title: string; text: string; examples: string; caseNames: readonly string[] }> = [
   { number: '01', title: 'Presencia digital', text: 'Landing pages y sitios que explican mejor el negocio, presentan la propuesta y reciben consultas.', examples: 'Landing · sitio institucional · portal comercial', caseNames: ['Movimientos Indumec'] },
-  { number: '02', title: 'Sistemas de gestión', text: 'Plataformas internas, CRMs y herramientas propias para ordenar clientes, tareas y decisiones.', examples: 'CRM interno · tablero operativo · sistema de gestión', caseNames: ['Administración Pacífico', 'Movimientos Indumec'] },
+  { number: '02', title: 'Sistemas de gestión', text: 'Plataformas internas, CRMs y herramientas propias para ordenar clientes, tareas y decisiones.', examples: 'CRM interno · recompra · tablero operativo · sistema de gestión', caseNames: ['Administración Pacífico', 'Hotel Bristol', 'Movimientos Indumec'] },
   { number: '03', title: 'Automatización operativa', text: 'Procesos existentes que pueden funcionar con menos carga manual y mejor seguimiento.', examples: 'Documentos · extractos · cobranzas · liquidación', caseNames: ['IMEPHO', 'Administración Bruno', 'Doña Francisca', 'Metzeler Joyas'] },
   { number: '04', title: 'Asistentes para clientes y equipos', text: 'Asistentes que toman pedidos, responden consultas y derivan cada caso con el contexto necesario.', examples: 'Pedidos · WhatsApp · stock · consultas internas', caseNames: ['DUGAS', 'QUALITYHARD'] },
 ] as const;
